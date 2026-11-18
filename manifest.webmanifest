@@ -1,0 +1,17 @@
+{
+  "name": "Crawler Survival \u2014 The Underfloor",
+  "short_name": "Crawler Survival",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0d11",
+  "theme_color": "#0b0d11",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
