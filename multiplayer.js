@@ -1,0 +1,38 @@
+/* Dungeon Crawler Kyle — lightweight private-room relay client.
+ * Presence/position alpha only. The relay is not authoritative for combat or loot.
+ */
+(()=>{'use strict';
+ const emit=(type,detail={})=>window.dispatchEvent(new CustomEvent('dcknet',{detail:{type,...detail}}));
+ const remoteOnly=()=>Object.fromEntries(Object.entries(players).filter(([id])=>id!==clientId));
+ let socket=null,roomCode=null,clientId=null,playerName='Crawler',pendingRoom=null,players={};
+ const api={
+  get connected(){return !!socket&&socket.readyState===WebSocket.OPEN},
+  get inRoom(){return this.connected&&!!roomCode},
+  get roomCode(){return roomCode},
+  connect(url,name){
+   if(!/^wss?:\/\//i.test(url))return Promise.reject(new Error('Use a ws:// or wss:// server URL.'));
+   if(socket)socket.close();roomCode=null;players={};playerName=(name||'Crawler').replace(/[^\w -]/g,'').slice(0,16)||'Crawler';
+   return new Promise((resolve,reject)=>{
+    let settled=false;try{socket=new WebSocket(url)}catch(e){reject(e);return}const activeSocket=socket;
+    const timeout=setTimeout(()=>{if(!settled){settled=true;socket?.close();reject(new Error('Connection timed out.'))}},9000);
+    activeSocket.addEventListener('open',()=>{if(socket!==activeSocket)return;settled=true;clearTimeout(timeout);emit('status',{text:'CONNECTED — SOLO / PARTY READY'});resolve()},{once:true});
+    activeSocket.addEventListener('error',()=>{if(socket!==activeSocket)return;if(!settled){settled=true;clearTimeout(timeout);reject(new Error('Could not reach the relay. Check the URL and hosting status.'))}else emit('error',{message:'Connection error.'})});
+    activeSocket.addEventListener('close',()=>{if(socket!==activeSocket)return;roomCode=null;players={};emit('players',{players:{}});emit('status',{text:'DISCONNECTED — SOLO MODE'});if(pendingRoom){pendingRoom.reject(new Error('Connection closed.'));pendingRoom=null}});
+    activeSocket.addEventListener('message',ev=>{if(socket!==activeSocket)return;let m;try{m=JSON.parse(ev.data)}catch{return}
+     if(m.type==='hello'){clientId=m.id;return}
+     if(m.type==='room_joined'){roomCode=m.code;players=m.players||{};emit('room',{code:roomCode});emit('players',{players:remoteOnly()});emit('status',{text:'IN PRIVATE PARTY',code:roomCode});if(pendingRoom){pendingRoom.resolve(roomCode);pendingRoom=null}return}
+     if(m.type==='room_update'){players=m.players||{};emit('players',{players:remoteOnly()});return}
+     if(m.type==='player_state'){players[m.id]=m.player;if(m.id!==clientId)emit('player_state',{id:m.id,player:m.player});return}
+     if(m.type==='player_left'){delete players[m.id];emit('player_left',{id:m.id});return}
+     if(m.type==='error'){if(pendingRoom){pendingRoom.reject(new Error(m.message));pendingRoom=null}emit('error',{message:m.message});}
+    });
+   });
+  },
+  createRoom(){return this._roomAction({type:'create_room',name:playerName})},
+  joinRoom(code){code=(code||'').trim().toUpperCase();if(!/^[A-Z0-9]{6}$/.test(code))return Promise.reject(new Error('Enter a valid 6-character room code.'));return this._roomAction({type:'join_room',code,name:playerName})},
+  _roomAction(message){if(!this.connected)return Promise.reject(new Error('Connect to the relay first.'));if(pendingRoom)return Promise.reject(new Error('A room request is already pending.'));return new Promise((resolve,reject)=>{pendingRoom={resolve,reject};socket.send(JSON.stringify(message));setTimeout(()=>{if(pendingRoom){pendingRoom.reject(new Error('Room request timed out.'));pendingRoom=null}},7000)})},
+  sendState(player){if(this.inRoom)socket.send(JSON.stringify({type:'player_state',player}))},
+  leave(){if(this.connected&&roomCode)socket.send(JSON.stringify({type:'leave_room'}));roomCode=null;players={};emit('players',{players:{}});emit('status',{text:'CONNECTED — SOLO MODE'})}
+ };
+ window.DCKNet=api;
+})();
