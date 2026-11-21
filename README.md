@@ -1,8 +1,8 @@
-# Dungeon Crawler Kyle — 0.10.0 Co-op & Art Foundation
+# Dungeon Crawler Kyle — 0.11.0 Frame Animation & Co-op Alpha
 
 A mobile-first, installable browser RPG prototype. The build now uses a purpose-made pixel-art character/enemy set in live gameplay and includes a first private-room networking slice. The original generated character atlas is retained under `assets/source/` for future art iteration.
 
-## Included in 0.10.0
+## Included in 0.11.0
 
 - Solo dungeon run with generated floors, connected rooms, stairs, and floor guardians.
 - More enemy archetypes: hollow skeleton, goblin, crypt spider, ash knight, mire wretch, skeleton archer, and goblin hexer.
@@ -36,7 +36,7 @@ Then open `http://localhost:8000`. On iPhone, use a published HTTPS host (for ex
 4. In GitHub repository Settings → Pages, select Deploy from a branch, `main`, and `/(root)`; save.
 5. Open the HTTPS Pages URL in Safari and add it to your Home Screen.
 
-If a previous PWA build is installed, close it and reload the hosted page so the `dck-shell-v2` service worker cache can update.
+If a previous PWA build is installed, close it and reload the hosted page so the `dck-shell-v3` service worker cache can update.
 
 ## Deploy the private relay
 
@@ -55,7 +55,7 @@ The process listens on `PORT` (default 8080) and exposes `/health`. Set `ALLOWED
 1. Server-authoritative shared dungeon state: deterministic floor seed, enemy positions/health, combat events, drops, stairs, and progression.
 2. Account identity, secure invites, reconnect/rejoin, host migration, persistence, and abuse/anti-cheat controls.
 3. Gameplay content: additional floors/biomes, quest lines, equipment affixes, crafting, NPCs, bosses, balance, and accessibility options.
-4. More sprite animation frames, directional walk/attack/death cycles, environment tilesets, particles, audio, and UI polish.
+4. Directional hero walk cycles, a timed four-frame attack sequence, and four-frame enemy animation loops are now included. Remaining art work includes directional enemy attacks/death cycles and authored environment tilesets.
 5. Automated gameplay tests, iPhone/Android device testing, privacy/security review, store compliance, and native packaging if required.
 
 ## Validation performed for this build
@@ -66,3 +66,10 @@ The process listens on `PORT` (default 8080) and exposes `/health`. Set `ALLOWED
 - A headless Chromium visual run was attempted but timed out in this execution environment; manual iPhone/Android testing is still required.
 
 Real-device testing and a hosted multi-device co-op session have not yet been performed.
+
+
+## Frame animation update (v0.11.0)
+
+The hero now uses four-frame directional walk cycles (front, back, side), a four-frame attack sequence, and timed movement/attack playback. Enemy archetypes also have four-frame idle/recoil loops. These animation frames are derived from the approved pixel-art character assets and preserve their original style. They are lightweight sprite frames loaded locally and precached for offline play.
+
+For GitHub Pages, upload the contents of this project folder to the repository root (not the enclosing folder). Keep `index.html` at the repository root.
