@@ -39,3 +39,16 @@
 @keyframes goblinRush{0%,100%{transform:none}19%{transform:translateX(2cqw) rotate(8deg)}42%{transform:translateX(-26cqw) rotate(-9deg)}54%{transform:translateX(-37cqw) rotate(-18deg)}73%{transform:translateX(-16cqw) rotate(4deg)}}
 
 .loot-pocket h3{font-size:13px;margin:7px 0 2px;color:#e3c69b}.loot-pocket{max-height:45svh;overflow:auto;overscroll-behavior:contain}
+
+.strike-pose{display:none;position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:300%;height:150%;object-fit:contain;object-position:bottom;image-rendering:pixelated;pointer-events:none}
+.duel-stage[data-move=attack] .strike-pose{display:block}
+.duel-stage[data-move=attack] #duelHero{visibility:hidden}
+.duel-stage[data-move=attack] .crawler{animation:meleeAdvance .52s both}
+.duel-stage[data-move=attack][data-weapon=hammer] .crawler{animation-duration:.64s}
+.duel-stage[data-move=attack][data-weapon=hammer] .opponent img,.duel-stage[data-move=attack][data-weapon=hammer] .impact{animation-delay:.33s}
+.duel-stage.counter[data-move=attack] .strike-pose{display:none}
+.duel-stage.counter[data-move=attack] #duelHero{visibility:visible}
+@keyframes meleeAdvance{0%,100%{transform:none}18%{transform:translateX(-2cqw) scaleY(.96)}44%,55%{transform:translateX(33cqw)}75%{transform:translateX(16cqw)}}
+@media(prefers-reduced-motion:reduce){.duel-stage[data-move=attack] .crawler{animation:none}}
+
+.guild-locked .bottom-tabs,.guild-locked #tabContent,.guild-locked #quickItems,.guild-locked #editCrawler,.guild-locked .left-panel [data-tab]{display:none}.guild-locked #packBtn{opacity:.75}

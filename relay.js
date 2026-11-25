@@ -34,7 +34,7 @@ wss.on('connection',(ws,req)=>{
    const items={};for(const key of ['gold','tonic','torch','box-Bronze']){const n=clampInt(m.items?.[key],0,9999);if(n)items[key]=n}
    send(target.ws,{type:'loot_bundle',items});return;
   }
-  if(m.type==='reward'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const target=room.players.get(m.target);if(target)send(target.ws,{type:'reward',gold:clampInt(m.gold,0,100),xp:clampInt(m.xp,0,500),item:['tonic','torch','shard'].includes(m.item)?m.item:null});return;}
+  if(m.type==='reward'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const target=room.players.get(m.target);if(target)send(target.ws,{type:'reward',guardian:m.guardian?{floor:clampInt(m.guardian.floor,1,999),name:String(m.guardian.name||'Guardian').slice(0,60)}:null,gold:clampInt(m.gold,0,100),xp:clampInt(m.xp,0,500),item:['tonic','torch','shard'].includes(m.item)?m.item:null});return;}
   if(m.type==='combat_intent'){const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p||!['attack','spell','loot','loot_close','take_gold','take_torch','take_tonic','take_all'].includes(m.action)&&!/^take_[0-9]{1,3}$/.test(m.action))return;const host=room.players.get(room.host);if(host)send(host.ws,{type:'combat_intent',id,action:m.action,player:p.state});return;}
   if(m.type==='player_state'){
    const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p)return;
@@ -44,7 +44,8 @@ wss.on('connection',(ws,req)=>{
      if(looks.includes(s.gear?.[slot]))gear[slot]=s.gear[slot];
    }
    const character={skin:clampInt(s.character?.skin??2,0,5),race:['Human','Elf','Dwarf'].includes(s.character?.race)?s.character.race:'Human'};
-   p.state={gear,character,name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999)};
+   const hall=s.hall?{index:clampInt(s.hall.index,0,5),x:clampInt(s.hall.x,1,11),y:clampInt(s.hall.y,2,8)}:null;
+   p.state={hall,gear,character,name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999)};
    broadcast(room,{type:'player_state',id,player:p.state},id);return;
   }
   send(ws,{type:'error',message:'Unsupported message.'});
