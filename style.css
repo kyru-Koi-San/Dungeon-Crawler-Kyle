@@ -12,3 +12,8 @@
 @media(max-height:600px) and (max-width:1100px){.mobile-controls{top:240px}}
 
 .inventory-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.inventory-grid .item-row{display:flex;flex-direction:column;align-items:center;text-align:center;border:1px solid #65563c;padding:10px;min-width:0;background:#111a23}.inventory-grid .ico{font-size:28px}.equipment-strip{padding:12px;border:1px solid #8b734b;color:#e4c58b;margin:8px 0}.reward-chest{font-size:76px;text-align:center;animation:rewardReveal .7s ease-out both}.box-reveal{text-align:center}@keyframes rewardReveal{0%{transform:scale(.25) rotate(-12deg);opacity:0}65%{transform:scale(1.2) rotate(4deg)}100%{transform:scale(1);opacity:1}}#achievementBanner{position:fixed;z-index:100;top:12%;left:8%;right:8%;padding:16px;background:#151c24;border:2px solid #d4ae66;color:#ffe2a6;text-align:center;pointer-events:none;opacity:0;transform:translateY(-20px);transition:.25s}#achievementBanner.active{opacity:1;transform:translateY(0)}.boss-encounter{background:radial-gradient(ellipse at 50% 30%,#47302c,#10151e 65%);padding:12px;text-align:center}.boss-encounter progress{width:100%;accent-color:#c84e47}
+
+#storyCaption{box-sizing:border-box;min-height:4.4em;padding:9px 12px;color:#e6deca;background:#151e23;border-left:3px solid #ba9a61;font:13px/1.45 system-ui,sans-serif;pointer-events:none}
+#storyCaption b{color:#f1c982;margin-right:.6em}
+#creator{display:grid;gap:12px}#creator canvas{justify-self:center;background:#0c171b;image-rendering:pixelated}
+#creator label{display:grid;gap:4px}#creator select{font:inherit;font-size:16px;color:#e6deca;background:#19252b;padding:8px}
