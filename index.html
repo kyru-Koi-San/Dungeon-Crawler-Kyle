@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#090d12"><meta name="description" content="Dungeon Crawler Kyle — a dark fantasy pixel-art dungeon RPG."><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css?v=0164"><title>Dungeon Crawler Kyle</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#090d12"><meta name="description" content="Dungeon Crawler Kyle — a dark fantasy pixel-art dungeon RPG."><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css?v=0191"><title>Dungeon Crawler Kyle</title>
 </head>
 <body>
 <div id="app">
-<header class="topbar"><div class="brand"><span class="brandmark">✦</span><div><b>DUNGEON CRAWLER <i>KYLE</i></b><small>BUILD 0.16.4 • BOSS ENCOUNTERS</small></div></div><div class="top-actions"><span id="collapseClock" aria-live="off">COLLAPSE 15:00</span><span id="floorTag">FLOOR 01</span><button id="soundBtn" class="iconbtn" aria-label="Toggle sound">♫</button><button id="saveBtn" class="iconbtn" aria-label="Save game">▣</button></div></header>
+<header class="topbar"><div class="brand"><span class="brandmark">✦</span><div><b>DUNGEON CRAWLER <i>KYLE</i></b><small>BUILD 0.19.1 • BOSS ENCOUNTERS</small></div></div><div class="top-actions"><span id="collapseClock" aria-live="off">COLLAPSE 15:00</span><span id="floorTag">FLOOR 01</span><button id="soundBtn" class="iconbtn" aria-label="Toggle sound">♫</button><button id="saveBtn" class="iconbtn" aria-label="Save game">▣</button></div></header>
 <main>
 <section class="game-layout">
 <aside class="left-panel panel"><div class="panel-title">CRAWLER STATUS <span class="live-dot"></span></div><div class="portrait-wrap"><canvas id="portrait" width="96" height="96"></canvas><div><b id="heroName">THE CRAWLER</b><small id="heroLevel">LEVEL 1 • NOVICE</small><div class="statline"><span>HP</span><div class="bar hp"><i id="hpBar"></i></div><b id="hpText">100/100</b></div><div class="statline"><span>MP</span><div class="bar mp"><i id="mpBar"></i></div><b id="mpText">35/35</b></div><div class="statline"><span>XP</span><div class="bar xp"><i id="xpBar"></i></div><b id="xpText">0/100</b></div></div></div><div class="stats-grid"><div><small>POWER</small><b id="powerStat">8</b></div><div><small>ARMOR</small><b id="armorStat">2</b></div><div><small>GOLD</small><b id="goldStat">25</b></div><div><small>FLOORS</small><b id="depthStat">1</b></div></div><div class="panel-title sub">QUICK INVENTORY</div><div id="quickItems" class="quick-items"></div><button class="widebtn" data-tab="inventory">OPEN INVENTORY <span>→</span></button></aside>
@@ -16,6 +16,6 @@
 </section>
 <aside class="right-panel panel"><div class="panel-title">DUNGEON TELEMETRY</div><div class="minimap-frame"><canvas id="minimap" width="240" height="180"></canvas><div class="map-legend"><span><i class="dot player"></i> YOU</span><span><i class="dot enemy"></i> MOB</span><span><i class="dot remains"></i> REMAINS</span></div></div><div class="panel-title sub">EXPEDITION GOALS</div><div id="goals" class="goals"></div><div class="panel-title sub">THE DUNGEON AI</div><div class="ai-box"><span class="ai-icon">◉</span><p id="aiLine">“Welcome, crawler. Try not to die before the opening credits.”</p><small>THE UNDERFLOOR • HOST</small></div><div class="panel-title sub">ACHIEVEMENTS</div><div id="achievements" class="achievements"></div><button id="newRun" class="widebtn danger">ABANDON RUN <span>↻</span></button></aside>
 </section>
-</main><footer>AN ORIGINAL DUNGEON RPG • LOCAL SAVE ENABLED <span>BUILD 0.16.4 • BOSS ENCOUNTERS</span></footer>
+</main><footer>AN ORIGINAL DUNGEON RPG • LOCAL SAVE ENABLED <span>BUILD 0.19.1 • BOSS ENCOUNTERS</span></footer>
 <div class="modal hidden" id="modal"><div class="modal-card"><button class="modal-close" id="modalClose">×</button><div id="modalBody"></div></div></div>
-</div><script src="multiplayer.js"></script><script src="game.js?v=0164"></script></body></html>
+</div><script src="multiplayer.js?v=0191"></script><script src="game.js?v=0191"></script></body></html>
