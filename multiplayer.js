@@ -8,7 +8,7 @@
  const api={
   get connected(){return !!socket&&socket.readyState===WebSocket.OPEN},
   get inRoom(){return this.connected&&!!roomCode},
-  get roomCode(){return roomCode},get isHost(){return this.inRoom&&hostId===clientId},
+  get playerId(){return clientId},get roomCode(){return roomCode},get isHost(){return this.inRoom&&hostId===clientId},
   connect(url,name){
    if(!/^wss?:\/\//i.test(url))return Promise.reject(new Error('Use a ws:// or wss:// server URL.'));
    if(socket)socket.close();roomCode=null;players={};playerName=(name||'Crawler').replace(/[^\w -]/g,'').slice(0,16)||'Crawler';

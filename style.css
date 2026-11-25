@@ -17,3 +17,7 @@
 #storyCaption b{color:#f1c982;margin-right:.6em}
 #creator{display:grid;gap:12px}#creator canvas{justify-self:center;background:#0c171b;image-rendering:pixelated}
 #creator label{display:grid;gap:4px}#creator select{font:inherit;font-size:16px;color:#e6deca;background:#19252b;padding:8px}
+
+.pack-button,.bag-nav button,#bagDetail button{background:#44362b;border:1px solid #99794f;color:#ffdfac;border-radius:5px;padding:7px 10px}.pack-button{margin-left:auto;margin-right:8px;white-space:nowrap}
+.bag-stats,.bag-nav,.loot-row{display:flex;align-items:center;gap:8px}.bag-stats{flex-wrap:wrap;gap:4px 12px;color:#e7d4af;margin-bottom:10px}.bag-grid,.loot-pocket{background:#332a24;border:2px solid #795a40;border-radius:12px;padding:9px;box-shadow:inset 0 0 0 3px #231c18}.bag-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.bag-slot,.loot-row{color:#eee0c9;background:#4a382b;border:1px dashed #a28663;border-radius:6px}.bag-slot{display:grid;align-content:center;justify-items:center;gap:2px;min-height:66px;padding:4px;font-size:11px;overflow-wrap:anywhere}.bag-slot strong,.loot-row b{font-size:21px}.bag-slot.empty{background:#30251e}.bag-nav{margin:9px 0;justify-content:space-between}.bag-nav button:disabled{opacity:.4}#bagDetail{min-height:30px;color:#ded4bf}.loot-pocket{display:grid;gap:6px}.loot-row{width:100%;padding:10px;text-align:left}.loot-row span:last-child{margin-left:auto}
+@media(max-width:700px){.room-coords{display:none}.pack-button{margin-right:0}.viewport-head{gap:5px}}
