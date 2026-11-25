@@ -14,6 +14,7 @@ for(const name of spriteNames){const img=new Image();img.src=name+'.png';img.onl
 const skinTones=['#f1cdb0','#dfaf87','#bc8b63','#a06c4b','#794f38','#50352c'];
 const ancestries=['Human','Elf','Dwarf'];
 const genders=['Woman','Man','Nonbinary'];
+const hairStyles=['Signature','Crop','Pixie','Bob','Curls','Ponytail','Braid','Shaved'];
 let captionUntil=0;
 function caption(speaker,line,story=false){
   if(!story && performance.now()<captionUntil)return;
@@ -29,13 +30,14 @@ function caption(speaker,line,story=false){
 function showCreator(){if(state.chapter!=='create'&&personalMenusLocked()){lockHint();return}
   const current=state.character||{race:'Human',skin:2,gender:'Nonbinary'};
   const choices=(list,value)=>list.map((name,i)=>'<option value="'+i+'" '+(i===value?'selected':'')+'>'+name+'</option>').join('');
-  showModal('<h2>Your crawler</h2><form id="creator"><canvas id="look" width="72" height="96"></canvas><label>Race<select name="race" '+(state.floor<4?'disabled':'')+'>'+choices(state.floor<4?['Human']:ancestries,ancestries.indexOf(current.race))+'</select></label><label>Skin tone<select name="skin">'+choices(['Porcelain','Sand','Amber','Copper','Umber','Deep brown'],current.skin)+'</select></label><label>Gender<select name="gender">'+choices(genders,genders.indexOf(current.gender))+'</select></label><button class="widebtn">'+(state.chapter==='create'?'Begin on the surface':'Save character')+'</button></form>');
+  showModal('<h2>Your crawler</h2><form id="creator"><canvas id="look" width="192" height="84" aria-label="Front, side, and back hairstyle preview"></canvas><label>Race<select name="race" '+(state.floor<4?'disabled':'')+'>'+choices(state.floor<4?['Human']:ancestries,ancestries.indexOf(current.race))+'</select></label><label>Skin tone<select name="skin">'+choices(['Porcelain','Sand','Amber','Copper','Umber','Deep brown'],current.skin)+'</select></label><label>Gender<select name="gender" aria-label="Gender">'+choices(genders,genders.indexOf(current.gender))+'</select></label><label>Hairstyle<select name="hair" aria-label="Hairstyle">'+choices(hairStyles,Math.max(0,hairStyles.indexOf(current.hair)))+'</select></label><button class="widebtn">'+(state.chapter==='create'?'Begin on the surface':'Save character')+'</button></form>');
   const form=$('#creator');
-  const selection=()=>({race:state.floor<4?'Human':ancestries[form.elements.race.value],skin:Number(form.elements.skin.value),gender:genders[form.elements.gender.value]});
+  const selection=()=>({race:state.floor<4?'Human':ancestries[form.elements.race.value],skin:Number(form.elements.skin.value),gender:genders[form.elements.gender.value],hair:hairStyles[form.elements.hair.value]});
   function preview(){
     const g=$('#look').getContext('2d');
-    g.clearRect(0,0,72,96);g.imageSmoothingEnabled=false;
-    g.drawImage(crawlerPose('down',0,selection()),0,0,72,96);
+    g.clearRect(0,0,192,84);g.imageSmoothingEnabled=false;
+    const chosen=selection();
+    ['down','side','up'].forEach((dir,i)=>g.drawImage(crawlerPose(dir,0,chosen),i*64+2,2,60,80));
   }
   form.onchange=preview;preview();
   form.onsubmit=e=>{
@@ -511,16 +513,46 @@ function gearLook(){
   }
   return look;
 }
-function crawlerPose(dir,frame,character=state?.character,look=gearLook()){let key=[dir,frame,character?.race,character?.skin,look.armor,look.weapon,look.charm].join('/');if(walkArt.has(key))return walkArt.get(key);let c=document.createElement('canvas');c.width=24;c.height=32;let g=c.getContext('2d');let rect=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)},poly=(pts,col)=>{g.fillStyle=col;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fill()};let side=dir==='side',back=dir==='up',stride=Math.sin(frame*Math.PI/8);
-const skin=skinTones[character?.skin]||skinTones[2];
+function crawlerPose(dir,frame,character=state?.character,look=gearLook()){let key=[dir,frame,character?.race,character?.skin,character?.gender,character?.hair,look.armor,look.weapon,look.charm].join('/');if(walkArt.has(key))return walkArt.get(key);let c=document.createElement('canvas');c.width=24;c.height=32;let g=c.getContext('2d');let rect=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)},poly=(pts,col)=>{g.fillStyle=col;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fill()};let side=dir==='side',back=dir==='up',stride=Math.sin(frame*Math.PI/8);
+const skin=skinTones[character?.skin]||skinTones[2],woman=character?.gender==='Woman';
+const hair=character?.hair&&character.hair!=='Signature'?character.hair:woman?'Ponytail':'Crop';
+const dark='#40312e',light='#795441',mid='#5d4136';
+const shirt=woman?'#685567':'#667565',seam=woman?'#99818e':'#879581';
+const sway=Math.round(stride);
 for(let leg=0;leg<2;leg++){
   const swing=leg?stride:-stride,x=(side?9:7)+leg*(side?3:6)+(side?2.8*swing:0),lift=-1.8*Math.max(0,swing);
-  rect(x,19+lift,4,9,'#37485a');rect(x-1,27+lift,6,3,'#53504b');rect(x-1,30+lift,6,1,'#c3bda9');
+  rect(x,19+lift,4,9,woman?'#414454':'#37485a');rect(x-1,27+lift,6,3,'#53504b');rect(x-1,30+lift,6,1,'#c3bda9');
 }
-rect(7,11,10,10,'#667565');rect(8,12,2,8,'#879581');rect(7,20,10,2,'#495b50');
-for(let arm=0;arm<2;arm++){const x=(arm?16:5)+(side?(arm?-2:2)*stride:0),y=12+(arm?stride:-stride);rect(x,y,3,4,'#687667');rect(x,y+4,3,4,skin)}
-rect(9,3,7,8,skin);rect(8,3,9,3,'#40332e');rect(9,2,6,2,'#51413a');
-if(back)rect(9,5,7,5,'#40332e');else{rect(8,5,2,3,'#40332e');rect(side?15:14,6,1,1,'#312c2a');if(!side)rect(10,6,1,1,'#312c2a')}
+if(woman){
+  poly([[8,11],[15,11],[17,14],[15,17],[17,22],[7,22],[9,17],[7,14]],shirt);
+  rect(9,12,2,4,seam);rect(10,11,4,2,skin);rect(8,20,8,1,'#453e49');
+}else{rect(7,11,10,10,shirt);rect(8,12,2,8,seam);rect(7,20,10,2,'#495b50')}
+for(let arm=0;arm<2;arm++){
+  const x=(arm?(woman?15:16):(woman?6:5))+(side?(arm?-2:2)*stride:0),y=12+(arm?stride:-stride);
+  rect(x,y,3,4,shirt);rect(x,y+4,3,4,skin);
+}
+rect(9,3,7,7,skin);rect(woman?10:9,10,woman?5:7,1,skin);
+if(!back){rect(side?15:14,6,1,1,'#312c2a');if(!side)rect(10,6,1,1,'#312c2a')}
+if(hair!=='Shaved'){
+  rect(8,3,9,3,dark);rect(9,2,7,2,mid);rect(10,2,4,1,light);
+  if(back)rect(9,5,7,5,dark);else rect(8,5,2,3,dark);
+  if(hair==='Pixie'){
+    rect(10,1,6,2,mid);rect(13,4,4,2,mid);rect(14,5,2,2,dark);rect(7,5,2,4,mid);
+  }else if(hair==='Bob'){
+    rect(7,4,3,8,dark);rect(8,4,1,6,light);if(!side)rect(15,4,3,8,mid);
+    if(back){rect(9,5,7,7,mid);rect(10,5,1,5,light)}else rect(9,4,5,2,mid);
+  }else if(hair==='Curls'){
+    for(const [x,y] of [[7,4],[8,2],[11,1],[14,2],[16,3],[7,7],[16,6]]){rect(x,y,3,3,dark);rect(x,y,2,1,light)}
+    if(back){rect(8,7,9,3,mid);rect(10,10,5,1,dark)}
+  }else if(hair==='Ponytail'){
+    const x=back?12:side?6:7;
+    rect(x-1,5,4,4,mid);rect(x-1,6,3,1,'#b99b64');rect(x-2,8,4,5,dark);rect(x-2+sway,12,3,4,mid);rect(x-3+sway,15,3,2,dark);
+  }else if(hair==='Braid'){
+    const x=back?12:side?6:8;
+    for(let j=0;j<5;j++){const bx=x+(j%2)+(j>2?sway:0);rect(bx-1,7+j*2,3,3,dark);rect(bx,7+j*2,2,1,light)}
+    rect(x+sway,17,3,1,'#b59c6b');rect(x+sway,18,2,2,mid);
+  }
+}
 if(look.armor){const coat=look.armor==='coat';rect(6,12,12,coat?12:8,coat?'#ac843c':look.armor==='mail'?'#55779c':'#687781');rect(8,13,8,1,coat?'#edc678':'#b1c8da');rect(12,14,1,6,'#403e43')}
 if(look.weapon){const x=back?5:18;rect(x,16,2,9,'#835b38');if(look.weapon==='hammer'){rect(x-3,12,8,5,'#8d9097');rect(x-3,12,7,1,'#d3d6db')}else{rect(x,9,2,9,'#d8e6e5');rect(x-2,17,6,1,'#ba9362')}}
 if(look.charm){rect(11,12,3,2,'#dec789');rect(11,14,3,4,look.charm==='glass'?'#78e5f2':look.charm==='iron'?'#9696a9':'#e0aa41')}
@@ -736,6 +768,22 @@ let k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '
 function storageMenu(q){state.storage??=[];let available=state.inventory.filter(i=>i.qty>0&&state.equipment?.[i.slot]!==i.id);showModal('<h2>CRAWLER LOCKER</h2><p>Shared across sanctuaries and floors.</p><h3>Deposit</h3>'+available.map((i,n)=>'<button class="widebtn" data-deposit="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<h3>Withdraw</h3>'+state.storage.map((i,n)=>'<button class="widebtn" data-withdraw="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<button class="widebtn" id="storageBack">BACK</button>');let transfer=(from,to,item)=>{if(!item||item.qty<1)return;let existing=to.find(i=>i.id===item.id);if(existing)existing.qty++;else to.push({...item,qty:1});item.qty--;if(!item.qty)from.splice(from.indexOf(item),1);save();storageMenu(q)};$$('[data-deposit]').forEach(b=>b.onclick=()=>transfer(state.inventory,state.storage,available[Number(b.dataset.deposit)]));$$('[data-withdraw]').forEach(b=>b.onclick=()=>transfer(state.storage,state.inventory,state.storage[Number(b.dataset.withdraw)]));$('#storageBack').onclick=()=>sanctuaryMenu(q)}function sanctuaryMenu(q){showModal('<h2>SANCTUARY</h2><p>Protected quarters • Gold: '+state.gold+'</p><button class="widebtn" id="restSafe">'+(q.rested?'BED — USED':'REST AT BED')+'</button><button class="widebtn" id="buySafe">MERCHANT: TONIC — 15 GOLD</button><button class="widebtn" id="stashSafe">'+(q.cache?'STORAGE — EMPTY':'OPEN SUPPLY CHEST')+'</button><button class="widebtn" id="lockerSafe">PERSONAL STORAGE</button><button class="widebtn" id="leaveSafe">RETURN</button>');$('#restSafe').onclick=()=>{if(!q.rested){q.rested=true;state.hp=state.maxHp;state.mp=state.maxMp;unlock('Safe harbor');save();render()}sanctuaryMenu(q)};$('#buySafe').onclick=()=>{if(state.gold>=15){state.gold-=15;giveItem('tonic',1);save();render()}sanctuaryMenu(q)};$('#stashSafe').onclick=()=>{if(q.cache)return;const nearby=nearbyContainers(state);if(!nearby.some(c=>c.source===q)){notify('Move closer to the supply chest.');return}if(partyGuest()){closeModal();window.DCKNet.sendIntent('loot')}else startLoot(nearby,null)};$('#lockerSafe').onclick=()=>storageMenu(q);$('#leaveSafe').onclick=closeModal}function giveItem(id,n){let i=state.inventory.find(v=>v.id===id);if(i)i.qty+=n;else{let names={tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};state.inventory.push({id,name:names[id]||id,icon:'✦',qty:n,desc:'Dungeon supply'})}}let bagPage=0, activeLoot=null, remoteLoot=null, lootSignature='';
 const lootNames={'box-Bronze':'Bronze loot box',gold:'Gold coins',tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};
 const lootIcons={'box-Bronze':'🎁',gold:'◉',tonic:'🧪',torch:'🔥',shard:'🔷'};
+let outfitAngle=0;
+function outfitPanel(){
+  const slots=[['weapon','Weapon','Unarmed'],['armor','Armor','Everyday clothes'],['charm','Charm','None']];
+  const rows=slots.map(([slot,label,empty])=>{
+    const item=state.inventory.find(i=>i.id===state.equipment?.[slot]);
+    return '<dt>'+label+'</dt><dd>'+safeAttr(item?.name||empty)+'</dd>';
+  }).join('');
+  return '<section class="bag-outfit" aria-label="Equipped outfit"><button id="turnOutfit" aria-label="Rotate your crawler"><canvas id="bagCrawler" width="96" height="128"></canvas><small>↻ Rotate</small></button><dl>'+rows+'</dl></section>';
+}
+function drawOutfit(){
+  const canvas=$('#bagCrawler'),g=canvas.getContext('2d');
+  const dirs=['down','side','up','side'];
+  g.clearRect(0,0,96,128);g.imageSmoothingEnabled=false;g.save();
+  if(outfitAngle===3){g.translate(96,0);g.scale(-1,1)}
+  g.drawImage(crawlerPose(dirs[outfitAngle],0),0,0,96,128);g.restore();
+}
 function backpack(){if(personalMenusLocked()){lockHint();return}
   if(state.dead||bossFight||activeLoot||remoteLoot||state.chapter==='create')return;
   const items=state.inventory.filter(item=>item.qty>0);
@@ -744,7 +792,8 @@ function backpack(){if(personalMenusLocked()){lockHint();return}
   const slots=items.slice(bagPage*6,bagPage*6+6).map((item,i)=>
     '<button class="bag-slot" data-slot="'+i+'"><strong>'+safeAttr(item.icon)+'</strong><span>'+safeAttr(item.name)+'</span><small>×'+item.qty+(state.equipment?.[item.slot]===item.id?' · Equipped':'')+'</small></button>');
   while(slots.length<6)slots.push('<div class="bag-slot empty" aria-hidden="true"></div>');
-  showModal('<h2>Backpack</h2><div class="bag-stats"><span>HP '+state.hp+'/'+state.maxHp+'</span><span>MP '+state.mp+'/'+state.maxMp+'</span><span>Level '+state.level+'</span><span>Power '+state.power+'</span><span>Armor '+state.armor+'</span><span>Gold '+state.gold+'</span><span>XP '+state.xp+'/'+state.nextXp+'</span><span>Spell bonus '+(state.spellBonus||0)+'</span>'+(state.teaPower?'<span>Tea +'+state.teaPower+' power this floor</span>':'')+'</div><div class="bag-grid">'+slots.join('')+'</div><div class="bag-nav"><button id="bagPrev" '+(!bagPage?'disabled':'')+'>‹</button><span>Pocket '+(bagPage+1)+' / '+pages+'</span><button id="bagNext" '+(bagPage+1>=pages?'disabled':'')+'>›</button><button id="bagAdd">Add item</button></div><div id="bagDetail" aria-live="polite">Select an item to inspect it.</div>');
+  showModal('<div class="bag-layout"><h2>Backpack</h2>'+outfitPanel()+'<div class="bag-stats"><span>HP '+state.hp+'/'+state.maxHp+'</span><span>MP '+state.mp+'/'+state.maxMp+'</span><span>Level '+state.level+'</span><span>Power '+state.power+'</span><span>Armor '+state.armor+'</span><span>Gold '+state.gold+'</span><span>XP '+state.xp+'/'+state.nextXp+'</span><span>Spell bonus '+(state.spellBonus||0)+'</span>'+(state.teaPower?'<span>Tea +'+state.teaPower+' power this floor</span>':'')+'</div><div class="bag-grid">'+slots.join('')+'</div><div class="bag-nav"><button id="bagPrev" '+(!bagPage?'disabled':'')+'>‹</button><span>Pocket '+(bagPage+1)+' / '+pages+'</span><button id="bagNext" '+(bagPage+1>=pages?'disabled':'')+'>›</button><button id="bagAdd">Add item</button></div><div id="bagDetail" aria-live="polite">Select an item to inspect it.</div></div>');
+  drawOutfit();$('#turnOutfit').onclick=()=>{outfitAngle=(outfitAngle+1)%4;drawOutfit()};
   $('#bagPrev').onclick=()=>{bagPage--;backpack()};
   $('#bagNext').onclick=()=>{bagPage++;backpack()};
   $('#bagAdd').onclick=addItem;

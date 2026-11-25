@@ -43,7 +43,9 @@ wss.on('connection',(ws,req)=>{
    for(const [slot,looks] of Object.entries({weapon:['knife','hammer'],armor:['coat','mail','steel'],charm:['bell','glass','iron']})){
      if(looks.includes(s.gear?.[slot]))gear[slot]=s.gear[slot];
    }
-   const character={skin:clampInt(s.character?.skin??2,0,5),race:['Human','Elf','Dwarf'].includes(s.character?.race)?s.character.race:'Human'};
+   const hair=['Signature','Crop','Pixie','Bob','Curls','Ponytail','Braid','Shaved'].includes(s.character?.hair)?s.character.hair:'Signature';
+   const gender=['Woman','Man','Nonbinary'].includes(s.character?.gender)?s.character.gender:'Nonbinary';
+   const character={hair,gender,skin:clampInt(s.character?.skin??2,0,5),race:['Human','Elf','Dwarf'].includes(s.character?.race)?s.character.race:'Human'};
    const hall=s.hall?{index:clampInt(s.hall.index,0,5),x:clampInt(s.hall.x,1,11),y:clampInt(s.hall.y,2,8)}:null;
    p.state={hall,gear,character,name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999)};
    broadcast(room,{type:'player_state',id,player:p.state},id);return;
