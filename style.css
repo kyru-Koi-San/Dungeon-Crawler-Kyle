@@ -37,3 +37,5 @@
 .duel-stage[data-enemy=sewer-rat].counter .opponent{animation-name:ratPounce}.duel-stage[data-enemy=goblin].counter .opponent{animation-name:goblinRush}.duel-stage .impact{font:700 22px/1 monospace;z-index:2}
 @keyframes ratPounce{0%,100%{transform:none}19%{transform:scale(1.12,.8)}47%{transform:translate(-38cqw,-52%) rotate(-14deg)}61%{transform:translate(-35cqw,-4%) scale(1.1,.85)}82%{transform:translate(-10cqw,-22%)}}
 @keyframes goblinRush{0%,100%{transform:none}19%{transform:translateX(2cqw) rotate(8deg)}42%{transform:translateX(-26cqw) rotate(-9deg)}54%{transform:translateX(-37cqw) rotate(-18deg)}73%{transform:translateX(-16cqw) rotate(4deg)}}
+
+.loot-pocket h3{font-size:13px;margin:7px 0 2px;color:#e3c69b}.loot-pocket{max-height:45svh;overflow:auto;overscroll-behavior:contain}

@@ -23,6 +23,7 @@
      if(m.type==='room_joined'){roomCode=m.code;hostId=m.host;revision=0;players=m.players||{};emit('room',{code:roomCode});emit('players',{players:remoteOnly()});emit('status',{text:'IN PRIVATE PARTY',code:roomCode});if(pendingRoom){pendingRoom.resolve(roomCode);pendingRoom=null}return}
      if(m.type==='host_changed'){hostId=m.host;emit('host',{isHost:api.isHost});return}
      if(m.type==='world_snapshot'){if(m.revision>revision){revision=m.revision;emit('world',{world:m.world})}return}
+     if(m.type==='loot_bundle'){emit('loot_bundle',{items:m.items});return}
      if(m.type==='reward'){emit('reward',{gold:m.gold,xp:m.xp,item:m.item});return}
      if(m.type==='combat_intent'){if(api.isHost)emit('combat_intent',{id:m.id,action:m.action,player:m.player});return}
      if(m.type==='room_update'){players=m.players||{};emit('players',{players:remoteOnly()});return}
@@ -35,6 +36,7 @@
   createRoom(){return this._roomAction({type:'create_room',name:playerName})},
   joinRoom(code){code=(code||'').trim().toUpperCase();if(!/^[A-Z0-9]{6}$/.test(code))return Promise.reject(new Error('Enter a valid 6-character room code.'));return this._roomAction({type:'join_room',code,name:playerName})},
   _roomAction(message){if(!this.connected)return Promise.reject(new Error('Connect to the relay first.'));if(pendingRoom)return Promise.reject(new Error('A room request is already pending.'));return new Promise((resolve,reject)=>{pendingRoom={resolve,reject};socket.send(JSON.stringify(message));setTimeout(()=>{if(pendingRoom){pendingRoom.reject(new Error('Room request timed out.'));pendingRoom=null}},7000)})},
+  sendLoot(target,items){if(this.isHost)socket.send(JSON.stringify({type:'loot_bundle',target,items}))},
   sendReward(target,gold,xp,item){if(this.isHost)socket.send(JSON.stringify({type:'reward',target,gold,xp,item}))},
   sendWorld(world){if(this.isHost)socket.send(JSON.stringify({type:'world_snapshot',world}))},
   sendIntent(action){if(this.inRoom)socket.send(JSON.stringify({type:'combat_intent',action}))},

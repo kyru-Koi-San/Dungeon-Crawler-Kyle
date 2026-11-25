@@ -28,12 +28,23 @@ wss.on('connection',(ws,req)=>{
   }
   if(m.type==='leave_room'){leave(ws);return}
   if(m.type==='world_snapshot'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const world=m.world;if(!world||!Number.isInteger(world.floor)||world.floor<1||world.floor>999||!Array.isArray(world.enemies)||world.enemies.length>100)return;room.world=world;room.revision++;broadcast(room,{type:'world_snapshot',revision:room.revision,world},id);return;}
+  if(m.type==='loot_bundle'){
+   const room=rooms.get(client.room);if(!room||room.host!==id)return;
+   const target=room.players.get(m.target);if(!target)return;
+   const items={};for(const key of ['gold','tonic','torch','box-Bronze']){const n=clampInt(m.items?.[key],0,9999);if(n)items[key]=n}
+   send(target.ws,{type:'loot_bundle',items});return;
+  }
   if(m.type==='reward'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const target=room.players.get(m.target);if(target)send(target.ws,{type:'reward',gold:clampInt(m.gold,0,100),xp:clampInt(m.xp,0,500),item:['tonic','torch','shard'].includes(m.item)?m.item:null});return;}
-  if(m.type==='combat_intent'){const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p||!['attack','spell','loot','loot_close','take_gold','take_torch','take_tonic','take_all'].includes(m.action))return;const host=room.players.get(room.host);if(host)send(host.ws,{type:'combat_intent',id,action:m.action,player:p.state});return;}
+  if(m.type==='combat_intent'){const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p||!['attack','spell','loot','loot_close','take_gold','take_torch','take_tonic','take_all'].includes(m.action)&&!/^take_[0-9]{1,3}$/.test(m.action))return;const host=room.players.get(room.host);if(host)send(host.ws,{type:'combat_intent',id,action:m.action,player:p.state});return;}
   if(m.type==='player_state'){
    const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p)return;
    const s=m.player||{};const floor=clampInt(s.floor,1,999),x=clampInt(s.x,0,71),y=clampInt(s.y,0,47);
-   p.state={name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999)};
+   const gear={};
+   for(const [slot,looks] of Object.entries({weapon:['knife','hammer'],armor:['coat','mail','steel'],charm:['bell','glass','iron']})){
+     if(looks.includes(s.gear?.[slot]))gear[slot]=s.gear[slot];
+   }
+   const character={skin:clampInt(s.character?.skin??2,0,5),race:['Human','Elf','Dwarf'].includes(s.character?.race)?s.character.race:'Human'};
+   p.state={gear,character,name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999)};
    broadcast(room,{type:'player_state',id,player:p.state},id);return;
   }
   send(ws,{type:'error',message:'Unsupported message.'});
