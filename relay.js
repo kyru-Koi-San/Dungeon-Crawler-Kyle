@@ -29,7 +29,7 @@ wss.on('connection',(ws,req)=>{
   if(m.type==='leave_room'){leave(ws);return}
   if(m.type==='player_state'){
    const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p)return;
-   const s=m.player||{};const floor=clampInt(s.floor,1,999),x=clampInt(s.x,0,29),y=clampInt(s.y,0,17);
+   const s=m.player||{};const floor=clampInt(s.floor,1,999),x=clampInt(s.x,0,71),y=clampInt(s.y,0,47);
    p.state={name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999)};
    broadcast(room,{type:'player_state',id,player:p.state},id);return;
   }
