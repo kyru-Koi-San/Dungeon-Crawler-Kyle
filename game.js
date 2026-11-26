@@ -525,19 +525,48 @@ function nearby(){return entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-
 let bossFight=null;
 function beginBoss(e){if(bossFight||state.dead||modalOpen()||sanctuaryAt(state.x,state.y)||(e.boss&&state.arena&&!inArena(state.x,state.y)))return;bossFight={e,turn:1,log:e.boss?'The arena seals.':'The '+e.name.toLowerCase()+' advances.'};step=null;visualX=state.x;visualY=state.y;joyX=joyY=0;if(e.boss)ai('BOSS BATTLE! Please make your inevitable suffering entertaining.');bossScreen();persistCampaign()}
 function bossIntent(b){return b.e.sprite==='wraith'&&b.turn%3===2?'MANA DRAIN':b.e.sprite==='bone-champion'&&b.turn%4===0?'ARMOR SHATTER':b.turn%3===0?'DEVASTATING STRIKE':b.e.sprite==='spider-boss'&&b.turn%2===0?'VENOM BITE':b.e.hp<b.e.max/2?'ENRAGED ATTACK':'Standard attack'}let animatingTurn=false;
-function encounterScreen(){
+const techniques={
+  mend:{name:'Mend',floor:4,job:'Arcanist',cost:8,desc:'Restore health and treat injuries.'},
+  brace:{name:'Shieldbreaker',floor:4,job:'Vanguard',cost:5,desc:'Strike for power + 6 and guard the counterattack.'},
+  rend:{name:'Rending blow',floor:4,job:'Reaver',cost:6,desc:'Strike for twice your power.'},
+  bell:{name:'Bell chime',floor:6,cost:6,desc:'Deal 16 damage plus your spell bonus.'},
+  lunge:{name:'Driving lunge',floor:9,cost:8,desc:'Strike for twice your power + 4.'},
+  tide:{name:'Undertow',floor:12,cost:12,desc:'Deal 32 damage plus twice your spell bonus.'}
+};
+function learned(id){const a=techniques[id];return !!a&&state.floor>=a.floor&&(!a.job||a.job===state.specialization)}
+function prepared(){return (state.spellLoadout||[]).filter(learned).slice(0,3)}
+function techniqueDamage(id){
+  switch(id){
+    case 'brace':return state.power+6;
+    case 'rend':return state.power*2;
+    case 'bell':return Math.max(1,16+(state.spellBonus||0));
+    case 'lunge':return state.power*2+4;
+    case 'tide':return Math.max(1,32+2*(state.spellBonus||0));
+    default:return 0;
+  }
+}
+function spellLoadoutPanel(){
+  const ready=prepared();
+  return '<details class="skill-limb" data-path="Spells" '+(openPaths.has('Spells')?'open':'')+'><summary>Spell menu <small>'+ready.length+'/3 prepared</small></summary><div class="skill-stem">'+Object.entries(techniques).map(([id,a])=>{
+    const equipped=ready.includes(id);
+    return '<div class="skill-node"><div><b>'+a.name+'</b><small>'+a.cost+' MP · '+a.desc+'</small></div>'+(learned(id)?'<button class="smallbtn" data-prepare="'+id+'" aria-pressed="'+equipped+'" '+(!equipped&&ready.length===3?'disabled':'')+'>'+(equipped?'Remove':'Prepare')+'</button>':'<small>Floor '+a.floor+(a.job?' · '+a.job:'')+'</small>')+'</div>';
+  }).join('')+'</div></details>';
+}
+
+function encounterScreen(spellMenu=false){
   const battle=bossFight;
   if(!battle||animatingTurn)return;
   const enemy=battle.e;
   const moves=[['attack',state.equipment?.weapon?'Swing':'Punch'],['guard','Guard'],['heal','Health potion']];
   if(!enemy.boss)moves.push(['retreat','Run away']);
-  if(canMend())moves.push(['mend','Mend · 8 MP']);
+  if(Object.keys(techniques).some(learned))moves.push(['spells','Spells']);
   if(enemy.boss)moves.push(['trap',battle.trapUsed?'Trap spent':'Spring trap']);
-  showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><button class="smallbtn" data-campaign-menu>Campaign saves</button><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions">'+moves.map(([id,label])=>'<button class="widebtn" data-boss="'+id+'" '+((id==='mend'&&(state.mp<8||(state.hp===state.maxHp&&!conditionText())))||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!state.inventory.some(i=>i.id==='tonic'&&i.qty>0))?'disabled':'')+'>'+label+'</button>').join('')+'</div></div>');
+  if(spellMenu)moves.splice(0,moves.length,...prepared().map(id=>[id,techniques[id].name+' · '+techniques[id].cost+' MP']),['back','Back']);
+  showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><button class="smallbtn" data-campaign-menu>Campaign saves</button><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions command-fan">'+(spellMenu&&!prepared().length?'<p>Prepare abilities in Backpack → Skills → Spell menu.</p>':'')+moves.map(([id,label])=>'<button class="duel-command" data-boss="'+id+'" '+((techniques[id]&&state.mp<techniques[id].cost)||(id==='mend'&&state.hp===state.maxHp&&!conditionText())||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!quantity('tonic'))?'disabled':'')+'><i aria-hidden="true">'+(({attack:'⚔',guard:'⬟',heal:'✚',retreat:'↗',spells:'✧',trap:'⌖',back:'‹'})[id]||'✦')+'</i><span>'+label+'</span></button>').join('')+'</div></div>');
   $('#duelHero').src=crawlerPose('side',0).toDataURL();
   const stage=$('.duel-stage');stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
   if(state.equipment?.weapon)stage.classList.add('armed');
-  $$('[data-boss]').forEach(button=>button.onclick=()=>animateTurn(button.dataset.boss));
+  $$('[data-boss]').forEach(button=>button.onclick=()=>{const id=button.dataset.boss;if(id==='spells'||id==='back')encounterScreen(id==='spells');else animateTurn(id)});
 }
 function battleFrames(duration,paint,valid){
   return new Promise(resolve=>{
@@ -554,6 +583,7 @@ function battleFrames(duration,paint,valid){
 async function animateTurn(action){
   const battle=bossFight;
   if(!battle||animatingTurn||state.dead)return;
+  if(techniques[action]&&(!prepared().includes(action)||state.mp<techniques[action].cost))return;
   if(action==='retreat'){
     if(battle.e.boss)return;
     const enemy=battle.e;
@@ -564,15 +594,15 @@ async function animateTurn(action){
     persistCampaign();render();return;
   }
   const stage=$('.duel-stage');
-  const strike=action==='attack'?state.power+(state.pet?.crawler?state.pet.level+1:0)+Math.floor(Math.random()*5):0;
+  const strike=action==='attack'?state.power+(state.pet?.crawler?state.pet.level+1:0)+Math.floor(Math.random()*5):techniqueDamage(action);
   const damage=strike+(action==='trap'?25+state.level*3:0)+(battle.assist||0);
   animatingTurn=true;
   const wait=ms=>battleFrames(ms,null,()=>bossFight===battle);
   try{
     $$('[data-boss]').forEach(button=>button.disabled=true);
-    stage.dataset.move=action;
+    const melee=['attack','brace','rend','lunge'].includes(action);stage.dataset.move=melee?'attack':action;
     if(damage>0)stage.querySelector('.impact').textContent='−'+damage;
-    if(action==='attack')await playDuelStrike(stage,battle);else await wait(480);
+    if(melee)await playDuelStrike(stage,battle);else await wait(480);
     if(bossFight!==battle)return;
     if(damage<battle.e.hp){stage.classList.add('counter');await wait(460)}
     if(bossFight!==battle)return;
@@ -581,7 +611,7 @@ async function animateTurn(action){
 }
 
 function bossScreen(){encounterScreen()}
-function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(35)}d+=b.assist||0;b.assist=0;e.hp-=d;if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;petVictory();if(!e.boss){
+function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(techniques[action]&&action!=='mend'){if(!prepared().includes(action)||state.mp<techniques[action].cost)return;state.mp-=techniques[action].cost;d=strike;guard=action==='brace'}if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(35)}d+=b.assist||0;b.assist=0;e.hp-=d;if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;petVictory();if(!e.boss){
 state.xp+=e.xp;state.gold+=5+Math.floor(Math.random()*12);bossFight=null;
 const milestones={10:['Unlicensed Exterminator','Silver'],30:['The Neighborhood Is Quiet Now','Gold'],100:['Population Control Department','Celestial']};
 if(milestones[state.kills])ridiculous(...milestones[state.kills]);
@@ -619,7 +649,40 @@ const chasing=Math.hypot(e.x-state.x,e.y-state.y)<7;
 const target=chasing?state:e.den;if(!target)continue;
 let dx=Math.sign(target.x-e.x),dy=Math.sign(target.y-e.y);let opts=Math.random()<.5?[[dx,0],[0,dy]]:[[0,dy],[dx,0]];for(let [ax,ay] of opts)if((ax||ay)&&!(step&&e.x+ax===step.nx&&e.y+ay===step.ny)&&!solid(e.x+ax,e.y+ay)&&!sanctuaryAt(e.x+ax,e.y+ay)&&!entities.some(q=>q!==e&&q.alive&&q.x===e.x+ax&&q.y===e.y+ay)){e.x+=ax;e.y+=ay;break}}}}
 function checkLevel(){while(state.xp>=state.nextXp){state.xp-=state.nextXp;state.level++;state.nextXp=Math.floor(state.nextXp*1.35);state.maxHp+=12;restoreHealth(state.maxHp);if(state.floor>=4){state.maxMp+=4;state.mp=state.maxMp}state.power+=2;state.skillPoints++;feed('<b>LEVEL UP!</b> You reached level '+state.level+'. Stats increased.');notify('LEVEL UP — LEVEL '+state.level);unlock('Getting stronger');beep(660,.2,'sine')}}
-function awardBox(tier){let id='box-'+tier,it=state.inventory.find(i=>i.id===id);if(it)it.qty++;else state.inventory.push({id,name:tier+' loot box',icon:'🎁',qty:1,desc:'Open for randomized dungeon rewards.'});notify(tier.toUpperCase()+' LOOT BOX AWARDED');}function ridiculous(n,tier='Bronze'){if(state.achievements.includes(n))return;const bonus=tier!=='Bronze'||n==='Local Pest Control';unlock(n,bonus?tier:null);if(bonus)awardBox(tier);ai('NEW ACHIEVEMENT: '+n+'.'+(bonus?' A '+tier+' box lands in your backpack.':' The audience noticed.'));if(tab==='inventory')openTab(tab)}const awardQueue=[];
+const achievementNotes={
+  'Guild inductee':'Finished Rowan’s induction and earned access to the crawler menus.',
+  'Not alone':'Found another crawler and spoke to them in the dungeon.',
+  'Even Cowards Need a Break':'Discovered a guild sanctuary. Even the audience needs an intermission.',
+  'Safe harbor':'Rested in a sanctuary bed.',
+  'First blood':'Won your first fight in the dungeon.',
+  'Local Pest Control':'Defeated your first dungeon enemy. The pest-control contract is apparently yours now.',
+  'Getting stronger':'Earned enough experience to gain a level.',
+  'Down but not out':'Fell in combat. The guild can still bring you back.',
+  'Warden breaker':'Defeated a floor guardian.',
+  'Management Has Been Terminated':'Defeated a guardian and broke its hold on the floor.',
+  'Four paws, one crawler':'Transformed a pet into a crawler with an enchanted biscuit.',
+  'Scavenger':'Emptied a nearby loot container.',
+  'Personal Space Is for the Living':'Emptied three loot containers.',
+  'Estate Sale Enthusiast':'Emptied fifteen loot containers.',
+  'Deeper down':'Descended from one dungeon floor to the next.',
+  'Elevator Out of Service':'Reached the stairs and continued deeper on foot.',
+  'Congratulations, You Have Legs':'Walked 50 steps in the dungeon.',
+  'The Dungeon Is Not a Treadmill':'Walked 250 steps in the dungeon.',
+  'Certified Corridor Enthusiast':'Walked 1,000 steps in the dungeon.',
+  'Suspiciously Competent Wandering':'Caught the audience’s attention while exploring the tunnels.',
+  'Unlicensed Exterminator':'Defeated ten dungeon enemies.',
+  'The Neighborhood Is Quiet Now':'Defeated thirty dungeon enemies.',
+  'Population Control Department':'Defeated one hundred dungeon enemies.',
+  'Gravity Is a Suggestion':'Jumped ten times in the dungeon.',
+  'Unauthorized Indoor Fireworks':'Cast five Arc Pulse attacks.'
+};
+const historicPrizes={'Local Pest Control':'Bronze','Elevator Out of Service':'Silver','Estate Sale Enthusiast':'Silver','Unlicensed Exterminator':'Silver','The Dungeon Is Not a Treadmill':'Silver','Certified Corridor Enthusiast':'Legendary','Management Has Been Terminated':'Gold','The Neighborhood Is Quiet Now':'Gold','Population Control Department':'Celestial'};
+function achievementEntry(name){
+  const tier=state.achievementPrizes?.[name]??historicPrizes[name];
+  return '<details class="earned-award"><summary>✦ '+safeAttr(name)+'</summary><p>'+safeAttr(achievementNotes[name]||'Earned during an earlier expedition.')+'</p>'+(tier?'<small>Reward · '+safeAttr(tier)+' loot box ×1</small>':'')+'</details>';
+}
+
+function awardBox(tier){let id='box-'+tier,it=state.inventory.find(i=>i.id===id);if(it)it.qty++;else state.inventory.push({id,name:tier+' loot box',icon:'🎁',qty:1,desc:'Open for randomized dungeon rewards.'});notify(tier.toUpperCase()+' LOOT BOX AWARDED');return tier;}function ridiculous(n,tier='Bronze'){if(state.achievements.includes(n))return;const bonus=tier!=='Bronze'||n==='Local Pest Control';unlock(n,bonus?awardBox(tier):null);ai('NEW ACHIEVEMENT: '+n+'.'+(bonus?' A '+tier+' box lands in your backpack.':' The audience noticed.'));if(tab==='inventory')openTab(tab)}const awardQueue=[];
 let awardShowing=false;
 function achievementBanner(name,tier){
   awardQueue.push({name,tier});if(!awardShowing)playAchievement();
@@ -632,7 +695,8 @@ function playAchievement(){
   }
   if(!awardShowing){pauseInspectionClock();awardShowing=true}
   $('#awardName').textContent=next.name;
-  $('#awardReward').textContent=next.tier?next.tier+' loot box awarded':'The audience insists you acknowledge this.';
+  $('#awardDescription').textContent=achievementNotes[next.name]||'Earned during your expedition.';
+  $('#awardReward').hidden=!next.tier;$('#awardReward').textContent=next.tier?'🎁 '+next.tier+' loot box ×1 · Added to backpack':'';
   if(!el.open)el.showModal();
   $('#awardSkip').focus({preventScroll:true});
   beep(523,.09,'sine');setTimeout(()=>beep(784,.15,'sine'),95);
@@ -727,7 +791,7 @@ function inspectOwned(item,duplicate=false){
   inspectItem(item,item.slot?(equipped?'Unequip':'Equip'):item.id.startsWith('box-')?'Open':'Use',
     usable&&!(duplicate&&equipped)?()=>useItem(item.id):null);
 }
-function unlock(n,tier=null){if(!state.achievements.includes(n)){state.achievements.push(n);achievementBanner(n,tier);feed('Achievement unlocked: <b>'+n+'</b>.');}}
+function unlock(n,tier=null){if(!state.achievements.includes(n)){state.achievements.push(n);if(tier)(state.achievementPrizes??={})[n]=tier;achievementBanner(n,tier);feed('Achievement unlocked: <b>'+n+'</b>.');}}
 const rewardCatalog=[
  {id:'dock-knife',name:'Dock knife',slot:'weapon',look:'knife',icon:'⚔',mods:{power:3}},
  {id:'raincoat',name:'Riveted raincoat',slot:'armor',look:'coat',icon:'⬟',mods:{armor:3}},
@@ -1122,7 +1186,7 @@ let m=$('#minimap'),w=m.width,h=m.height;mini.fillStyle='#070b0f';mini.fillRect(
 mini.fillStyle='#f2d36e';mini.beginPath();mini.arc(ox+(state.x+.5)*s,oy+(state.y+.5)*s,3.5,0,Math.PI*2);mini.fill();for(const p of Object.values(netPlayers)){if(p.floor!==state.floor||p.hall)continue;mini.fillStyle='#65c9d5';mini.beginPath();mini.arc(ox+(p.x+.5)*s,oy+(p.y+.5)*s,3,0,Math.PI*2);mini.fill()}}
 function drawFieldMap(){let m=$('#fieldMini');if(m){let c=m.getContext('2d');c.clearRect(0,0,m.width,m.height);c.drawImage($('#minimap'),0,0,m.width,m.height)}}function drawPortrait(){portrait.fillStyle='#0b1117';portrait.fillRect(0,0,96,96);if(state.character){portrait.imageSmoothingEnabled=false;portrait.drawImage(crawlerPose('down',0),12,0,72,96);return}const im=sprites['hero-front'];if(im?.complete&&im.naturalWidth){let h=88,w=h*im.naturalWidth/im.naturalHeight;portrait.drawImage(im,(96-w)/2,4,w,h)}else{portrait.fillStyle='#1c2b36';portrait.fillRect(18,16,60,65)}portrait.strokeStyle='#a98852';portrait.strokeRect(1,1,94,94)}
 function renderFeed(){let el=$('#feed');if(!el)return;el.innerHTML=(state.feed||[]).slice(0,9).map(x=>`<div class="feed-line"><span class="time">${x.tm}</span>${x.s}</div>`).join('')||'<div class="feed-line">The dungeon is quiet. For now.</div>'}
-function render(){if(!state)return;const hotLabel=$('[data-action="hot"] small');if(hotLabel)hotLabel.textContent=supplies[state.hotItem]?.short||'Hot list';let hud=$('#fieldHud');if(hud)hud.innerHTML=`<div class="field-stat crawler-hud-name">${safeAttr(crawlerTitle())}</div><div class="field-stat">HP ${state.hp}/${state.maxHp} ${conditionText()}<div class="bar hp"><i style="width:${100*state.hp/state.maxHp}%"></i></div></div><div class="field-stat">MP ${state.mp}/${state.maxMp}<div class="bar mp"><i style="width:${100*state.mp/Math.max(1,state.maxMp)}%"></i></div></div><div class="field-stat">LV ${state.level} · XP ${state.xp}/${state.nextXp}</div>`;$('#hpBar').style.width=100*state.hp/state.maxHp+'%';$('#mpBar').style.width=100*state.mp/Math.max(1,state.maxMp)+'%';$('#xpBar').style.width=100*state.xp/state.nextXp+'%';$('#hpText').textContent=`${state.hp}/${state.maxHp}`;$('#mpText').textContent=`${state.mp}/${state.maxMp}`;$('#xpText').textContent=`${state.xp}/${state.nextXp}`;$('#heroLevel').textContent=`LEVEL ${state.level} • ${state.level<4?'NOVICE':state.level<8?'DELVER':'VETERAN'}`;$('#powerStat').textContent=state.power;$('#armorStat').textContent=state.armor;$('#goldStat').textContent=state.gold;$('#depthStat').textContent=state.floor;$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();$('#coords').textContent=`X: ${String(state.x).padStart(2,'0')} / Y: ${String(state.y).padStart(2,'0')}`;$('#quickItems').innerHTML=state.inventory.slice(0,4).map(i=>`<button class="quick-slot" data-item="${i.id}" title="${i.name}">${i.icon}<small>${i.qty}</small></button>`).join('');$('#achievements').innerHTML=state.achievements.map(a=>`<span class="achievement">✦ ${a}</span>`).join('')||'<span class="muted">No accolades yet.</span>';$('#goals').innerHTML=`<div class="goal"><em>◈</em> Explore the chamber and find the gold stairs.</div><div class="goal"><em>⚔</em> Enemies defeated: ${state.kills}</div><div class="goal"><em>✧</em> Reach floor ${Math.floor(state.floor/3+1)*3} to face the next guardian.</div>`;let b=entities.find(e=>e.boss&&e.alive);if(b){$('#bossbar').classList.remove('hidden');$('#bossHp').style.width=100*b.hp/b.max+'%';$('#bossHpText').textContent=`${Math.max(0,b.hp)} / ${b.max}`}else $('#bossbar').classList.add('hidden');const target=interactionTarget();
+function render(){if(!state)return;const hotLabel=$('[data-action="hot"] small');if(hotLabel)hotLabel.textContent=supplies[state.hotItem]?.short||'Hot list';let hud=$('#fieldHud');if(hud)hud.innerHTML=`<div class="field-stat crawler-hud-name">${safeAttr(crawlerTitle())}</div><div class="field-stat">HP ${state.hp}/${state.maxHp} ${conditionText()}<div class="bar hp"><i style="width:${100*state.hp/state.maxHp}%"></i></div></div><div class="field-stat">MP ${state.mp}/${state.maxMp}<div class="bar mp"><i style="width:${100*state.mp/Math.max(1,state.maxMp)}%"></i></div></div><div class="field-stat">LV ${state.level} · XP ${state.xp}/${state.nextXp}</div>`;$('#hpBar').style.width=100*state.hp/state.maxHp+'%';$('#mpBar').style.width=100*state.mp/Math.max(1,state.maxMp)+'%';$('#xpBar').style.width=100*state.xp/state.nextXp+'%';$('#hpText').textContent=`${state.hp}/${state.maxHp}`;$('#mpText').textContent=`${state.mp}/${state.maxMp}`;$('#xpText').textContent=`${state.xp}/${state.nextXp}`;$('#heroLevel').textContent=`LEVEL ${state.level} • ${state.level<4?'NOVICE':state.level<8?'DELVER':'VETERAN'}`;$('#powerStat').textContent=state.power;$('#armorStat').textContent=state.armor;$('#goldStat').textContent=state.gold;$('#depthStat').textContent=state.floor;$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();$('#coords').textContent=`X: ${String(state.x).padStart(2,'0')} / Y: ${String(state.y).padStart(2,'0')}`;$('#quickItems').innerHTML=state.inventory.slice(0,4).map(i=>`<button class="quick-slot" data-item="${i.id}" title="${i.name}">${i.icon}<small>${i.qty}</small></button>`).join('');const awardList=$('#achievements'),signature=JSON.stringify([state.achievements,state.achievementPrizes]);if(awardList.dataset.signature!==signature){awardList.dataset.signature=signature;awardList.innerHTML=state.achievements.map(achievementEntry).join('')||'<span class="muted">No accolades yet.</span>';}$('#goals').innerHTML=`<div class="goal"><em>◈</em> Explore the chamber and find the gold stairs.</div><div class="goal"><em>⚔</em> Enemies defeated: ${state.kills}</div><div class="goal"><em>✧</em> Reach floor ${Math.floor(state.floor/3+1)*3} to face the next guardian.</div>`;let b=entities.find(e=>e.boss&&e.alive);if(b){$('#bossbar').classList.remove('hidden');$('#bossHp').style.width=100*b.hp/b.max+'%';$('#bossHpText').textContent=`${Math.max(0,b.hp)} / ${b.max}`}else $('#bossbar').classList.add('hidden');const target=interactionTarget();
 for(const button of $$('[data-action="interact"]')){
 button.classList.toggle('available',!!target&&!state.dead);
 const label=target?.label||'Interact';if(button.title!==label){button.title=label;button.setAttribute('aria-label','Interact: '+label)}
@@ -1264,7 +1328,7 @@ function skillsPanel(){
     }
     html+=limb(name,locked?'Unlocks on Floor 4':active?'Active class':'Class path',nodes);
   }
-  return html+'</div>';
+  return html+spellLoadoutPanel()+'</div>';
 }
 let bagSection='general';
 const POCKET_SIZE=12;
@@ -1308,6 +1372,12 @@ function backpack(){
   });
   if(bagSection==='skills'){
     for(const limb of $$('[data-path]'))limb.ontoggle=()=>{if(!limb.isConnected)return;if(limb.open)openPaths.add(limb.dataset.path);else openPaths.delete(limb.dataset.path)};
+    for(const b of $$('[data-prepare]'))b.onclick=()=>{
+      const id=b.dataset.prepare,ready=prepared();if(!learned(id))return;
+      if(ready.includes(id))state.spellLoadout=ready.filter(v=>v!==id);
+      else if(ready.length<3)state.spellLoadout=[...ready,id];else return;
+      openPaths.add('Spells');persistCampaign();backpack();
+    };
     if($('#bagMend'))$('#bagMend').onclick=()=>{if(mend()){persistCampaign();render();backpack()}else notify('Mend requires injury and 8 mana.')};
     $$('[data-up]').forEach(button=>{button.disabled=state.skillPoints<1;button.onclick=()=>{
       if(state.skillPoints<1)return;

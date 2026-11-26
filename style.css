@@ -182,3 +182,16 @@ body:has(#modal:not(.hidden)){overflow:hidden}.modal,.modal-card{overscroll-beha
 #saveSlots section{display:grid;grid-template-columns:1fr auto auto;gap:5px;padding:9px 0;border-top:1px solid #475058}#saveSlots small{grid-column:1;line-height:1.4;color:#c6c4b7}#saveSlots button{grid-row:1/3}#saveSlots button:first-of-type{grid-column:2}#saveSlots button:last-of-type{grid-column:3}
 #campaignNotice:not(:empty){margin:8px 0;padding:8px;border:1px solid #9b8159}#campaignNotice button+button{margin-left:8px}.menu-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .companion-profile{display:flex;align-items:center;gap:12px;margin-top:10px}.companion-profile canvas{width:84px;height:84px;image-rendering:pixelated;background:#28333b;border:1px solid #776447}.companion-profile h3{margin:0}#petNameForm{display:flex;align-items:end;gap:6px}#petNameForm label{display:grid;gap:4px;flex:1;min-width:0}#petNameForm input{min-width:0;padding:8px}
+
+.modal-card:has(.duel){background:linear-gradient(125deg,#23232b,#12191e 65%,#262522);border-color:#a48c67}
+.duel h2{font:700 clamp(21px,5vmin,35px)/1.05 Georgia,serif;color:#ffeac7;letter-spacing:.025em}
+.duel .command-fan{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 9px;padding:5px 7px;background:linear-gradient(100deg,#090e14b3,transparent)}
+.command-fan .duel-command{display:flex;align-items:center;gap:7px;min-height:42px;text-align:left;position:relative;isolation:isolate;overflow:hidden;border:0;border-left:3px solid #b39b70;border-radius:0;background:linear-gradient(105deg,#31343c 0%,#161c24 78%,#443d34);color:#f9eacf;box-shadow:inset 0 -1px #8d7853;transform:skewX(-8deg);padding:4px 10px;font:600 16px/1.12 Georgia,serif}
+.command-fan .duel-command:nth-child(2n){transform:translateY(3px) skewX(-8deg)}.duel-command i,.duel-command span{transform:skewX(8deg)}.duel-command i{font:17px Georgia;color:#e5be80;min-width:20px}
+.command-fan .duel-command[data-boss=attack]{background:linear-gradient(110deg,#623c37,#262027 80%);border-left-color:#eead89}
+.command-fan .duel-command[data-boss=spells]{background:linear-gradient(110deg,#434059,#222130 80%)}
+.command-fan .duel-command:disabled{opacity:.45}.command-fan .duel-command:focus-visible{outline:2px solid #ffdf9a;outline-offset:1px}.command-fan p{grid-column:1/-1;margin:2px}
+.duel-stage:is([data-move=bell],[data-move=tide]) .impact{opacity:1;color:#a4ebeb;text-shadow:0 0 10px #39a3a6}
+#awardDescription{max-width:45ch;margin:12px auto;color:#fff4de;font:600 clamp(14px,3vmin,20px)/1.35 system-ui}
+#awardReward:not([hidden]){display:table;margin:10px auto;padding:6px 12px;background:#ffe4a2;color:#3a1937;border:2px solid #ecad55;font-weight:800}
+.earned-award{width:100%;padding:5px;border-bottom:1px solid #4d483e}.earned-award summary{color:#e9ce93;cursor:pointer}.earned-award p{margin:5px 0;color:#e1ded5}.earned-award small{color:#eaca87}
