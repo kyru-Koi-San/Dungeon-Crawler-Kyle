@@ -3,7 +3,8 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const safeAttr=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const canvas=$('#game'),ctx=canvas.getContext('2d'),mini=$('#minimap').getContext('2d'),portrait=$('#portrait').getContext('2d');
 const TILE=32;let W=72,H=48;const saveKey='dck-final-save-v1';
-const names=['Pioneer Square • Bell Vault','Elliott Bay • Floodworks','SoDo • Iron Cage','Capitol Hill • Signal Room','Lake Union • Lost Archive','Queen Anne • Sky Relay'];
+const names=['Pioneer Square • Bell Vault','Elliott Bay • Floodworks','SoDo • Iron Cage','Capitol Hill • Signal Room','Lake Union • Lost Archive','Queen Anne • Sky Relay','Ballard • Lock Chambers','Fremont • Drawbridge Works','Wallingford • Mirror Well','Georgetown • Boiler House','Beacon Hill • Buried Station','Rainier Valley • Cinder Court','West Seattle • Salt Galleries','Magnolia • Watchtower','Interbay • Iron Tribunal','Duwamish • Black Channel','Alki • Beacon Crypt','Seattle Underground • Last Bell'];
+const FINAL_FLOOR=18;
 const quips=['Welcome, crawler. Try not to die before the opening credits.','Your posture suggests a lack of confidence. And armor.','The audience loves a comeback. They love a dismemberment more.','I have seen rats with better tactical instincts.','Excellent footwork. Shame about the rest of you.','A new floor! The same questionable life choices.','Remember: pain is temporary. The highlight reel is forever.','That corpse had a family. Probably.','Your odds are improving. They were dreadful, so this is relative.','Do keep moving. The walls are not decorative.'];
 const enemyTypes=[['Hollow',18,5,12,'☠'],['Cave goblin',25,7,16,'♟'],['Crypt spider',15,4,10,'✣'],['Ash knight',42,10,28,'♜'],['Mire wretch',32,8,20,'♟'],['Bone archer',22,6,17,'➶'],['Goblin hexer',29,8,21,'✧']];
 let state,tiles=[],seen=[],entities=[],particles=[],keys={},last=0,acc=0,walkUntil=0,attackStarted=0,sound=true,audio=null,toastTimer=0,attackCooldown=0,spawnedFloor=0,tab='journal',touchMove=null,netPlayers={},netSyncClock=0;
@@ -485,9 +486,9 @@ function chooseLanding(){
   if(eligible.length)[state.x,state.y]=eligible[0];
 }
 
-function generate(){state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;W=72;H=48;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
+function generate(){state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;const depth=Math.min(FINAL_FLOOR,state.floor)-1;W=118-depth*4;H=80-depth*2;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
 // carve connected rooms and corridors
-let rooms=[];for(let i=0;i<32;i++){let rw=4+Math.floor(r()*6),rh=3+Math.floor(r()*5),rx=1+Math.floor(r()*((state.floor%3===0?W-12:W)-rw-2)),ry=1+Math.floor(r()*(H-rh-2));let room={x:rx,y:ry,w:rw,h:rh,cx:Math.floor(rx+rw/2),cy:Math.floor(ry+rh/2)};for(let y=ry;y<ry+rh;y++)for(let x=rx;x<rx+rw;x++)tiles[y][x]=1;if(rooms.length){let p=rooms[rooms.length-1];let x=room.cx,y=room.cy;while(x!==p.cx){tiles[y][x]=1;x+=Math.sign(p.cx-x)}while(y!==p.cy){tiles[y][x]=1;y+=Math.sign(p.cy-y)}}rooms.push(room)}
+let rooms=[];for(let i=0;i<54-depth*2;i++){let rw=4+Math.floor(r()*6),rh=3+Math.floor(r()*5),rx=1+Math.floor(r()*((state.floor%3===0?W-12:W)-rw-2)),ry=1+Math.floor(r()*(H-rh-2));let room={x:rx,y:ry,w:rw,h:rh,cx:Math.floor(rx+rw/2),cy:Math.floor(ry+rh/2)};for(let y=ry;y<ry+rh;y++)for(let x=rx;x<rx+rw;x++)tiles[y][x]=1;if(rooms.length){let p=rooms[rooms.length-1];let x=room.cx,y=room.cy;while(x!==p.cx){tiles[y][x]=1;x+=Math.sign(p.cx-x)}while(y!==p.cy){tiles[y][x]=1;y+=Math.sign(p.cy-y)}}rooms.push(room)}
 // walls around corridors
 for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++)if(tiles[y][x]===0){for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(tiles[y+dy]?.[x+dx]===1){tiles[y][x]=2;break}}
 state.x=rooms[0].cx;state.y=rooms[0].cy;state.rooms=rooms.length;let safe=rooms[0];state.safe={x:safe.cx,y:safe.cy};state.sanctuaries=[{...state.safe,rested:false}];for(let room of rooms.slice(2,-1)){if(state.sanctuaries.length>=6)break;if(r()<.28&&state.sanctuaries.every(q=>Math.hypot(q.x-room.cx,q.y-room.cy)>8))state.sanctuaries.push({x:room.cx,y:room.cy,rested:false})}buildSanctuaries();chooseLanding();let npc=rooms[1];state.npc={x:npc.cx,y:npc.cy,met:false};state.rested=false;
@@ -501,8 +502,9 @@ if(state.floor<=3){
  const hp=(rat?7:13)+state.floor*2;
  entities.push({type:'enemy',name:rat?'Drain rat':'Tunnel goblin',sprite:rat?'sewer-rat':'goblin',small:true,x,y,hp,max:hp,atk:(rat?1:2)+state.floor,xp:(rat?6:10)+state.floor,cool:0,alive:true,boss:false});return
 }
-let t=enemyTypes[Math.min(enemyTypes.length-1,Math.floor(r()*Math.min(enemyTypes.length,2+state.floor/2)))];entities.push({type:'enemy',name:t[0],sprite:({'Hollow':'skeleton','Cave goblin':'goblin','Crypt spider':'spider','Ash knight':'bone-champion','Mire wretch':'wraith','Bone archer':'archer','Goblin hexer':'shaman'})[t[0]],x,y,hp:t[1]+state.floor*4,max:t[1]+state.floor*4,atk:t[2]+Math.floor(state.floor/2),xp:t[3]+state.floor*2,icon:t[4],cool:0,alive:true,boss:false});}
+let t=enemyTypes[Math.min(enemyTypes.length-1,Math.floor(r()*Math.min(enemyTypes.length,2+state.floor/2)))];entities.push({type:'enemy',name:t[0],sprite:({'Hollow':'skeleton','Cave goblin':'goblin','Crypt spider':'spider','Ash knight':'bone-champion','Mire wretch':'wraith','Bone archer':'archer','Goblin hexer':'shaman'})[t[0]],x,y,hp:t[1]+state.floor*4,max:t[1]+state.floor*4,atk:t[2]+Math.floor(state.floor*.85),xp:t[3]+state.floor*2,icon:t[4],cool:0,alive:true,boss:false});}
 function spawnBoss(x,y){let brood=state.floor%9===6,phantom=state.floor%9===0,hp=brood?155+state.floor*22:phantom?145+state.floor*24:130+state.floor*20;let b={type:'enemy',name:brood?'The Brood Matriarch':phantom?'The Hollow Regent':'The Ossuary Warden',sprite:brood?'spider-boss':phantom?'wraith':'bone-champion',x,y,hp,max:hp,atk:14+state.floor*2,xp:100+state.floor*10,icon:'♛',cool:0,alive:true,boss:true};if(state.floor===3)Object.assign(b,{name:'Pip, Keeper of the Cage',sprite:'goblin',small:true,hp:48,max:48,atk:5});
+if(state.floor===FINAL_FLOOR)b.name='The Last Bellkeeper';
 entities.push(b);state.boss=entities.length-1;$('#bossbar').classList.remove('hidden');$('#bossName').textContent=b.name;}
 function tile(x,y){return tiles[y]?.[x]??0}function solid(x,y){return !!state.scenery?.some(p=>p.art<3&&p.x===x&&p.y===y)||(tile(x,y)!==1&&tile(x,y)!==3)||!!(bossFight&&state.arena?.gates?.some(g=>g.x===x&&g.y===y))}
 function reveal(){if(state.hall)return;let rad=state.torchTurns>0?7:5;for(let y=Math.max(0,state.y-rad);y<=Math.min(H-1,state.y+rad);y++)for(let x=Math.max(0,state.x-rad);x<=Math.min(W-1,state.x+rad);x++)if(Math.hypot(x-state.x,y-state.y)<=rad)seen[y][x]=true}
@@ -650,6 +652,52 @@ function itemArt(item){
   const known=['box','tonic','shard','torch','gold','food','biscuit',...rewardCatalog.map(i=>i.id)];
   return known.includes(art)?art:'satchel';
 }
+function gearModifiers(piece){
+  if(!piece)return {};
+  return piece.mods||{[piece.slot==='weapon'?'power':'armor']:piece.bonus||0};
+}
+function showComparison(item){
+  const panel=$('#itemCompare');panel.replaceChildren();
+  if(item.art!==undefined||item.id.startsWith('box-')||item.id==='gold')return;
+  const gear=!!item.slot;
+  const peers=state.inventory.filter(other=>other.qty>0&&other.id!==item.id&&
+    (gear?other.slot===item.slot:!other.slot&&!other.id.startsWith('box-')));
+  if(!gear&&!peers.length)return;
+  const worn=state.equipment?.[item.slot],choices=gear?[null,...peers]:peers;
+  const label=i=>i.name+(i.rank?' · Rank '+i.rank:'');
+  const select=document.createElement('select');select.setAttribute('aria-label','Compare with');
+  choices.forEach((other,i)=>{
+    const name=other?label(other)+(gear&&other.id===worn?' (equipped)':''):({weapon:'Unarmed',armor:'Everyday clothes',charm:'Empty charm slot'})[item.slot];
+    select.add(new Option(name,String(i)));
+  });
+  select.selectedIndex=gear?Math.max(0,choices.findIndex(i=>i&&i.id===worn)):0;
+  if(gear&&item.id===worn&&peers.length)select.selectedIndex=1;
+  const caption=document.createElement('label');caption.append('Compare with ',select);panel.append(caption);
+  const table=document.createElement('table');panel.append(table);
+  function draw(){
+    const other=choices[select.selectedIndex];table.replaceChildren();
+    const head=table.createTHead().insertRow();
+    for(const title of [gear?'Stat':'Item',other?label(other):select.selectedOptions[0].textContent,label(item),...(gear?['Change']:[])]){
+      const cell=document.createElement('th');cell.textContent=title;head.append(cell);
+    }
+    const body=table.createTBody();
+    const row=(values,delta=0)=>{const tr=body.insertRow();for(const value of values)tr.insertCell().textContent=value;if(delta)tr.lastChild.className=delta>0?'gain':'loss'};
+    if(gear){
+      const a=gearModifiers(item),b=gearModifiers(other);
+      for(const [key,title] of Object.entries({power:'Power',armor:'Armor',spellBonus:'Spell bonus'})){
+        if(!(key in a)&&!(key in b))continue;
+        const delta=(a[key]||0)-(b[key]||0);
+        row([title,b[key]||0,a[key]||0,(delta>0?'+':'')+delta],delta);
+      }
+    }else{
+      const effect=i=>supplies[i.id]?.desc||(i.id==='shard'?'Restores 20 mana.':i.desc)||'No listed effect.';
+      row(['Effect',effect(other),effect(item)]);
+      row(['In pack',quantity(other.id),quantity(item.id)]);
+    }
+  }
+  select.onchange=draw;draw();
+}
+
 function inspectItem(item,label,action){
   if(!item||awardShowing)return;
   const screen=$('#inspectScreen');
@@ -665,7 +713,7 @@ function inspectItem(item,label,action){
   }
   $('#inspectType').textContent=item.art!==undefined?'Field discovery':item.slot||'Inventory item';
   $('#inspectTitle').textContent=item.name;
-  $('#inspectText').textContent=item.desc||'';
+  $('#inspectText').textContent=item.desc||'';showComparison(item);
   const confirm=$('#inspectAction');confirm.hidden=!action;confirm.textContent=label||'';
   const dismiss=()=>{screen.close();resumeInspectionClock()};
   $('#inspectBack').onclick=dismiss;screen.oncancel=e=>{e.preventDefault();dismiss()};
@@ -709,7 +757,7 @@ function equipItem(item){
   const previous=state.inventory.find(i=>i.id===state.equipment[item.slot]);
   function apply(piece,sign){
     if(!piece)return;
-    const mods=piece.mods||{[piece.slot==='weapon'?'power':'armor']:piece.bonus||0};
+    const mods=gearModifiers(piece);
     for(const [stat,n] of Object.entries(mods))state[stat]=(state[stat]||0)+n*sign;
   }
   apply(previous,-1);
@@ -730,12 +778,18 @@ if(it.slot){equipItem(it);save();render();openTab('inventory');return}
 if(it.effect==='boon'&&state.floor<4){notify('Spell boons unlock on Floor 4.');return}
 if(it.effect==='buff'){state.power-=state.teaPower||0;state.teaPower=2+it.rank;state.power+=state.teaPower;it.qty--;notify('Ember tea active on this floor.')}
 else if(it.effect==='boon'){if(state.mp<5){notify('Requires 5 MP.');return}state.mp-=5;state.spellBonus=(state.spellBonus||0)+it.rank;it.qty--;notify('Spell boon learned.')}
-else if(id.startsWith('box-')){it.qty--;const tier=id.slice(4),reward=rollReward(tier);showModal('<div class="box-reveal"><h2>'+safeAttr(tier)+' loot box</h2><div class="reward-chest">'+reward.icon+'</div><h3>'+reward.name+'</h3><p>'+reward.desc+'</p><button class="widebtn" id="rewardDone">Back to backpack</button></div>');$('#rewardDone').onclick=backpack;feed('Unboxed '+reward.name+'.')}else if(id==='tonic'){let v=Math.min(35,state.maxHp-state.hp);if(!v&&!conditionText()){notify('Health already full.');return}restoreHealth(v);it.qty--;feed('Health potion restores '+v+' HP and treats injuries.')}else if(id==='shard'){let v=Math.min(20,state.maxMp-state.mp);if(!v){notify('Mana already full.');return}state.mp+=v;it.qty--;feed('Mana shard restores '+v+' MP.')}else if(id==='torch'){state.torchTurns=40;it.qty--;reveal();feed('You light a torch. The shadows retreat.')}save();render();if(!quick&&!id.startsWith('box-'))openTab('inventory')}
+else if(id.startsWith('box-')){it.qty--;const tier=id.slice(4),reward=rollReward(tier);showModal('<div class="box-reveal"><h2>'+safeAttr(tier)+' loot box</h2><div class="reward-chest">'+reward.icon+'</div><h3>'+reward.name+'</h3><p>'+reward.desc+'</p><button class="widebtn" id="inspectReward">Inspect reward</button><button class="widebtn" id="rewardDone">Back to backpack</button></div>');$('#inspectReward').onclick=()=>inspectOwned(reward);$('#rewardDone').onclick=backpack;feed('Unboxed '+reward.name+'.')}else if(id==='tonic'){let v=Math.min(35,state.maxHp-state.hp);if(!v&&!conditionText()){notify('Health already full.');return}restoreHealth(v);it.qty--;feed('Health potion restores '+v+' HP and treats injuries.')}else if(id==='shard'){let v=Math.min(20,state.maxMp-state.mp);if(!v){notify('Mana already full.');return}state.mp+=v;it.qty--;feed('Mana shard restores '+v+' MP.')}else if(id==='torch'){state.torchTurns=40;it.qty--;reveal();feed('You light a torch. The shadows retreat.')}save();render();if(!quick&&!id.startsWith('box-'))openTab('inventory')}
 function nextFloor(){if(state.chapter==='surface'){
 state.chapter='mine';generate();$('#objective').textContent='FIND THE STAIRS • SURVIVE';
 caption('Beneath Seattle','Street noise fades above you. A blue bell rope trails under Seattle. Beside it, someone has scratched three words: Find the keeper.',true);
 const guild=state.sanctuaries?.find(q=>q.door);if(guild&&personalMenusLocked())enterHall(guild);persistCampaign();return}
-if(partyGuest()){notify('Wait for the party host to descend.');return}if(entities.some(e=>e.boss&&e.alive)){notify('Defeat the guardian before descending.');return}ridiculous('Elevator Out of Service','Silver');state.floor++;if(state.floor===4&&state.maxMp===0){state.maxMp=35;state.mp=35}state.hp=Math.min(state.maxHp,state.hp+18);state.mp=Math.min(state.maxMp,state.mp+8);state.gold+=10;unlock('Deeper down');feed('You descend to floor '+state.floor+'. +10 gold, recovered vitality.');generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();
+if(partyGuest()){notify('Wait for the party host to descend.');return}if(entities.some(e=>e.boss&&e.alive)){notify('Defeat the guardian before descending.');return}
+if(state.floor>=FINAL_FLOOR){
+  if(!state.campaignWon){state.campaignWon=true;feed('The last bell rings. Seattle hears the all-clear.');persistCampaign();sendPartyWorld()}
+  showModal('<h2>Seattle hears the last bell</h2><p>You cleared all 18 floors. Above the rescue shaft, the street lamps come back on.</p><button class="widebtn" id="campaignDone">Return to the floor</button>');
+  $('#campaignDone').onclick=closeModal;return;
+}
+ridiculous('Elevator Out of Service','Silver');state.floor++;if(state.floor===4&&state.maxMp===0){state.maxMp=35;state.mp=35}state.hp=Math.min(state.maxHp,state.hp+18);state.mp=Math.min(state.maxMp,state.mp+8);state.gold+=10;unlock('Deeper down');feed('You descend to floor '+state.floor+'. +10 gold, recovered vitality.');generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();
 const reports={
 2:['Iven’s radio','Elliott Bay is leaking through the west wall. Follow the blue pipes to the cage motor.'],
 3:['Rescue frequency','The SoDo lift is drawing power again. Something is holding the cage below the platform.'],
@@ -1020,7 +1074,7 @@ button.classList.toggle('available',!!target&&!state.dead);
 const label=target?.label||'Interact';if(button.title!==label){button.title=label;button.setAttribute('aria-label','Interact: '+label)}
 }
 document.body.classList.toggle('guild-locked',personalMenusLocked());chapterHUD();draw();drawMini();drawFieldMap();drawPortrait();renderFeed()}
-function trainBranch(n){if(personalMenusLocked()){lockHint();return}if(state.floor<4)return;let ranks=state.branches??={};let rank=ranks[n]||0;if(state.skillPoints<1||rank>=3||!state.specialization)return;let allowed={Vanguard:['Fortitude','Bulwark'],Arcanist:['Reservoir','Channeling'],Reaver:['Precision','Ferocity']}[state.specialization]||[];if(!allowed.includes(n)||(n===allowed[1]&&!(ranks[allowed[0]]>=2)))return;state.skillPoints--;ranks[n]=rank+1;if(n==='Fortitude'){state.maxHp+=10;state.hp+=10}else if(n==='Bulwark')state.armor+=2;else if(n==='Reservoir'){state.maxMp+=8;state.mp+=8}else if(n==='Channeling')state.spellBonus=(state.spellBonus||0)+5;else state.power+=n==='Ferocity'?3:2;save();render();openTab('skills')}function branchUI(){let a={Vanguard:['Fortitude','Bulwark'],Arcanist:['Reservoir','Channeling'],Reaver:['Precision','Ferocity']}[state.specialization];if(!a)return '';return '<div class="panel-title">CLASS SKILL TREE</div>'+a.map((n,i)=>'<button class="widebtn" data-branch="'+n+'" '+((i&&!(state.branches?.[a[0]]>=2))||(state.branches?.[n]||0)>=3?'disabled':'')+'>'+n+' • '+(state.branches?.[n]||0)+'/3 • 1 SP</button>').join('')}function removeClass(){
+function trainBranch(n){if(personalMenusLocked()){lockHint();return}if(state.floor<4)return;let ranks=state.branches??={};let rank=ranks[n]||0;if(state.skillPoints<1||rank>=3||!state.specialization)return;let allowed=skillPaths[state.specialization]?.nodes.map(([name])=>name)||[];if(!allowed.includes(n)||(n===allowed[1]&&!(ranks[allowed[0]]>=2)))return;state.skillPoints--;ranks[n]=rank+1;if(n==='Fortitude'){state.maxHp+=10;state.hp+=10}else if(n==='Bulwark')state.armor+=2;else if(n==='Reservoir'){state.maxMp+=8;state.mp+=8}else if(n==='Channeling')state.spellBonus=(state.spellBonus||0)+5;else state.power+=n==='Ferocity'?3:2;save();render();openTab('skills')}function removeClass(){
 const ranks=state.branches||{};
 state.maxHp-=(state.specialization==='Vanguard'?15:0)+(ranks.Fortitude||0)*10;
 state.maxMp-=(state.specialization==='Arcanist'?20:0)+(ranks.Reservoir||0)*8;
@@ -1127,14 +1181,38 @@ function drawOutfit(){
   if(outfitAngle===3){g.translate(96,0);g.scale(-1,1)}
   g.drawImage(crawlerPose(dirs[outfitAngle],0),0,0,96,128);g.restore();
 }
-function skillsPanel(){return `<div class="panel-title">ABILITIES & TRAINING</div><div class="item-list"><div class="item-row"><span class="ico">⚔</span><div><b>Weapon mastery</b><small>Increase base strike damage. Current power: ${state.power}</small></div><button class="smallbtn" data-up="power">TRAIN • 1 SP</button></div><div class="item-row"><span class="ico">⬟</span><div><b>Iron constitution</b><small>Increase maximum health and armor.</small></div><button class="smallbtn" data-up="armor">TRAIN • 1 SP</button></div></div><p>Unspent skill points: <b>${state.skillPoints}</b></p><div class="panel-title">SPECIALIZATION</div><p>${state.floor<4?'Race and class unlock on Floor 4':state.specialization||'Choose your class'}</p>${branchUI()}${state.floor<4?'': '<button class="widebtn" data-class="Vanguard">VANGUARD • +15 HP, +2 armor</button><button class="widebtn" data-class="Arcanist">ARCANIST • +20 MP</button><button class="widebtn" data-class="Reaver">REAVER • +4 power</button>'}`}
+const skillPaths={
+  Vanguard:{bonus:'+15 maximum health · +2 armor',nodes:[['Fortitude','+10 maximum health'],['Bulwark','+2 armor']]},
+  Arcanist:{bonus:'+20 maximum mana · unlock Mend',nodes:[['Reservoir','+8 maximum mana'],['Channeling','+5 spell bonus']]},
+  Reaver:{bonus:'+4 power',nodes:[['Precision','+2 power'],['Ferocity','+3 power']]}
+};
+const openPaths=new Set(['Foundations']);
+function skillsPanel(){
+  const points=state.skillPoints;
+  const node=(name,info,control)=>'<div class="skill-node"><div><b>'+name+'</b><small>'+info+'</small></div>'+control+'</div>';
+  const limb=(name,info,nodes)=>'<details class="skill-limb" data-path="'+name+'" '+(openPaths.has(name)?'open':'')+'><summary>'+name+'<small>'+info+'</small></summary><div class="skill-stem">'+nodes+'</div></details>';
+  const cost=(attr,disabled=false)=>'<button class="smallbtn" '+attr+' '+(!points||disabled?'disabled':'')+'>Train · 1 SP</button>';
+  let html='<div class="skill-tree"><div class="skill-root">Skill tree <b>'+points+' SP available</b></div>';
+  html+=limb('Foundations','All crawlers',node('Weapon mastery','+2 power',cost('data-up="power"'))+node('Iron constitution','+15 maximum health · +1 armor',cost('data-up="armor"')));
+  for(const [name,path] of Object.entries(skillPaths)){
+    const active=state.specialization===name,locked=state.floor<4;
+    let nodes=node(name,path.bonus,active?'':locked?'':'<button class="smallbtn" data-class="'+name+'">Choose class</button>');
+    for(const [i,[skill,effect]] of path.nodes.entries()){
+      const rank=active?(state.branches?.[skill]||0):0,requires=i&&(!active||(state.branches?.[path.nodes[0][0]]||0)<2);
+      nodes+=node(skill+' · '+rank+'/3',effect+' per rank'+(requires?' · Requires '+path.nodes[0][0]+' 2/3':''),rank===3?'':cost('data-branch="'+skill+'"',!active||locked||requires));
+    }
+    html+=limb(name,locked?'Unlocks on Floor 4':active?'Active class':'Class path',nodes);
+  }
+  return html+'</div>';
+}
 let bagSection='general';
 const POCKET_SIZE=12;
 function backpack(){
   if(personalMenusLocked()){lockHint();return}
   if(state.dead||bossFight||activeLoot||remoteLoot||state.chapter==='create')return;
   const count=item=>item.qty-(state.equipment?.[item.slot]===item.id?1:0);
-  const items=state.inventory.filter(item=>count(item)>0);
+  const boxes=bagSection==='boxes';
+  const items=state.inventory.filter(item=>count(item)>0&&item.id.startsWith('box-')===boxes);
   const pages=Math.max(1,Math.ceil(items.length/POCKET_SIZE));
   bagPage=Math.min(bagPage,pages-1);
   const entries=items.slice(bagPage*POCKET_SIZE,(bagPage+1)*POCKET_SIZE);
@@ -1142,7 +1220,7 @@ function backpack(){
   const picture=item=>'<img class="pack-icon" alt="" src="item-art.svg#'+itemArt(item)+'">';
   const slots=entries.map((item,i)=>'<button class="bag-slot rank-'+Math.min(5,item.rank||1)+'" data-slot="'+i+'" title="'+safeAttr(item.name)+'">'+picture(item)+'<span>'+safeAttr(item.name)+'</span><small>×'+count(item)+'</small></button>');
   while(slots.length<POCKET_SIZE)slots.push('<div class="bag-slot empty" aria-hidden="true"></div>');
-  const sections=['general','equipped','skills'].map(id=>'<button data-bag-section="'+id+'" aria-pressed="'+(bagSection===id)+'">'+id+'</button>').join('');
+  const sections=['general','equipped','boxes','skills'].map(id=>'<button data-bag-section="'+id+'" aria-pressed="'+(bagSection===id)+'">'+(id==='boxes'?'Loot boxes':id)+'</button>').join('');
   const statLine='<div class="bag-stats">'+(conditionText()?'<span>'+conditionText()+'</span>':'')+'<span>HP '+state.hp+'/'+state.maxHp+'</span><span>MP '+state.mp+'/'+state.maxMp+'</span><span>Level '+state.level+'</span><span>Power '+state.power+'</span><span>Armor '+state.armor+'</span><span>Gold '+state.gold+'</span><span>XP '+state.xp+'/'+state.nextXp+'</span><span>Spell bonus '+(state.spellBonus||0)+'</span>'+(state.pet?'<span>'+animalNames[state.pet.species]+(state.pet.crawler?' · Crawler Lv '+state.pet.level:' · Pet')+'</span>':'')+(state.teaPower?'<span>Tea +'+state.teaPower+' power this floor</span>':'')+'</div>';
   let body;
   if(bagSection==='skills')body=skillsPanel()+(canMend()?'<button class="widebtn" id="bagMend">Mend · 8 MP</button>':'');
@@ -1154,11 +1232,11 @@ function backpack(){
       return '<button class="gear-socket" data-gear="'+slot+'">'+(item?picture(item):'<i>'+symbol[slot]+'</i>')+'<span><small>'+slot+'</small><b>'+safeAttr(item?.name||fallback[slot])+'</b></span></button>';
     }).join('')+'</div></div>';
   }else{
-    body='<div class="bag-grid">'+slots.join('')+'</div><div class="bag-nav"><button id="bagHot">X · '+hotName+'</button><button id="bagPrev" aria-label="Previous pocket" '+(!bagPage?'disabled':'')+'>‹</button><span>Pocket '+(bagPage+1)+' / '+pages+'</span><button id="bagNext" aria-label="Next pocket" '+(bagPage+1>=pages?'disabled':'')+'>›</button></div><div id="bagDetail" aria-live="polite">'+(items.length?'':'No loose items in your backpack.')+'</div>';
+    body='<div class="bag-grid">'+slots.join('')+'</div><div class="bag-nav">'+(boxes?'':'<button id="bagHot">X · '+hotName+'</button>')+'<button id="bagPrev" aria-label="Previous pocket" '+(!bagPage?'disabled':'')+'>‹</button><span>Pocket '+(bagPage+1)+' / '+pages+'</span><button id="bagNext" aria-label="Next pocket" '+(bagPage+1>=pages?'disabled':'')+'>›</button></div><div id="bagDetail" aria-live="polite">'+(items.length?'':boxes?'No unopened loot boxes.':'No loose items in your backpack.')+'</div>';
   }
   showModal('<div class="bag-layout rpg-pack" data-section="'+bagSection+'"><h2>Backpack</h2>'+(bagSection==='equipped'?'':outfitPanel())+statLine+'<nav class="bag-sections" aria-label="Backpack sections">'+sections+'</nav><div class="bag-section-body">'+body+'</div></div>');
   drawOutfit();$('#turnOutfit').onclick=()=>{outfitAngle=(outfitAngle+1)%4;drawOutfit()};
-  $$('[data-bag-section]').forEach(button=>button.onclick=()=>{bagSection=button.dataset.bagSection;backpack()});
+  $$('[data-bag-section]').forEach(button=>button.onclick=()=>{bagSection=button.dataset.bagSection;bagPage=0;backpack()});
   $$('[data-gear]').forEach(button=>button.onclick=()=>{
     const slot=button.dataset.gear,current=state.inventory.find(i=>i.id===state.equipment?.[slot]);
     if(current){inspectOwned(current);return}
@@ -1168,6 +1246,7 @@ function backpack(){
     $$('[data-choice]').forEach(b=>b.onclick=()=>inspectOwned(choices[Number(b.dataset.choice)]));
   });
   if(bagSection==='skills'){
+    for(const limb of $$('[data-path]'))limb.ontoggle=()=>{if(!limb.isConnected)return;if(limb.open)openPaths.add(limb.dataset.path);else openPaths.delete(limb.dataset.path)};
     if($('#bagMend'))$('#bagMend').onclick=()=>{if(mend()){persistCampaign();render();backpack()}else notify('Mend requires injury and 8 mana.')};
     $$('[data-up]').forEach(button=>{button.disabled=state.skillPoints<1;button.onclick=()=>{
       if(state.skillPoints<1)return;
@@ -1175,8 +1254,8 @@ function backpack(){
       feed('You train your '+button.dataset.up+'.');persistCampaign();render();backpack();
     }});
   }
-  if(bagSection!=='general')return;
-  $('#bagHot').onclick=chooseHot;
+  if(bagSection!=='general'&&!boxes)return;
+  if(!boxes)$('#bagHot').onclick=chooseHot;
   $('#bagPrev').onclick=()=>{bagPage--;backpack()};
   $('#bagNext').onclick=()=>{bagPage++;backpack()};
   $$('[data-slot]').forEach(button=>button.onclick=()=>{
@@ -1272,8 +1351,8 @@ if(nearby.length){if(partyGuest())window.DCKNet.sendIntent('loot');else startLoo
 let sanctuary=sanctuaryAt(state.x,state.y);if(sanctuary){sanctuaryMenu(sanctuary);return}notify('No remains or cache nearby.')}function action(a){if(a==='loot')loot();if(a==='attack')attack();if(a==='interact')interact();if(a==='hot')hotUse()}
 let worldClock=0;const remoteCooldown=new Map();
 function partyGuest(){return !!window.DCKNet?.inRoom&&!window.DCKNet.isHost}
-function sendPartyWorld(){if(!window.DCKNet?.isHost)return;window.DCKNet.sendWorld({floor:state.floor,loot:activeLoot,scenery:state.scenery,chests:(state.sanctuaries||[]).map(q=>!!q.cache),enemies:entities.map((e,i)=>({i,x:e.x,y:e.y,hp:e.hp,alive:e.alive,looted:!!e.looted})),collapse:Math.ceil(state.collapseLeft)})}
-function applyPartyWorld(w){if(!partyGuest()||!w||!Number.isInteger(w.floor)||w.floor<1||w.floor>999)return;syncLoot(w.loot);if(w.floor!==state.floor){bossFight=null;state.dead=false;state.hp=Math.max(1,state.hp);state.floor=w.floor;if(state.floor>=4&&!state.maxMp)state.mp=state.maxMp=35;generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();closeModal();notify('PARTY FLOOR '+state.floor)}if(Array.isArray(w.scenery))state.scenery=w.scenery;if(Array.isArray(w.chests))(state.sanctuaries||[]).forEach((q,i)=>q.cache=!!w.chests[i]);for(let v of w.enemies||[]){let e=entities[v.i];if(!e||!Number.isInteger(v.x)||!Number.isInteger(v.y)||v.x<0||v.x>=W||v.y<0||v.y>=H)continue;e.x=v.x;e.y=v.y;if(Number.isFinite(v.hp))e.hp=Math.max(0,Math.min(e.max||9999,v.hp));e.alive=!!v.alive;e.looted=!!v.looted}if(Number.isFinite(w.collapse))state.collapseLeft=Math.max(0,w.collapse)}
+function sendPartyWorld(){if(!window.DCKNet?.isHost)return;window.DCKNet.sendWorld({floor:state.floor,campaignWon:!!state.campaignWon,loot:activeLoot,scenery:state.scenery,chests:(state.sanctuaries||[]).map(q=>!!q.cache),enemies:entities.map((e,i)=>({i,x:e.x,y:e.y,hp:e.hp,alive:e.alive,looted:!!e.looted})),collapse:Math.ceil(state.collapseLeft)})}
+function applyPartyWorld(w){if(!partyGuest()||!w||!Number.isInteger(w.floor)||w.floor<1||w.floor>999)return;if(w.campaignWon&&w.floor>=FINAL_FLOOR&&!state.campaignWon){state.campaignWon=true;caption('Rescue frequency','All eighteen floors clear. Seattle hears the last bell.',true);persistCampaign()}syncLoot(w.loot);if(w.floor!==state.floor){bossFight=null;state.dead=false;state.hp=Math.max(1,state.hp);state.floor=w.floor;if(state.floor>=4&&!state.maxMp)state.mp=state.maxMp=35;generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();closeModal();notify('PARTY FLOOR '+state.floor)}if(Array.isArray(w.scenery))state.scenery=w.scenery;if(Array.isArray(w.chests))(state.sanctuaries||[]).forEach((q,i)=>q.cache=!!w.chests[i]);for(let v of w.enemies||[]){let e=entities[v.i];if(!e||!Number.isInteger(v.x)||!Number.isInteger(v.y)||v.x<0||v.x>=W||v.y<0||v.y>=H)continue;e.x=v.x;e.y=v.y;if(Number.isFinite(v.hp))e.hp=Math.max(0,Math.min(e.max||9999,v.hp));e.alive=!!v.alive;e.looted=!!v.looted}if(Number.isFinite(w.collapse))state.collapseLeft=Math.max(0,w.collapse)}
 function partyIntent(d){if(!window.DCKNet?.isHost||d.player?.floor!==state.floor)return;
 if(activeLoot){if(activeLoot.owner===d.id){
 if(d.action==='loot_close')finishLoot();else if(d.action.startsWith('take_'))transferLoot(d.action.slice(5))
@@ -1285,7 +1364,7 @@ window.addEventListener('dcknet',e=>{const d=e.detail||{};if(remoteLoot&&!partyG
 if(activeLoot?.owner&&d.type==='player_left'&&activeLoot.owner===d.id)finishLoot();
 if(activeLoot?.owner&&!window.DCKNet?.inRoom)finishLoot();
 if(d.type==='loot_bundle'){if(partyGuest()){receiveLoot(d.items);persistCampaign();render()}}else if(d.type==='reward'){if(partyGuest()){petVictory();if(d.guardian)recordGuardian(d.guardian.floor,d.guardian.name);state.gold+=d.gold||0;state.xp+=d.xp||0;if(d.item)giveItem(d.item,1);checkLevel();save();render();notify('PARTY REWARD RECEIVED')}}else if(d.type==='world'){applyPartyWorld(d.world)}else if(d.type==='combat_intent'){partyIntent(d)}else if(d.type==='players'){netPlayers=d.players||{};render();updatePartyRoster()}else if(d.type==='player_state'){netPlayers[d.id]=d.player;render();updatePartyRoster()}else if(d.type==='player_left'){delete netPlayers[d.id];render();updatePartyRoster()}else if(d.type==='room'){notify('PRIVATE ROOM '+d.code);render()}else if(d.type==='status'){const el=$('#netStatus');if(el)el.textContent=d.text;const room=$('#netRoom');if(room)room.textContent=d.code?'ROOM '+d.code:'No active room';updatePartyRoster()}else if(d.type==='error'){notify('CO-OP: '+d.message)}});
-function collapseTick(dt){if(state.hall&&!window.DCKNet?.inRoom)return;if(bossFight&&!window.DCKNet?.inRoom)return;if(state.chapter==='surface'||state.chapter==='create'||state.dead)return;state.collapseLeft=Math.max(0,(state.collapseLeft??900)-dt);let n=Math.ceil(state.collapseLeft),el=$('#collapseClock');if(el){el.textContent='COLLAPSE '+Math.floor(n/60)+':'+String(n%60).padStart(2,'0');el.style.color=n<=60?'#ff7766':'#e6c47d'}for(let t of [300,60,10])if(n<=t&&!state.warned.includes(t)){state.warned.push(t);ai('Floor collapse in '+t+' seconds. Find the stairs, crawler.');notify('COLLAPSE WARNING: '+t+'s')}if(n===0){bossFight=null;state.collapsed=true;state.dead=true;state.hp=0;save();showModal('<h2>FLOOR COLLAPSED</h2><p>You failed to reach the stairs in time.</p><button class="widebtn" id="collapseRestart">NEW RUN</button>');$('#collapseRestart').onclick=()=>{startStory()}}}document.addEventListener('click',e=>{let b=e.target.closest('[data-class]');if(b)chooseClass(b.dataset.class);let t=e.target.closest('[data-branch]');if(t)trainBranch(t.dataset.branch)});function tick(ts){
+function collapseTick(dt){if(state.campaignWon)return;if(state.hall&&!window.DCKNet?.inRoom)return;if(bossFight&&!window.DCKNet?.inRoom)return;if(state.chapter==='surface'||state.chapter==='create'||state.dead)return;state.collapseLeft=Math.max(0,(state.collapseLeft??900)-dt);let n=Math.ceil(state.collapseLeft),el=$('#collapseClock');if(el){el.textContent='COLLAPSE '+Math.floor(n/60)+':'+String(n%60).padStart(2,'0');el.style.color=n<=60?'#ff7766':'#e6c47d'}for(let t of [300,60,10])if(n<=t&&!state.warned.includes(t)){state.warned.push(t);ai('Floor collapse in '+t+' seconds. Find the stairs, crawler.');notify('COLLAPSE WARNING: '+t+'s')}if(n===0){bossFight=null;state.collapsed=true;state.dead=true;state.hp=0;save();showModal('<h2>FLOOR COLLAPSED</h2><p>You failed to reach the stairs in time.</p><button class="widebtn" id="collapseRestart">NEW RUN</button>');$('#collapseRestart').onclick=()=>{startStory()}}}document.addEventListener('click',e=>{let b=e.target.closest('[data-class]');if(b)chooseClass(b.dataset.class);let t=e.target.closest('[data-branch]');if(t)trainBranch(t.dataset.branch)});function tick(ts){
 if(pauseStarted!==null){last=ts;requestAnimationFrame(tick);return}
 if(bossFight&&!window.DCKNet?.inRoom){last=ts;requestAnimationFrame(tick);return}
 if(activeLoot||remoteLoot){last=ts;requestAnimationFrame(tick);return}let elapsed=last?Math.max(0,(ts-last)/1000||0):0,dt=Math.min(.05,elapsed);let nextStepStart=ts;last=ts;collapseTick(Math.min(elapsed,1));if(step){let p=Math.min(1,(ts-step.start)/step.duration);p=Math.max(0,p);visualX=step.x+(step.nx-step.x)*p;visualY=step.y+(step.ny-step.y)*p;if(p>=1){let done=step;nextStepStart=Math.max(ts-32,done.start+done.duration);if(!done.returning)finishStep(done.nx,done.ny);step=null;visualX=(state.hall||state).x;visualY=(state.hall||state).y}}else{visualX=(state.hall||state).x;visualY=(state.hall||state).y}if(!state.dead){if(!step){let x=joyX||((keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)),y=joyY||((keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0));if(x||y){if(Math.abs(x)>Math.abs(y))move(Math.sign(x),0,nextStepStart);else move(0,Math.sign(y),nextStepStart);

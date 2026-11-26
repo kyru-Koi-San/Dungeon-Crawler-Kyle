@@ -167,3 +167,13 @@ body:has(#modal:not(.hidden)){overflow:hidden}.modal,.modal-card{overscroll-beha
  .rpg-pack .bag-slot .pack-icon{width:25px;height:25px}.rpg-pack .gear-board .bag-outfit{flex-direction:row}
  .rpg-pack .gear-sockets{grid-template-columns:repeat(3,minmax(0,1fr))}.rpg-pack .gear-socket{flex-direction:column;justify-content:center;text-align:center}
 }
+#itemCompare:not(:empty){margin:10px 0 14px;padding-top:9px;border-top:1px solid #655940}
+#itemCompare label{display:grid;gap:4px;color:#dfcba2}#itemCompare select{width:100%;min-height:36px;background:#222c32;color:#fff0ce;border:1px solid #827254;font:inherit}
+#itemCompare table{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:7px;font:12px/1.3 system-ui;color:#e3e6e1}
+#itemCompare th,#itemCompare td{padding:5px 3px;border-bottom:1px solid #354047;overflow-wrap:anywhere;text-align:left}
+#itemCompare th{font-size:11px;color:#c8bfab}#itemCompare .gain{color:#95dfa6}#itemCompare .loss{color:#ffa3a0}
+@media(orientation:landscape) and (max-height:540px){#inspectScreen:has(#itemCompare table){width:min(560px,94vw)}}
+.skill-tree{padding:4px 2px}.skill-root,.skill-limb summary,.skill-node{border:1px solid #605846;background:#1d282f;padding:8px;border-radius:4px}
+.skill-root{display:flex;justify-content:space-between;color:#ffe0a0;background:#38352c;font-weight:bold}.skill-root b,.skill-limb summary small{font-size:11px;color:#d3bd96}
+.skill-limb{margin:0 0 0 12px;padding:7px 0 0 12px;border-left:2px solid #776741}.skill-limb summary{cursor:pointer;font-weight:bold;color:#f6e7cd}.skill-limb summary small{margin-left:10px;font-weight:normal}
+.skill-stem{margin-left:10px;border-left:1px solid #877549;padding-left:11px}.skill-node{display:flex;position:relative;align-items:center;justify-content:space-between;gap:5px;margin-top:5px}.skill-node:before{content:'';position:absolute;left:-12px;top:50%;width:11px;border-top:1px solid #877549}.skill-node small{display:block;color:#c8c9bb;margin-top:3px}.skill-node button:disabled{opacity:.48}

@@ -38,7 +38,7 @@ wss.on('connection',(ws,req)=>{
   if(m.type==='combat_intent'){const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p||!['attack','spell','loot','loot_close','take_gold','take_torch','take_tonic','take_all'].includes(m.action)&&!/^take_[0-9]{1,3}$/.test(m.action))return;const host=room.players.get(room.host);if(host)send(host.ws,{type:'combat_intent',id,action:m.action,player:p.state});return;}
   if(m.type==='player_state'){
    const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p)return;
-   const s=m.player||{};const floor=clampInt(s.floor,1,999),x=clampInt(s.x,0,71),y=clampInt(s.y,0,47);
+   const s=m.player||{};const floor=clampInt(s.floor,1,999),x=clampInt(s.x,0,117),y=clampInt(s.y,0,79);
    const gear={};
    for(const [slot,looks] of Object.entries({weapon:['knife','hammer'],armor:['coat','mail','steel'],charm:['bell','glass','iron']})){
      if(looks.includes(s.gear?.[slot]))gear[slot]=s.gear[slot];
