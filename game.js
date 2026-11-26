@@ -58,7 +58,7 @@ function showCreator(){if(state.chapter!=='create'&&personalMenusLocked()){lockH
 const guildArt=new Image();guildArt.src='guild-hall.png';
 const guildLessons=[
   ['Explore','Use the joystick or arrow keys to walk. The minimap fills in as you explore. Tap Interact beside a person, sign, or discovery.'],
-  ['Fight','In solo combat, choose a move when it is your turn. Read the incoming attack. Punch or swing to attack. Guard reduces incoming damage.'],
+  ['Fight','In solo combat, choose a move when it is your turn. Read the incoming attack. Punch or swing to attack. Guard reduces incoming damage. Run away from ordinary enemies, but watch for pursuit. Guardians seal the arena.'],
   ['Loot and equip','Choose a consumable for X in your backpack. Tap Loot near a body or chest. The game pauses while you choose what to take. Inspect gear in your backpack before equipping it: some items carry penalties.'],
   ['Return to the guild','Walk through a sanctuary door to find me on any floor. Use the bed to recover once per shelter. After a guardian victory, ask me to review the fight.']
 ];
@@ -132,6 +132,7 @@ function enterHall(q){
   }
   const dx=q.legacyExit?0:q.door.x<q.room.x?-1:q.door.x>=q.room.x+q.room.w?1:0;
   const dy=q.legacyExit?0:q.door.y<q.room.y?-1:q.door.y>=q.room.y+q.room.h?1:0;
+  for(const e of entities)if(e.pursuit>0){e.pursuit=0;e.avoid=6}
   state.hall={index,x:6,y:7,returnX:q.legacyExit?.x??q.door.x+dx,returnY:q.legacyExit?.y??q.door.y+dy};
   state.x=q.x;state.y=q.y;state.facing='up';step=null;clearMovement();cameraX=null;
   visualX=6;visualY=7;
@@ -505,6 +506,7 @@ function encounterScreen(){
   if(!battle||animatingTurn)return;
   const enemy=battle.e;
   const moves=[['attack',state.equipment?.weapon?'Swing':'Punch'],['guard','Guard'],['heal','Health potion']];
+  if(!enemy.boss)moves.push(['retreat','Run away']);
   if(canMend())moves.push(['mend','Mend · 8 MP']);
   if(enemy.boss)moves.push(['trap',battle.trapUsed?'Trap spent':'Spring trap']);
   showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions">'+moves.map(([id,label])=>'<button class="widebtn" data-boss="'+id+'" '+((id==='mend'&&(state.mp<8||(state.hp===state.maxHp&&!conditionText())))||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!state.inventory.some(i=>i.id==='tonic'&&i.qty>0))?'disabled':'')+'>'+label+'</button>').join('')+'</div></div>');
@@ -528,6 +530,15 @@ function battleFrames(duration,paint,valid){
 async function animateTurn(action){
   const battle=bossFight;
   if(!battle||animatingTurn||state.dead)return;
+  if(action==='retreat'){
+    if(battle.e.boss)return;
+    const enemy=battle.e;
+    const strong=enemy.atk>=state.level+2;
+    enemy.pursuit=strong?10:0;enemy.pursuitDelay=1.5;enemy.avoid=strong?0:8;
+    state.retreatGrace=2;bossFight=null;clearMovement();closeModal();
+    caption('Encounter',strong?'You broke away. The '+enemy.name.toLowerCase()+' is chasing you!':'You slipped away from the '+enemy.name.toLowerCase()+'.',true);
+    persistCampaign();render();return;
+  }
   const stage=$('.duel-stage');
   const strike=action==='attack'?state.power+(state.pet?.crawler?state.pet.level+1:0)+Math.floor(Math.random()*5):0;
   const damage=strike+(action==='trap'?25+state.level*3:0)+(battle.assist||0);
@@ -557,7 +568,29 @@ closeModal();if(state.kills===1){unlock('First blood');ridiculous('Local Pest Co
 function attack(){if(state.chapter==='create'||state.chapter==='surface')return;if(state.dead||bossFight||sanctuaryAt(state.x,state.y))return;if(partyGuest()){if(!state.dead&&attackCooldown<=0){attackCooldown=.48;attackStarted=performance.now();window.DCKNet.sendIntent('attack')}return}let guardian=entities.find(e=>e.boss&&e.alive&&(!state.arena||inArena(state.x,state.y))&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);if(guardian){beginBoss(guardian);return}if(state.dead||attackCooldown>0)return;attackCooldown=.48;attackStarted=performance.now();let targets=entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);targets=targets.filter(e=>e.type==='enemy'&&!e.boss);if(!targets.length){beep(110,.06);return}targets.sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y));let e=targets[0];if(!window.DCKNet?.inRoom){beginBoss(e);return}let dmg=state.power+(state.pet?.crawler?state.pet.level+1:0)+Math.floor(Math.random()*5);e.hp-=dmg;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+dmg});beep(230,.08,'sawtooth');feed('You strike '+e.name+' for <b>'+dmg+'</b> damage.');if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;petVictory();if(state.kills===1)ridiculous('Local Pest Control');if(state.kills===10)ridiculous('Unlicensed Exterminator','Silver');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===30)ridiculous('The Neighborhood Is Quiet Now','Gold');if(Math.random()<.08)awardBox('Bronze');if(e.boss)ridiculous('Management Has Been Terminated','Gold');state.xp+=e.xp;state.gold+=Math.floor(5+Math.random()*12);feed('<b>'+e.name+'</b> falls. Remains left behind. +'+e.xp+' XP.');particles.push({x:e.x,y:e.y,t:0,kind:'death'});checkLevel();if(state.kills>=1)unlock('First blood');if(e.boss){state.gold+=100;state.xp+=100;unlock('Warden breaker');ai('The Warden is down. The audience is… cautiously impressed.');$('#bossbar').classList.add('hidden')}if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true})}render();}
 
 function takeDamage(n,e){if(state.dead)return;if(sanctuaryAt(state.x,state.y))return;hurtAt=performance.now();let d=Math.max(1,n-state.armor);state.hp=Math.max(0,state.hp-d);registerHit(e,d);particles.push({x:state.x,y:state.y,t:0,kind:'hurt',text:'-'+d});feed('<b>'+e.name+'</b> hits you for '+d+' damage.');beep(90,.12,'sawtooth');if(state.hp<=0){state.dead=true;feed('<b>You have fallen.</b> The dungeon claims another crawler.');unlock('Down but not out');notify('CRAWLER DOWN — TAP REVIVE');save();setTimeout(()=>openDeath(),600)}}
-function sanctuaryAt(x,y){return (state.sanctuaries||[state.safe].filter(Boolean)).find(q=>q.room?x>=q.room.x&&x<q.room.x+q.room.w&&y>=q.room.y&&y<q.room.y+q.room.h:Math.hypot(x-q.x,y-q.y)<=2)}function buildSanctuaries(){for(let q of state.sanctuaries){let candidates=[];for(let y=2;y<H-6;y++)for(let x=2;x<W-8;x++){let clear=true;for(let b=y-1;b<=y+4;b++)for(let a=x-1;a<=x+5;a++)if(tile(a,b)===1||tile(a,b)===3)clear=false;if(!clear)continue;for(let [dx,dy] of [[0,-2],[0,5],[-2,0],[6,0]]){let a=x+(dx===0?2:dx),b=y+(dy===0?1:dy);if(tile(a,b)===1)candidates.push({x,y,a,b,dx,dy})}}candidates.sort((a,b)=>Math.hypot(a.x-q.x,a.y-q.y)-Math.hypot(b.x-q.x,b.y-q.y));let c=candidates[0];if(!c)continue;let {x,y,a,b,dx,dy}=c;for(let j=y-1;j<=y+4;j++)for(let i=x-1;i<=x+5;i++)tiles[j][i]=(i>=x&&i<x+5&&j>=y&&j<y+4)?1:2;let door={x:dx<0?x-1:dx>0?x+5:x+2,y:dy<0?y-1:dy>0?y+4:y+1};tiles[door.y][door.x]=1;q.x=x+2;q.y=y+2;q.room={x,y,w:5,h:4};q.door=door;}state.sanctuaries=state.sanctuaries.filter(q=>q.room);if(state.sanctuaries.length)state.safe={x:state.sanctuaries[0].x,y:state.sanctuaries[0].y}}function enemyTick(dt){if(state.hall||state.dead||bossFight||partyGuest())return;let guardian=entities.find(e=>e.boss&&e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=3);if(guardian&&!sanctuaryAt(state.x,state.y)&&(!state.arena||inArena(state.x,state.y))){beginBoss(guardian);return}if(state.npc&&!state.npc.met&&Math.random()<dt*.65){let n=state.npc,opts=[[1,0],[-1,0],[0,1],[0,-1]],a=opts[Math.floor(Math.random()*4)],x=n.x+a[0],y=n.y+a[1];if(!solid(x,y)&&tile(x,y)!==3&&!(x===state.x&&y===state.y)&&!entities.some(e=>e.alive&&e.x===x&&e.y===y)){n.x=x;n.y=y}}if(sanctuaryAt(state.x,state.y))return;for(let e of entities){if(!e.alive||e.type!=='enemy'||e.boss)continue;e.cool-=dt;if(Math.hypot(e.x-state.x,e.y-state.y)<1.4){if(!window.DCKNet?.inRoom){beginBoss(e);return}if(e.cool<=0){e.attackAt=performance.now();takeDamage(e.atk,e);e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<dt*.72){
+function sanctuaryAt(x,y){return (state.sanctuaries||[state.safe].filter(Boolean)).find(q=>q.room?x>=q.room.x&&x<q.room.x+q.room.w&&y>=q.room.y&&y<q.room.y+q.room.h:Math.hypot(x-q.x,y-q.y)<=2)}function buildSanctuaries(){for(let q of state.sanctuaries){let candidates=[];for(let y=2;y<H-6;y++)for(let x=2;x<W-8;x++){let clear=true;for(let b=y-1;b<=y+4;b++)for(let a=x-1;a<=x+5;a++)if(tile(a,b)===1||tile(a,b)===3)clear=false;if(!clear)continue;for(let [dx,dy] of [[0,-2],[0,5],[-2,0],[6,0]]){let a=x+(dx===0?2:dx),b=y+(dy===0?1:dy);if(tile(a,b)===1)candidates.push({x,y,a,b,dx,dy})}}candidates.sort((a,b)=>Math.hypot(a.x-q.x,a.y-q.y)-Math.hypot(b.x-q.x,b.y-q.y));let c=candidates[0];if(!c)continue;let {x,y,a,b,dx,dy}=c;for(let j=y-1;j<=y+4;j++)for(let i=x-1;i<=x+5;i++)tiles[j][i]=(i>=x&&i<x+5&&j>=y&&j<y+4)?1:2;let door={x:dx<0?x-1:dx>0?x+5:x+2,y:dy<0?y-1:dy>0?y+4:y+1};tiles[door.y][door.x]=1;q.x=x+2;q.y=y+2;q.room={x,y,w:5,h:4};q.door=door;}state.sanctuaries=state.sanctuaries.filter(q=>q.room);if(state.sanctuaries.length)state.safe={x:state.sanctuaries[0].x,y:state.sanctuaries[0].y}}function pursueCrawler(enemy){
+  // Search a short, walkable route around props. Never cut across a guild threshold.
+  const queue=[[enemy.x,enemy.y,null]],seen=new Set([enemy.y*W+enemy.x]);
+  for(let i=0;i<queue.length&&i<260;i++){
+    const [x,y,first]=queue[i];
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const a=x+dx,b=y+dy,key=b*W+a;
+      if(seen.has(key)||solid(a,b)||sanctuaryAt(a,b)||tile(a,b)===3)continue;
+      if(a===state.x&&b===state.y){if(first)[enemy.x,enemy.y]=first;return}
+      if((step&&step.nx===a&&step.ny===b)||entities.some(e=>e!==enemy&&e.alive&&e.x===a&&e.y===b))continue;
+      seen.add(key);queue.push([a,b,first||[a,b]]);
+    }
+  }
+}
+function enemyTick(dt){if(state.hall||state.dead||bossFight||partyGuest())return;let guardian=entities.find(e=>e.boss&&e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=3);if(guardian&&!sanctuaryAt(state.x,state.y)&&(!state.arena||inArena(state.x,state.y))){beginBoss(guardian);return}if(state.npc&&!state.npc.met&&Math.random()<dt*.65){let n=state.npc,opts=[[1,0],[-1,0],[0,1],[0,-1]],a=opts[Math.floor(Math.random()*4)],x=n.x+a[0],y=n.y+a[1];if(!solid(x,y)&&tile(x,y)!==3&&!(x===state.x&&y===state.y)&&!entities.some(e=>e.alive&&e.x===x&&e.y===y)){n.x=x;n.y=y}}if(sanctuaryAt(state.x,state.y))return;state.retreatGrace=Math.max(0,(state.retreatGrace||0)-dt);for(let e of entities){if(!e.alive||e.type!=='enemy'||e.boss)continue;e.cool-=dt;
+if(e.avoid>0){e.avoid-=dt;continue}
+if(e.pursuit>0){
+  e.pursuit-=dt;e.pursuitDelay-=dt;
+  if(e.pursuitDelay<=0&&Math.hypot(e.x-state.x,e.y-state.y)>=1.4){pursueCrawler(e);e.pursuitDelay=.48}
+  if(state.retreatGrace||Math.hypot(e.x-state.x,e.y-state.y)>=1.4)continue;
+}
+if(state.retreatGrace&&Math.hypot(e.x-state.x,e.y-state.y)<1.4)continue;
+if(Math.hypot(e.x-state.x,e.y-state.y)<1.4){if(!window.DCKNet?.inRoom){beginBoss(e);return}if(e.cool<=0){e.attackAt=performance.now();takeDamage(e.atk,e);e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<dt*.72){
 const chasing=Math.hypot(e.x-state.x,e.y-state.y)<7;
 const target=chasing?state:e.den;if(!target)continue;
 let dx=Math.sign(target.x-e.x),dy=Math.sign(target.y-e.y);let opts=Math.random()<.5?[[dx,0],[0,dy]]:[[0,dy],[dx,0]];for(let [ax,ay] of opts)if((ax||ay)&&!(step&&e.x+ax===step.nx&&e.y+ay===step.ny)&&!solid(e.x+ax,e.y+ay)&&!sanctuaryAt(e.x+ax,e.y+ay)&&!entities.some(q=>q!==e&&q.alive&&q.x===e.x+ax&&q.y===e.y+ay)){e.x+=ax;e.y+=ay;break}}}}
@@ -589,12 +622,15 @@ function resumeInspectionClock(){
 }
 $('#awardScreen').oncancel=e=>e.preventDefault();
 $('#awardSkip').onclick=playAchievement;
-function inspectItem(item,label,action){
-  if(!item||awardShowing)return;
-  const screen=$('#inspectScreen');
+function itemArt(item){
   const base=item.id.replace(/-\d+$/,'');
   const art=base.startsWith('box-')?'box':base.startsWith('gear-')?(item.slot==='armor'?'echo-mail':'dock-knife'):base;
   const known=['box','tonic','shard','torch','gold','food','biscuit',...rewardCatalog.map(i=>i.id)];
+  return known.includes(art)?art:'satchel';
+}
+function inspectItem(item,label,action){
+  if(!item||awardShowing)return;
+  const screen=$('#inspectScreen');
   const display=$('#inspectArt');display.replaceChildren();
   if(item.art!==undefined){
     const c=document.createElement('canvas');c.width=c.height=32;
@@ -603,7 +639,7 @@ function inspectItem(item,label,action){
     display.append(c);
   }else{
     const img=document.createElement('img');img.alt=item.name;
-    img.src='item-art.svg#'+(known.includes(art)?art:'satchel');display.append(img);
+    img.src='item-art.svg#'+itemArt(item);display.append(img);
   }
   $('#inspectType').textContent=item.art!==undefined?'Field discovery':item.slot||'Inventory item';
   $('#inspectTitle').textContent=item.name;
@@ -1081,24 +1117,34 @@ function backpack(){
   bagPage=Math.min(bagPage,pages-1);
   const entries=items.slice(bagPage*POCKET_SIZE,(bagPage+1)*POCKET_SIZE);
   const hotName=supplies[state.hotItem]?.short||'Choose item';
-  const slots=entries.map((item,i)=>'<button class="bag-slot" data-slot="'+i+'"><strong>'+safeAttr(item.icon)+'</strong><span>'+safeAttr(item.name)+'</span><small>×'+count(item)+'</small></button>');
+  const picture=item=>'<img class="pack-icon" alt="" src="item-art.svg#'+itemArt(item)+'">';
+  const slots=entries.map((item,i)=>'<button class="bag-slot rank-'+Math.min(5,item.rank||1)+'" data-slot="'+i+'" title="'+safeAttr(item.name)+'">'+picture(item)+'<span>'+safeAttr(item.name)+'</span><small>×'+count(item)+'</small></button>');
   while(slots.length<POCKET_SIZE)slots.push('<div class="bag-slot empty" aria-hidden="true"></div>');
   const sections=['general','equipped','skills'].map(id=>'<button data-bag-section="'+id+'" aria-pressed="'+(bagSection===id)+'">'+id+'</button>').join('');
   const statLine='<div class="bag-stats">'+(conditionText()?'<span>'+conditionText()+'</span>':'')+'<span>HP '+state.hp+'/'+state.maxHp+'</span><span>MP '+state.mp+'/'+state.maxMp+'</span><span>Level '+state.level+'</span><span>Power '+state.power+'</span><span>Armor '+state.armor+'</span><span>Gold '+state.gold+'</span><span>XP '+state.xp+'/'+state.nextXp+'</span><span>Spell bonus '+(state.spellBonus||0)+'</span>'+(state.pet?'<span>'+animalNames[state.pet.species]+(state.pet.crawler?' · Crawler Lv '+state.pet.level:' · Pet')+'</span>':'')+(state.teaPower?'<span>Tea +'+state.teaPower+' power this floor</span>':'')+'</div>';
   let body;
   if(bagSection==='skills')body=skillsPanel()+(canMend()?'<button class="widebtn" id="bagMend">Mend · 8 MP</button>':'');
   else if(bagSection==='equipped'){
-    body=['weapon','armor','charm'].map(slot=>{
+    body='<div class="gear-board">'+outfitPanel()+'<div class="gear-sockets">'+['weapon','armor','charm'].map(slot=>{
       const item=state.inventory.find(i=>i.id===state.equipment?.[slot]);
-      return '<div class="worn-row"><div><small>'+slot+'</small><b>'+safeAttr(item?.name||({weapon:'Unarmed',armor:'Everyday clothes',charm:'None'})[slot])+'</b>'+(item?'<span>'+safeAttr(item.desc)+'</span>':'')+'</div>'+(item?'<button class="smallbtn" data-remove="'+safeAttr(item.id)+'">Inspect</button>':'')+'</div>';
-    }).join('');
+      const fallback={weapon:'Unarmed',armor:'Everyday clothes',charm:'Empty'};
+      const symbol={weapon:'⚔',armor:'⬟',charm:'◇'};
+      return '<button class="gear-socket" data-gear="'+slot+'">'+(item?picture(item):'<i>'+symbol[slot]+'</i>')+'<span><small>'+slot+'</small><b>'+safeAttr(item?.name||fallback[slot])+'</b></span></button>';
+    }).join('')+'</div></div>';
   }else{
     body='<div class="bag-grid">'+slots.join('')+'</div><div class="bag-nav"><button id="bagHot">X · '+hotName+'</button><button id="bagPrev" aria-label="Previous pocket" '+(!bagPage?'disabled':'')+'>‹</button><span>Pocket '+(bagPage+1)+' / '+pages+'</span><button id="bagNext" aria-label="Next pocket" '+(bagPage+1>=pages?'disabled':'')+'>›</button></div><div id="bagDetail" aria-live="polite">'+(items.length?'':'No loose items in your backpack.')+'</div>';
   }
-  showModal('<div class="bag-layout"><h2>Backpack</h2>'+outfitPanel()+statLine+'<nav class="bag-sections" aria-label="Backpack sections">'+sections+'</nav><div class="bag-section-body">'+body+'</div></div>');
+  showModal('<div class="bag-layout rpg-pack" data-section="'+bagSection+'"><h2>Backpack</h2>'+(bagSection==='equipped'?'':outfitPanel())+statLine+'<nav class="bag-sections" aria-label="Backpack sections">'+sections+'</nav><div class="bag-section-body">'+body+'</div></div>');
   drawOutfit();$('#turnOutfit').onclick=()=>{outfitAngle=(outfitAngle+1)%4;drawOutfit()};
   $$('[data-bag-section]').forEach(button=>button.onclick=()=>{bagSection=button.dataset.bagSection;backpack()});
-  $$('[data-remove]').forEach(button=>button.onclick=()=>inspectOwned(state.inventory.find(i=>i.id===button.dataset.remove)));
+  $$('[data-gear]').forEach(button=>button.onclick=()=>{
+    const slot=button.dataset.gear,current=state.inventory.find(i=>i.id===state.equipment?.[slot]);
+    if(current){inspectOwned(current);return}
+    const choices=state.inventory.filter(i=>i.slot===slot&&i.qty>0);
+    showModal('<h2>Equip '+slot+'</h2>'+choices.map((item,i)=>'<button class="widebtn" data-choice="'+i+'">'+picture(item)+safeAttr(item.name)+'</button>').join('')+(choices.length?'':'<p>No '+slot+' items in your backpack.</p>')+'<button id="gearBack" class="widebtn">Back to equipment</button>');
+    $('#gearBack').onclick=backpack;
+    $$('[data-choice]').forEach(b=>b.onclick=()=>inspectOwned(choices[Number(b.dataset.choice)]));
+  });
   if(bagSection==='skills'){
     if($('#bagMend'))$('#bagMend').onclick=()=>{if(mend()){persistCampaign();render();backpack()}else notify('Mend requires injury and 8 mana.')};
     $$('[data-up]').forEach(button=>{button.disabled=state.skillPoints<1;button.onclick=()=>{
