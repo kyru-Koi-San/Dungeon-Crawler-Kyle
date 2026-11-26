@@ -6,12 +6,11 @@ const TILE=32;let W=72,H=48;const saveKey='dck-final-save-v1';
 const names=['Pioneer Square • Bell Vault','Elliott Bay • Floodworks','SoDo • Iron Cage','Capitol Hill • Signal Room','Lake Union • Lost Archive','Queen Anne • Sky Relay','Ballard • Lock Chambers','Fremont • Drawbridge Works','Wallingford • Mirror Well','Georgetown • Boiler House','Beacon Hill • Buried Station','Rainier Valley • Cinder Court','West Seattle • Salt Galleries','Magnolia • Watchtower','Interbay • Iron Tribunal','Duwamish • Black Channel','Alki • Beacon Crypt','Seattle Underground • Last Bell'];
 const FINAL_FLOOR=18;
 const quips=['Welcome, crawler. Try not to die before the opening credits.','Your posture suggests a lack of confidence. And armor.','The audience loves a comeback. They love a dismemberment more.','I have seen rats with better tactical instincts.','Excellent footwork. Shame about the rest of you.','A new floor! The same questionable life choices.','Remember: pain is temporary. The highlight reel is forever.','That corpse had a family. Probably.','Your odds are improving. They were dreadful, so this is relative.','Do keep moving. The walls are not decorative.'];
-const enemyTypes=[['Hollow',18,5,12,'☠'],['Cave goblin',25,7,16,'♟'],['Crypt spider',15,4,10,'✣'],['Ash knight',42,10,28,'♜'],['Mire wretch',32,8,20,'♟'],['Bone archer',22,6,17,'➶'],['Goblin hexer',29,8,21,'✧']];
 let state,tiles=[],seen=[],entities=[],particles=[],keys={},last=0,acc=0,walkUntil=0,attackStarted=0,sound=true,audio=null,toastTimer=0,attackCooldown=0,spawnedFloor=0,tab='journal',touchMove=null,netPlayers={},netSyncClock=0;
 let step=null,stepCount=0;const WALK_MS=275,RUN_MS=160;
 let runPointer=null;
 let joystickAxis=null;let visualX=null,visualY=null,visualFloor=0,joyX=0,joyY=0,hurtAt=0;const sprites={};
-const spriteNames=['hero-front','hero-side','hero-back','hero-slash','hero-strike','sewer-rat','skeleton','goblin','spider','wraith','archer','shaman','spider-boss','bone-champion'];
+const spriteNames=['pack-llama','flood-grub','mire-leprechaun','hero-front','hero-side','hero-back','hero-slash','hero-strike','sewer-rat','skeleton','goblin','spider','wraith','archer','shaman','spider-boss','bone-champion'];
 for(const name of spriteNames){const img=new Image();img.src=name+'.png';img.onload=()=>render();sprites[name]=img;}
 const skinTones=['#f1cdb0','#dfaf87','#bc8b63','#a06c4b','#794f38','#50352c'];
 const ancestries=['Human','Elf','Dwarf'];
@@ -180,7 +179,8 @@ function guildReview(){
 function guildMaster(){
   if(!state.hall)return;
   if(personalMenusLocked()){hallTutorial();return}
-  showModal('<small>SEATTLE CRAWLERS’ GUILD</small><h2>Guild Master Rowan</h2><p>Take a seat by the hearth. What shall we go over?</p><button class="widebtn" id="guildNotes">Review defeated guardians</button><button class="widebtn" id="guildBasics">Revisit the tutorial</button><button class="widebtn" id="guildCounter">Guild services</button>');
+  showModal('<small>SEATTLE CRAWLERS’ GUILD</small><h2>Guild Master Rowan</h2><p>Take a seat by the hearth. What shall we go over?</p><button class="widebtn" id="guildNotes">Review defeated guardians</button><button class="widebtn" id="guildBasics">Revisit the tutorial</button><button class="widebtn" id="guildCounter">Guild services</button>'+(state.floor%6===0?'<button class="widebtn" id="cityExchange">City exchange</button>':''));
+  if($('#cityExchange'))$('#cityExchange').onclick=cityMarket;
   $('#guildNotes').onclick=guildReview;$('#guildBasics').onclick=()=>hallTutorial(0,true);$('#guildCounter').onclick=()=>sanctuaryMenu(state.sanctuaries[state.hall.index]);
 }
 function hallInteract(){
@@ -344,6 +344,7 @@ function drawGuildEntrance(q){
   ctx.restore();
 }
 const supplies={
+  'meth-cargo':{name:'Sealed meth cargo',icon:'▣',desc:'Trade this pack llama parcel at the city exchanges on Floors 6, 12 or 18. Ask Rowan in the guild.'},
   torch:{name:'Torch',short:'Torch',icon:'🔥',desc:'Lights your surroundings for 40 steps.'},
   food:{name:'Trail ration',short:'Food',icon:'🍞',desc:'Restores 15 health, or 7 while sick.'},
   tonic:{name:'Health potion',short:'Potion',icon:'⚗',desc:'Restores 35 health and treats wounds, poison, and sickness.'},
@@ -486,7 +487,7 @@ function chooseLanding(){
   if(eligible.length)[state.x,state.y]=eligible[0];
 }
 
-function generate(){state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;const depth=Math.min(FINAL_FLOOR,state.floor)-1;W=118-depth*4;H=80-depth*2;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
+function generate(){state.grubHatches=0;state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;const depth=Math.min(FINAL_FLOOR,state.floor)-1;W=118-depth*4;H=80-depth*2;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
 // carve connected rooms and corridors
 let rooms=[];for(let i=0;i<54-depth*2;i++){let rw=4+Math.floor(r()*6),rh=3+Math.floor(r()*5),rx=1+Math.floor(r()*((state.floor%3===0?W-12:W)-rw-2)),ry=1+Math.floor(r()*(H-rh-2));let room={x:rx,y:ry,w:rw,h:rh,cx:Math.floor(rx+rw/2),cy:Math.floor(ry+rh/2)};for(let y=ry;y<ry+rh;y++)for(let x=rx;x<rx+rw;x++)tiles[y][x]=1;if(rooms.length){let p=rooms[rooms.length-1];let x=room.cx,y=room.cy;while(x!==p.cx){tiles[y][x]=1;x+=Math.sign(p.cx-x)}while(y!==p.cy){tiles[y][x]=1;y+=Math.sign(p.cy-y)}}rooms.push(room)}
 // walls around corridors
@@ -496,13 +497,54 @@ for(let i=0;i<Math.min(24+state.floor*2,65);i++){let room=rooms[1+Math.floor(r()
 let dist=Array.from({length:H},()=>Array(W).fill(-1)),queue=[[state.x,state.y]];dist[state.y][state.x]=0;for(let i=0;i<queue.length;i++){let [x,y]=queue[i];for(let [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){let a=x+dx,b=y+dy;if(tile(a,b)===1&&!sanctuaryAt(a,b)&&!state.sanctuaries.some(q=>q.door?.x===a&&q.door?.y===b)&&dist[b][a]<0){dist[b][a]=dist[y][x]+1;queue.push([a,b])}}}let end=rooms.slice(1).sort((a,b)=>dist[b.cy][b.cx]-dist[a.cy][a.cx])[0];const far=queue[queue.length-1];if(dist[end.cy][end.cx]<1||sanctuaryAt(end.cx,end.cy))end={...end,cx:far[0],cy:far[1]};tiles[end.cy][end.cx]=3;state.stairs=true;
 if(state.floor%3===0){let candidates=[];for(let y=2;y<H-9;y++)for(let x=2;x<W-11;x++){let w=8,h=6,clear=true;for(let j=y-1;j<=y+h;j++)for(let i=x-1;i<=x+w;i++)if(tile(i,j)===1||tile(i,j)===3)clear=false;if(!clear)continue;for(let [dx,dy] of [[0,-1],[0,1],[-1,0],[1,0]]){let gx=dx<0?x-1:dx>0?x+w:x+4,gy=dy<0?y-1:dy>0?y+h:y+3;if(tile(gx+dx,gy+dy)===1&&dist[gy+dy][gx+dx]>12)candidates.push({x,y,w,h,gx,gy,score:dist[gy+dy][gx+dx]})}}candidates.sort((a,b)=>b.score-a.score);let a=candidates[0];if(!a){let x=W-10,y=H-10,w=8,h=6,gx=x-1,gy=y+3;let nearest=queue.filter(([i,j])=>i<gx).sort((p,q)=>Math.abs(p[0]-gx)+Math.abs(p[1]-gy)-Math.abs(q[0]-gx)-Math.abs(q[1]-gy))[0];if(nearest){let [i,j]=nearest;while(j!==gy){tiles[j][i]=1;j+=Math.sign(gy-j)}while(i<gx){tiles[j][i]=1;i++}a={x,y,w,h,gx,gy}}}if(a){for(let j=a.y-1;j<=a.y+a.h;j++)for(let i=a.x-1;i<=a.x+a.w;i++)tiles[j][i]=i>=a.x&&i<a.x+a.w&&j>=a.y&&j<a.y+a.h?1:2;tiles[a.gy][a.gx]=1;state.arena={x:a.x,y:a.y,w:a.w,h:a.h,gates:[{x:a.gx,y:a.gy}]};spawnBoss(a.x+4,a.y+3)}else{let room=rooms.filter(q=>q!==end&&dist[q.cy][q.cx]>12).sort((a,b)=>b.w*b.h-a.w*a.h)[0]||rooms[1];state.arena={x:room.x,y:room.y,w:room.w,h:room.h,gates:[]};entities=entities.filter(e=>!(e.x>=room.x&&e.x<room.x+room.w&&e.y>=room.y&&e.y<room.y+room.h));spawnBoss(room.cx,room.cy)}}else state.arena=null;
 furnishFloor();placeAnimal();feed('You descend into <b>'+names[(state.floor-1)%names.length]+'</b>.');ai(quips[Math.floor(r()*quips.length)]);reveal();render();}
-function spawnEnemy(x,y,r=Math.random){
-if(state.floor<=3){
- const rat=r()<.85-state.floor*.13;
- const hp=(rat?7:13)+state.floor*2;
- entities.push({type:'enemy',name:rat?'Drain rat':'Tunnel goblin',sprite:rat?'sewer-rat':'goblin',small:true,x,y,hp,max:hp,atk:(rat?1:2)+state.floor,xp:(rat?6:10)+state.floor,cool:0,alive:true,boss:false});return
+const floorMobs=[
+ [['Drain rat','sewer-rat'],['Tunnel goblin','goblin'],['Pack llama','pack-llama']],
+ [['Flood grub','flood-grub'],['Mire leprechaun','mire-leprechaun']],
+ [['Cage runner','goblin'],['Ironwhisker rat','sewer-rat']],
+ [['Signal thief','archer'],['Aerial hexer','shaman']],
+ [['Index wraith','wraith'],['Bookbinder spider','spider']],
+ [['Relay sentinel','bone-champion'],['Copperwire archer','archer']],
+ [['Lock tender','skeleton'],['Barnacle widow','spider']],
+ [['Bridge troll','bone-champion'],['Counterweight thief','goblin']],
+ [['Mirror echo','wraith'],['Silver-eye seer','shaman']],
+ [['Kiln knight','bone-champion'],['Coal skitter','spider']],
+ [['Platform phantom','wraith'],['Token collector','skeleton']],
+ [['Cinder bow','archer'],['Ash magistrate','shaman']],
+ [['Brine widow','spider'],['Salt collector','skeleton']],
+ [['Lookout revenant','archer'],['Beacon witch','shaman']],
+ [['Tribunal bailiff','bone-champion'],['Oathbreaker','wraith']],
+ [['Silt stalker','spider'],['Channel caller','shaman']],
+ [['Crypt lamplighter','skeleton'],['Beacon shade','wraith']],
+ [['Bellbound knight','bone-champion'],['Last chorister','shaman']]
+];
+function floorEnemy(floor,index,x,y){
+ const roster=floorMobs[Math.min(floor,18)-1];
+ const entry=roster[floor===1?[0,0,1,0,2][index%5]:index%roster.length];
+ const [name,sprite]=entry,heavy=['bone-champion','pack-llama','goblin'].includes(sprite);
+ const hp=floor<=3?(heavy?13:7)+floor*2:16+floor*4+(heavy?14:0);
+ return {type:'enemy',name,sprite,x,y,hp,max:hp,atk:(heavy?2:1)+floor+(floor>3?3:0),xp:5+floor*2+(heavy?4:0),small:floor<=3,cool:0,alive:true,boss:false,rosterVersion:1,
+ ...(sprite==='pack-llama'?{contents:[{id:'meth-cargo',qty:1},{id:'gold',qty:5}]}:{})};
 }
-let t=enemyTypes[Math.min(enemyTypes.length-1,Math.floor(r()*Math.min(enemyTypes.length,2+state.floor/2)))];entities.push({type:'enemy',name:t[0],sprite:({'Hollow':'skeleton','Cave goblin':'goblin','Crypt spider':'spider','Ash knight':'bone-champion','Mire wretch':'wraith','Bone archer':'archer','Goblin hexer':'shaman'})[t[0]],x,y,hp:t[1]+state.floor*4,max:t[1]+state.floor*4,atk:t[2]+Math.floor(state.floor*.85),xp:t[3]+state.floor*2,icon:t[4],cool:0,alive:true,boss:false});}
+function spawnEnemy(x,y,r=Math.random){
+ r(); // Preserve the seeded room placement sequence used by existing campaigns.
+ entities.push(floorEnemy(state.floor,entities.length,x,y));
+}
+function hatchGrub(parent){
+ if(parent.budded||(state.grubHatches||0)>=6||entities.length>=95)return false;
+ for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
+   const x=parent.x+dx,y=parent.y+dy;
+   if(tile(x,y)!==1||solid(x,y)||sanctuaryAt(x,y)||(x===state.x&&y===state.y)||entities.some(e=>e.alive&&e.x===x&&e.y===y))continue;
+   const larva=floorEnemy(2,0,x,y);Object.assign(larva,{name:'Grub hatchling',hp:5,max:5,budded:true,hatchling:true});
+   entities.push(larva);parent.budded=true;state.grubHatches=(state.grubHatches||0)+1;return true;
+ }
+ return false;
+}
+function cityMarket(){
+ const price=state.floor*5;
+ showModal('<small>'+safeAttr(names[state.floor-1])+'</small><h2>City exchange</h2><p>Sealed meth cargo · '+price+' gold per parcel</p><p>In backpack ×'+quantity('meth-cargo')+'</p><button class="widebtn" id="sellCargo" '+(!quantity('meth-cargo')?'disabled':'')+'>Trade one parcel</button><button class="widebtn" id="leaveMarket">Leave exchange</button>');
+ $('#sellCargo').onclick=()=>{const cargo=state.inventory.find(i=>i.id==='meth-cargo'&&i.qty>0);if(!cargo)return;cargo.qty--;state.gold+=price;persistCampaign();render();cityMarket()};
+ $('#leaveMarket').onclick=closeModal;
+}
 function spawnBoss(x,y){let brood=state.floor%9===6,phantom=state.floor%9===0,hp=brood?155+state.floor*22:phantom?145+state.floor*24:130+state.floor*20;let b={type:'enemy',name:brood?'The Brood Matriarch':phantom?'The Hollow Regent':'The Ossuary Warden',sprite:brood?'spider-boss':phantom?'wraith':'bone-champion',x,y,hp,max:hp,atk:14+state.floor*2,xp:100+state.floor*10,icon:'♛',cool:0,alive:true,boss:true};if(state.floor===3)Object.assign(b,{name:'Pip, Keeper of the Cage',sprite:'goblin',small:true,hp:48,max:48,atk:5});
 if(state.floor===FINAL_FLOOR)b.name='The Last Bellkeeper';
 entities.push(b);state.boss=entities.length-1;$('#bossbar').classList.remove('hidden');$('#bossName').textContent=b.name;}
@@ -524,7 +566,15 @@ const shelter=state.sanctuaries?.find(q=>(q.door?.x===nx&&q.door.y===ny)||q.room
 function nearby(){return entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=1.65).sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y))[0]}
 let bossFight=null;
 function beginBoss(e){if(bossFight||state.dead||modalOpen()||sanctuaryAt(state.x,state.y)||(e.boss&&state.arena&&!inArena(state.x,state.y)))return;bossFight={e,turn:1,log:e.boss?'The arena seals.':'The '+e.name.toLowerCase()+' advances.'};step=null;visualX=state.x;visualY=state.y;joyX=joyY=0;if(e.boss)ai('BOSS BATTLE! Please make your inevitable suffering entertaining.');bossScreen();persistCampaign()}
-function bossIntent(b){return b.e.sprite==='wraith'&&b.turn%3===2?'MANA DRAIN':b.e.sprite==='bone-champion'&&b.turn%4===0?'ARMOR SHATTER':b.turn%3===0?'DEVASTATING STRIKE':b.e.sprite==='spider-boss'&&b.turn%2===0?'VENOM BITE':b.e.hp<b.e.max/2?'ENRAGED ATTACK':'Standard attack'}let animatingTurn=false;
+function bossIntent(b){
+ if(!b.e.boss){
+   if(b.e.sprite==='flood-grub'&&!b.e.budded&&(state.grubHatches||0)<6&&b.turn%2===0)return 'BUDDING';
+   if(b.e.sprite==='mire-leprechaun'&&b.turn%2===0)return 'SICKENING MIST';
+   if(b.e.sprite==='archer'&&b.turn%3===2)return 'AIMED SHOT';
+   if(b.e.sprite==='shaman'&&b.turn%4===0)return 'MANA DRAIN';
+   if(b.e.sprite==='spider'&&b.turn%4===0)return 'VENOM BITE';
+ }
+ return b.e.sprite==='wraith'&&b.turn%3===2?'MANA DRAIN':b.e.sprite==='bone-champion'&&b.turn%4===0?'ARMOR SHATTER':b.turn%3===0?'DEVASTATING STRIKE':b.e.sprite==='spider-boss'&&b.turn%2===0?'VENOM BITE':b.e.hp<b.e.max/2?'ENRAGED ATTACK':'Standard attack'}let animatingTurn=false;
 const techniques={
   mend:{name:'Mend',floor:4,job:'Arcanist',cost:8,desc:'Restore health and treat injuries.'},
   brace:{name:'Shieldbreaker',floor:4,job:'Vanguard',cost:5,desc:'Strike for power + 6 and guard the counterattack.'},
@@ -618,7 +668,9 @@ if(milestones[state.kills])ridiculous(...milestones[state.kills]);
 if(Math.random()<.08)awardBox('Bronze');
 if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true});
 closeModal();if(state.kills===1){unlock('First blood');ridiculous('Local Pest Control')}checkLevel();feed(e.name+' falls. Search its belongings with Loot.');persistCampaign();render();return
-}recordGuardian(state.floor,e.name,b.turn,b.guards||0);state.xp+=e.xp+100;state.gold+=100;if(window.DCKNet?.isHost)for(let [id,p] of Object.entries(netPlayers))if(p.floor===state.floor&&Math.hypot(p.x-e.x,p.y-e.y)<=8)window.DCKNet.sendReward(id,50,e.xp||100,'tonic',{floor:state.floor,name:e.name});if(state.achievements.includes('Management Has Been Terminated'))awardBox('Gold');else ridiculous('Management Has Been Terminated','Gold');checkLevel();$('#bossbar').classList.add('hidden');bossFight=null;showModal('<h2>GUARDIAN DEFEATED</h2><p>Gold loot box awarded. Loot the remains in the dungeon.</p><button class="widebtn" id="bossDone">CONTINUE</button>');if(state.floor===3&&state.foundKeeper){state.minersFree=true;caption('Iven','Hear that? Three bells. The cage is moving. My crew is going home.',true)}$('#bossDone').onclick=closeModal;save();render();return}let hit=Math.max(1,Math.floor((e.atk*(intent==='DEVASTATING STRIKE'?1.7:intent==='ENRAGED ATTACK'?1.25:1)-state.armor)*(guard?.25:1)));if(intent==='MANA DRAIN'&&!guard){state.mp=Math.max(0,state.mp-8);hit+=4}if(intent==='ARMOR SHATTER'&&!guard)hit+=Math.min(12,state.armor);if(state.wounds?.poison||b.poison>0)hit+=2;if(state.wounds?.bleed&&!guard)hit+=1;state.hp=Math.max(0,state.hp-hit);registerHit(e,hit,guard,intent==='VENOM BITE');b.log=(d?'You dealt '+d+' damage. ':guard?'You brace for impact. ':action==='focus'?'You recover mana. ':'You recover health. ')+'The guardian deals '+hit+' damage.';b.turn++;if(state.hp<=0){state.dead=true;bossFight=null;save();openDeath();return}persistCampaign();bossScreen();render()}
+}recordGuardian(state.floor,e.name,b.turn,b.guards||0);state.xp+=e.xp+100;state.gold+=100;if(window.DCKNet?.isHost)for(let [id,p] of Object.entries(netPlayers))if(p.floor===state.floor&&Math.hypot(p.x-e.x,p.y-e.y)<=8)window.DCKNet.sendReward(id,50,e.xp||100,'tonic',{floor:state.floor,name:e.name});if(state.achievements.includes('Management Has Been Terminated'))awardBox('Gold');else ridiculous('Management Has Been Terminated','Gold');checkLevel();$('#bossbar').classList.add('hidden');bossFight=null;showModal('<h2>GUARDIAN DEFEATED</h2><p>Gold loot box awarded. Loot the remains in the dungeon.</p><button class="widebtn" id="bossDone">CONTINUE</button>');if(state.floor===3&&state.foundKeeper){state.minersFree=true;caption('Iven','Hear that? Three bells. The cage is moving. My crew is going home.',true)}$('#bossDone').onclick=closeModal;save();render();return}let hit=Math.max(1,Math.floor((e.atk*(intent==='AIMED SHOT'?1.5:intent==='DEVASTATING STRIKE'?1.7:intent==='ENRAGED ATTACK'?1.25:1)-state.armor)*(guard?.25:1)));if(intent==='BUDDING'&&hatchGrub(e)){b.log='The grub splits. A hatchling wriggles onto the floor beside it.';b.turn++;persistCampaign();sendPartyWorld();bossScreen();render();return}
+if(intent==='SICKENING MIST'&&!guard)(state.wounds??={}).sick=true;
+if(intent==='MANA DRAIN'&&!guard){state.mp=Math.max(0,state.mp-8);hit+=4}if(intent==='ARMOR SHATTER'&&!guard)hit+=Math.min(12,state.armor);if(state.wounds?.poison||b.poison>0)hit+=2;if(state.wounds?.bleed&&!guard)hit+=1;state.hp=Math.max(0,state.hp-hit);registerHit(e,hit,guard,intent==='VENOM BITE');b.log=(d?'You dealt '+d+' damage. ':guard?'You brace for impact. ':action==='focus'?'You recover mana. ':'You recover health. ')+'The guardian deals '+hit+' damage.';b.turn++;if(state.hp<=0){state.dead=true;bossFight=null;save();openDeath();return}persistCampaign();bossScreen();render()}
 function attack(){if(state.chapter==='create'||state.chapter==='surface')return;if(state.dead||bossFight||sanctuaryAt(state.x,state.y))return;if(partyGuest()){if(!state.dead&&attackCooldown<=0){attackCooldown=.48;attackStarted=performance.now();window.DCKNet.sendIntent('attack')}return}let guardian=entities.find(e=>e.boss&&e.alive&&(!state.arena||inArena(state.x,state.y))&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);if(guardian){beginBoss(guardian);return}if(state.dead||attackCooldown>0)return;attackCooldown=.48;attackStarted=performance.now();let targets=entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);targets=targets.filter(e=>e.type==='enemy'&&!e.boss);if(!targets.length){beep(110,.06);return}targets.sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y));let e=targets[0];if(!window.DCKNet?.inRoom){beginBoss(e);return}let dmg=state.power+(state.pet?.crawler?state.pet.level+1:0)+Math.floor(Math.random()*5);e.hp-=dmg;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+dmg});beep(230,.08,'sawtooth');feed('You strike '+e.name+' for <b>'+dmg+'</b> damage.');if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;petVictory();if(state.kills===1)ridiculous('Local Pest Control');if(state.kills===10)ridiculous('Unlicensed Exterminator','Silver');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===30)ridiculous('The Neighborhood Is Quiet Now','Gold');if(Math.random()<.08)awardBox('Bronze');if(e.boss)ridiculous('Management Has Been Terminated','Gold');state.xp+=e.xp;state.gold+=Math.floor(5+Math.random()*12);feed('<b>'+e.name+'</b> falls. Remains left behind. +'+e.xp+' XP.');particles.push({x:e.x,y:e.y,t:0,kind:'death'});checkLevel();if(state.kills>=1)unlock('First blood');if(e.boss){state.gold+=100;state.xp+=100;unlock('Warden breaker');ai('The Warden is down. The audience is… cautiously impressed.');$('#bossbar').classList.add('hidden')}if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true})}render();}
 
 function takeDamage(n,e){if(state.dead)return;if(sanctuaryAt(state.x,state.y))return;hurtAt=performance.now();let d=Math.max(1,n-state.armor);state.hp=Math.max(0,state.hp-d);registerHit(e,d);particles.push({x:state.x,y:state.y,t:0,kind:'hurt',text:'-'+d});feed('<b>'+e.name+'</b> hits you for '+d+' damage.');beep(90,.12,'sawtooth');if(state.hp<=0){state.dead=true;feed('<b>You have fallen.</b> The dungeon claims another crawler.');unlock('Down but not out');notify('CRAWLER DOWN — TAP REVIVE');save();setTimeout(()=>openDeath(),600)}}
@@ -644,7 +696,9 @@ if(e.pursuit>0){
   if(state.retreatGrace||Math.hypot(e.x-state.x,e.y-state.y)>=1.4)continue;
 }
 if(state.retreatGrace&&Math.hypot(e.x-state.x,e.y-state.y)<1.4)continue;
-if(Math.hypot(e.x-state.x,e.y-state.y)<1.4){if(!window.DCKNet?.inRoom){beginBoss(e);return}if(e.cool<=0){e.attackAt=performance.now();takeDamage(e.atk,e);e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<dt*.72){
+if(Math.hypot(e.x-state.x,e.y-state.y)<1.4){if(!window.DCKNet?.inRoom){beginBoss(e);return}if(e.cool<=0){e.attackAt=performance.now();
+ if(e.sprite==='flood-grub'&&hatchGrub(e))notify('A grub hatchling emerges.');
+ else{if(e.sprite==='mire-leprechaun'&&Math.random()<.4)(state.wounds??={}).sick=true;takeDamage(e.atk,e)}e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<dt*.72){
 const chasing=Math.hypot(e.x-state.x,e.y-state.y)<7;
 const target=chasing?state:e.den;if(!target)continue;
 let dx=Math.sign(target.x-e.x),dy=Math.sign(target.y-e.y);let opts=Math.random()<.5?[[dx,0],[0,dy]]:[[0,dy],[dx,0]];for(let [ax,ay] of opts)if((ax||ay)&&!(step&&e.x+ax===step.nx&&e.y+ay===step.ny)&&!solid(e.x+ax,e.y+ay)&&!sanctuaryAt(e.x+ax,e.y+ay)&&!entities.some(q=>q!==e&&q.alive&&q.x===e.x+ax&&q.y===e.y+ay)){e.x+=ax;e.y+=ay;break}}}}
@@ -713,7 +767,7 @@ $('#awardSkip').onclick=playAchievement;
 function itemArt(item){
   const base=item.id.replace(/-\d+$/,'');
   const art=base.startsWith('box-')?'box':base.startsWith('gear-')?(item.slot==='armor'?'echo-mail':'dock-knife'):base;
-  const known=['box','tonic','shard','torch','gold','food','biscuit',...rewardCatalog.map(i=>i.id)];
+  const known=['meth-cargo','box','tonic','shard','torch','gold','food','biscuit',...rewardCatalog.map(i=>i.id)];
   return known.includes(art)?art:'satchel';
 }
 function gearModifiers(piece){
@@ -936,6 +990,11 @@ if(state.floor<4){
  Object.assign(e,{small:true,max,sprite:rat?'sewer-rat':'goblin',name:e.boss?'Pip, Keeper of the Cage':rat?'Drain rat':'Tunnel goblin',atk:e.boss?5:(rat?1:2)+state.floor});
  });
 }
+if(state.chapter==='mine')entities.forEach((e,i)=>{
+  if(e.type!=='enemy'||e.boss||!e.alive||e.rosterVersion)return;
+  const fresh= floorEnemy(state.floor,i,e.x,e.y),ratio=e.hp/e.max;
+  Object.assign(e,fresh,{hp:Math.max(1,Math.round(fresh.max*ratio))});
+});
 state.dead=!!(state.dead||state.collapsed||state.hp<=0);
 const guardian=entities[o.encounter?.e];
 if(!state.dead&&guardian?.type==='enemy'&&guardian.alive)bossFight={...o.encounter,e:guardian};
@@ -1156,7 +1215,10 @@ function drawEnemy(e){
   if(rat)ctx.scale(m.facing,1);
   if(now-m.hit<120)ctx.globalAlpha=.55;
   const row=mobWalkRows.indexOf(base),frame=Math.floor(pose.phase*12+.5)%12;
-  if(row>=0&&mobWalkAtlas.complete&&mobWalkAtlas.naturalWidth){
+  if(['flood-grub','mire-leprechaun','pack-llama'].includes(base)){
+    const wave=Math.sin(pose.phase*2*Math.PI);ctx.scale(m.facing*(1+.055*wave),1-.05*wave);
+    spriteDraw(base,0,-2-Math.abs(wave)*1.5,base==='flood-grub'?27:30,base==='flood-grub'?23:32);
+  }else if(row>=0&&mobWalkAtlas.complete&&mobWalkAtlas.naturalWidth){
     ctx.drawImage(mobWalkAtlas,frame*64,row*64,64,64,-w/2,-2-h+TILE*.18,w,h);
   }else spriteDraw(base,0,-2,w,h);
   ctx.restore();
@@ -1288,8 +1350,8 @@ let k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '
   setEffects:enabled=>{sound=enabled}
 });$('#newRun').onclick=campaignMenu;$('#modalClose').onclick=closeModal;$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});window.addEventListener('beforeunload',save);}
 function storageMenu(q){state.storage??=[];let available=state.inventory.filter(i=>i.qty>0&&state.equipment?.[i.slot]!==i.id);showModal('<h2>CRAWLER LOCKER</h2><p>Shared across sanctuaries and floors.</p><h3>Deposit</h3>'+available.map((i,n)=>'<button class="widebtn" data-deposit="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<h3>Withdraw</h3>'+state.storage.map((i,n)=>'<button class="widebtn" data-withdraw="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<button class="widebtn" id="storageBack">BACK</button>');let transfer=(from,to,item)=>{if(!item||item.qty<1)return;let existing=to.find(i=>i.id===item.id);if(existing)existing.qty++;else to.push({...item,qty:1});item.qty--;if(!item.qty)from.splice(from.indexOf(item),1);save();storageMenu(q)};$$('[data-deposit]').forEach(b=>b.onclick=()=>{const i=available[Number(b.dataset.deposit)];inspectItem(i,"Deposit",()=>transfer(state.inventory,state.storage,i))});$$('[data-withdraw]').forEach(b=>b.onclick=()=>{const i=state.storage[Number(b.dataset.withdraw)];inspectItem(i,"Withdraw",()=>transfer(state.storage,state.inventory,i))});$('#storageBack').onclick=()=>sanctuaryMenu(q)}function sanctuaryMenu(q){showModal('<h2>SANCTUARY</h2><p>Protected quarters • Gold: '+state.gold+'</p><button class="widebtn" id="restSafe">'+(q.rested?'BED — USED':'REST AT BED')+'</button><button class="widebtn" id="buySafe">MERCHANT: TONIC — 15 GOLD</button><button class="widebtn" id="stashSafe">'+(q.cache?'STORAGE — EMPTY':'OPEN SUPPLY CHEST')+'</button><button class="widebtn" id="lockerSafe">PERSONAL STORAGE</button><button class="widebtn" id="leaveSafe">RETURN</button>');$('#restSafe').onclick=()=>{if(!q.rested){q.rested=true;restoreHealth(state.maxHp);state.mp=state.maxMp;unlock('Safe harbor');save();render()}sanctuaryMenu(q)};$('#buySafe').onclick=()=>{if(state.gold>=15){state.gold-=15;giveItem('tonic',1);save();render()}sanctuaryMenu(q)};$('#stashSafe').onclick=()=>{if(q.cache)return;const nearby=nearbyContainers(state);if(!nearby.some(c=>c.source===q)){notify('Move closer to the supply chest.');return}if(partyGuest()){closeModal();window.DCKNet.sendIntent('loot')}else startLoot(nearby,null)};$('#lockerSafe').onclick=()=>storageMenu(q);$('#leaveSafe').onclick=closeModal}function giveItem(id,n){let i=state.inventory.find(v=>v.id===id);if(i)i.qty+=n;else{let names={tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};state.inventory.push({id,name:supplies[id]?.name||names[id]||id,icon:supplies[id]?.icon||'✦',qty:n,desc:supplies[id]?.desc||'Dungeon supply'})}}let bagPage=0, activeLoot=null, remoteLoot=null, lootSignature='';
-const lootNames={'box-Bronze':'Bronze loot box',gold:'Gold coins',tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};
-const lootIcons={'box-Bronze':'🎁',gold:'◉',tonic:'🧪',torch:'🔥',shard:'🔷'};
+const lootNames={'meth-cargo':'Sealed meth cargo','box-Bronze':'Bronze loot box',gold:'Gold coins',tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};
+const lootIcons={'meth-cargo':'▣','box-Bronze':'🎁',gold:'◉',tonic:'🧪',torch:'🔥',shard:'🔷'};
 let outfitAngle=0;
 function outfitPanel(){
   const slots=[['weapon','Weapon','Unarmed'],['armor','Armor','Everyday clothes'],['charm','Charm','None']];
@@ -1433,7 +1495,7 @@ function drawLoot(session,canTake){
     const row=session.rows.find(r=>String(r.key??r.id)===b.dataset.take);
     if(!row)return;
     const desc={gold:'Currency accepted by sanctuary merchants.',tonic:'Drink to recover health.',torch:'Lights nearby dungeon tiles.',shard:'Restores mana.','box-Bronze':'Open from your backpack for a random reward.'};
-    inspectItem({id:row.id,name:lootNames[row.id]||row.id,desc:desc[row.id]},'Take ×'+row.qty,()=>take(b.dataset.take));
+    inspectItem({id:row.id,name:lootNames[row.id]||row.id,desc:supplies[row.id]?.desc||desc[row.id]},'Take ×'+row.qty,()=>take(b.dataset.take));
   });
   $('#takeAll').onclick=()=>take('all');$('#leaveLoot').onclick=closeModal;
 }
@@ -1482,8 +1544,8 @@ if(nearby.length){if(partyGuest())window.DCKNet.sendIntent('loot');else startLoo
 let sanctuary=sanctuaryAt(state.x,state.y);if(sanctuary){sanctuaryMenu(sanctuary);return}notify('No remains or cache nearby.')}function action(a){if(a==='loot')loot();if(a==='attack')attack();if(a==='interact')interact();if(a==='hot')hotUse()}
 let worldClock=0;const remoteCooldown=new Map();
 function partyGuest(){return !!window.DCKNet?.inRoom&&!window.DCKNet.isHost}
-function sendPartyWorld(){if(!window.DCKNet?.isHost)return;window.DCKNet.sendWorld({floor:state.floor,campaignWon:!!state.campaignWon,loot:activeLoot,scenery:state.scenery,chests:(state.sanctuaries||[]).map(q=>!!q.cache),enemies:entities.map((e,i)=>({i,x:e.x,y:e.y,hp:e.hp,alive:e.alive,looted:!!e.looted})),collapse:Math.ceil(state.collapseLeft)})}
-function applyPartyWorld(w){if(!partyGuest()||!w||!Number.isInteger(w.floor)||w.floor<1||w.floor>999)return;if(w.campaignWon&&w.floor>=FINAL_FLOOR&&!state.campaignWon){state.campaignWon=true;caption('Rescue frequency','All eighteen floors clear. Seattle hears the last bell.',true);persistCampaign()}syncLoot(w.loot);if(w.floor!==state.floor){bossFight=null;state.dead=false;state.hp=Math.max(1,state.hp);state.floor=w.floor;if(state.floor>=4&&!state.maxMp)state.mp=state.maxMp=35;generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();closeModal();notify('PARTY FLOOR '+state.floor)}if(Array.isArray(w.scenery))state.scenery=w.scenery;if(Array.isArray(w.chests))(state.sanctuaries||[]).forEach((q,i)=>q.cache=!!w.chests[i]);for(let v of w.enemies||[]){let e=entities[v.i];if(!e||!Number.isInteger(v.x)||!Number.isInteger(v.y)||v.x<0||v.x>=W||v.y<0||v.y>=H)continue;e.x=v.x;e.y=v.y;if(Number.isFinite(v.hp))e.hp=Math.max(0,Math.min(e.max||9999,v.hp));e.alive=!!v.alive;e.looted=!!v.looted}if(Number.isFinite(w.collapse))state.collapseLeft=Math.max(0,w.collapse)}
+function sendPartyWorld(){if(!window.DCKNet?.isHost)return;window.DCKNet.sendWorld({floor:state.floor,campaignWon:!!state.campaignWon,loot:activeLoot,scenery:state.scenery,chests:(state.sanctuaries||[]).map(q=>!!q.cache),enemies:entities.map((e,i)=>({i,x:e.x,y:e.y,hp:e.hp,alive:e.alive,looted:!!e.looted,hatchling:!!e.hatchling})),collapse:Math.ceil(state.collapseLeft)})}
+function applyPartyWorld(w){if(!partyGuest()||!w||!Number.isInteger(w.floor)||w.floor<1||w.floor>999)return;if(w.campaignWon&&w.floor>=FINAL_FLOOR&&!state.campaignWon){state.campaignWon=true;caption('Rescue frequency','All eighteen floors clear. Seattle hears the last bell.',true);persistCampaign()}syncLoot(w.loot);if(w.floor!==state.floor){bossFight=null;state.dead=false;state.hp=Math.max(1,state.hp);state.floor=w.floor;if(state.floor>=4&&!state.maxMp)state.mp=state.maxMp=35;generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();closeModal();notify('PARTY FLOOR '+state.floor)}if(Array.isArray(w.scenery))state.scenery=w.scenery;if(Array.isArray(w.chests))(state.sanctuaries||[]).forEach((q,i)=>q.cache=!!w.chests[i]);for(let v of w.enemies||[]){let e=entities[v.i];if(v.hatchling&&state.floor===2&&Number.isInteger(v.i)&&v.i>=0&&v.i<95&&!e?.hatchling){e={...floorEnemy(2,0,v.x,v.y),hatchling:true,budded:true,name:'Grub hatchling',max:5};while(entities.length<v.i)entities.push({type:'loot',alive:false,looted:true,x:0,y:0});entities[v.i]=e}if(!e||!Number.isInteger(v.x)||!Number.isInteger(v.y)||v.x<0||v.x>=W||v.y<0||v.y>=H)continue;e.x=v.x;e.y=v.y;if(Number.isFinite(v.hp))e.hp=Math.max(0,Math.min(e.max||9999,v.hp));e.alive=!!v.alive;e.looted=!!v.looted}if(Number.isFinite(w.collapse))state.collapseLeft=Math.max(0,w.collapse)}
 function partyIntent(d){if(!window.DCKNet?.isHost||d.player?.floor!==state.floor)return;
 if(activeLoot){if(activeLoot.owner===d.id){
 if(d.action==='loot_close')finishLoot();else if(d.action.startsWith('take_'))transferLoot(d.action.slice(5))

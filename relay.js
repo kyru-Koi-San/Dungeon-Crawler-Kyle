@@ -31,7 +31,7 @@ wss.on('connection',(ws,req)=>{
   if(m.type==='loot_bundle'){
    const room=rooms.get(client.room);if(!room||room.host!==id)return;
    const target=room.players.get(m.target);if(!target)return;
-   const items={};for(const key of ['gold','tonic','torch','box-Bronze']){const n=clampInt(m.items?.[key],0,9999);if(n)items[key]=n}
+   const items={};for(const key of ['gold','tonic','torch','box-Bronze','meth-cargo']){const n=clampInt(m.items?.[key],0,9999);if(n)items[key]=n}
    send(target.ws,{type:'loot_bundle',items});return;
   }
   if(m.type==='reward'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const target=room.players.get(m.target);if(target)send(target.ws,{type:'reward',guardian:m.guardian?{floor:clampInt(m.guardian.floor,1,999),name:String(m.guardian.name||'Guardian').slice(0,60)}:null,gold:clampInt(m.gold,0,100),xp:clampInt(m.xp,0,500),item:['tonic','torch','shard'].includes(m.item)?m.item:null});return;}
