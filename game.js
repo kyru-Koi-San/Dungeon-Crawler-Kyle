@@ -7,8 +7,9 @@ const names=['Pioneer Square • Bell Vault','Elliott Bay • Floodworks','SoDo 
 const quips=['Welcome, crawler. Try not to die before the opening credits.','Your posture suggests a lack of confidence. And armor.','The audience loves a comeback. They love a dismemberment more.','I have seen rats with better tactical instincts.','Excellent footwork. Shame about the rest of you.','A new floor! The same questionable life choices.','Remember: pain is temporary. The highlight reel is forever.','That corpse had a family. Probably.','Your odds are improving. They were dreadful, so this is relative.','Do keep moving. The walls are not decorative.'];
 const enemyTypes=[['Hollow',18,5,12,'☠'],['Cave goblin',25,7,16,'♟'],['Crypt spider',15,4,10,'✣'],['Ash knight',42,10,28,'♜'],['Mire wretch',32,8,20,'♟'],['Bone archer',22,6,17,'➶'],['Goblin hexer',29,8,21,'✧']];
 let state,tiles=[],seen=[],entities=[],particles=[],keys={},last=0,acc=0,walkUntil=0,attackStarted=0,sound=true,audio=null,toastTimer=0,attackCooldown=0,spawnedFloor=0,tab='journal',touchMove=null,netPlayers={},netSyncClock=0;
-let step=null,stepCount=0;const STEP_MS=185;
-let joystickAxis=null;let visualX=null,visualY=null,visualFloor=0,joyX=0,joyY=0,joyClock=0,jumpAt=0,hurtAt=0;const sprites={};
+let step=null,stepCount=0;const WALK_MS=275,RUN_MS=160;
+let runPointer=null;
+let joystickAxis=null;let visualX=null,visualY=null,visualFloor=0,joyX=0,joyY=0,hurtAt=0;const sprites={};
 const spriteNames=['hero-front','hero-side','hero-back','hero-slash','hero-strike','sewer-rat','skeleton','goblin','spider','wraith','archer','shaman','spider-boss','bone-champion'];
 for(const name of spriteNames){const img=new Image();img.src=name+'.png';img.onload=()=>render();sprites[name]=img;}
 const skinTones=['#f1cdb0','#dfaf87','#bc8b63','#a06c4b','#794f38','#50352c'];
@@ -308,7 +309,7 @@ function investigate(selected){if(state.hall){hallInteract();return}
   const [name,line]=dens[p.art]||sights[p.art-6];
   state.investigated??=[];if(!state.investigated.includes(p.y*W+p.x))state.investigated.push(p.y*W+p.x);
   if(p.art>=6)for(let y=Math.max(0,p.y-7);y<Math.min(H,p.y+8);y++)for(let x=Math.max(0,p.x-7);x<Math.min(W,p.x+8);x++)if(Math.hypot(x-p.x,y-p.y)<=7)seen[y][x]=true;
-  caption(name,line,true);persistCampaign();render();
+  caption(name,line,true);persistCampaign();render();inspectItem({id:"discovery",art:p.art,name,desc:line});
 }
 
 function generate(){state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;W=72;H=48;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
@@ -335,7 +336,7 @@ function reveal(){if(state.hall)return;let rad=state.torchTurns>0?7:5;for(let y=
 function feed(s){let d=new Date(),tm=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});state.feed.unshift({tm,s});state.feed=state.feed.slice(0,30);renderFeed()}
 function ai(s){caption("Underfloor",s);$('#aiLine').textContent='“'+s+'”'}function notify(s){let t=$('#toast');t.textContent=s;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),1600)}
 function beep(f=180,d=.07,type='square'){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();let o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+d);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d)}catch(e){}}
-function move(dx,dy,start=performance.now()){if(bossFight||state.dead||step||modalOpen())return;state.facing=dx<0?'left':dx>0?'right':dy<0?'up':'down';const pos=state.hall||state;let nx=pos.x+dx,ny=pos.y+dy;if(state.hall&&nx===6&&ny===8&&personalMenusLocked()){leaveHall();return}if(state.hall?!hallWalkable(nx,ny):solid(nx,ny)||entities.some(e=>e.type==='enemy'&&e.alive&&e.x===nx&&e.y===ny))return;step={x:pos.x,y:pos.y,nx,ny,start};stepCount++;return;}function finishStep(nx,ny){
+function move(dx,dy,start=performance.now()){if(pauseStarted!==null||bossFight||state.dead||step||modalOpen())return;state.facing=dx<0?'left':dx>0?'right':dy<0?'up':'down';const pos=state.hall||state;let nx=pos.x+dx,ny=pos.y+dy;if(state.hall&&nx===6&&ny===8&&personalMenusLocked()){leaveHall();return}if(state.hall?!hallWalkable(nx,ny):solid(nx,ny)||entities.some(e=>e.type==='enemy'&&e.alive&&e.x===nx&&e.y===ny))return;step={x:pos.x,y:pos.y,nx,ny,start,duration:strideDuration()};stepCount++;return;}function finishStep(nx,ny){
 if(state.hall){if(ny===8&&personalMenusLocked()){leaveHall();return}state.hall.x=nx;state.hall.y=ny;if(ny===8){leaveHall();return}persistCampaign();render();return}
 
 if(entities.some(e=>e.type==='enemy'&&e.alive&&e.x===nx&&e.y===ny))return;
@@ -361,6 +362,18 @@ function encounterScreen(){
   if(state.equipment?.weapon)stage.classList.add('armed');
   $$('[data-boss]').forEach(button=>button.onclick=()=>animateTurn(button.dataset.boss));
 }
+function battleFrames(duration,paint,valid){
+  return new Promise(resolve=>{
+    let elapsed=0,last=performance.now();
+    function frame(now){
+      if(!valid())return resolve();
+      if(pauseStarted===null){elapsed+=Math.min(64,now-last);paint?.(Math.min(1,elapsed/duration))}
+      last=now;
+      if(elapsed>=duration)resolve();else requestAnimationFrame(frame);
+    }
+    frame(last);
+  });
+}
 async function animateTurn(action){
   const battle=bossFight;
   if(!battle||animatingTurn||state.dead)return;
@@ -368,7 +381,7 @@ async function animateTurn(action){
   const strike=action==='attack'?state.power+Math.floor(Math.random()*5):0;
   const damage=strike+(action==='spell'?state.power*2+8+(state.spellBonus||0):action==='trap'?25+state.level*3:0)+(battle.assist||0);
   animatingTurn=true;
-  const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const wait=ms=>battleFrames(ms,null,()=>bossFight===battle);
   try{
     $$('[data-boss]').forEach(button=>button.disabled=true);
     stage.dataset.move=action;
@@ -392,7 +405,6 @@ closeModal();if(state.kills===1){unlock('First blood');ridiculous('Local Pest Co
 }recordGuardian(state.floor,e.name,b.turn,b.guards||0);state.xp+=e.xp+100;state.gold+=100;if(window.DCKNet?.isHost)for(let [id,p] of Object.entries(netPlayers))if(p.floor===state.floor&&Math.hypot(p.x-e.x,p.y-e.y)<=8)window.DCKNet.sendReward(id,50,e.xp||100,'tonic',{floor:state.floor,name:e.name});if(state.achievements.includes('Management Has Been Terminated'))awardBox('Gold');else ridiculous('Management Has Been Terminated','Gold');checkLevel();$('#bossbar').classList.add('hidden');bossFight=null;showModal('<h2>GUARDIAN DEFEATED</h2><p>Gold loot box awarded. Loot the remains in the dungeon.</p><button class="widebtn" id="bossDone">CONTINUE</button>');if(state.floor===3&&state.foundKeeper){state.minersFree=true;caption('Iven','Hear that? Three bells. The cage is moving. My crew is going home.',true)}$('#bossDone').onclick=closeModal;save();render();return}let hit=Math.max(1,Math.floor((e.atk*(intent==='DEVASTATING STRIKE'?1.7:intent==='ENRAGED ATTACK'?1.25:1)-state.armor)*(guard?.25:1)));if(intent==='MANA DRAIN'&&!guard){state.mp=Math.max(0,state.mp-8);hit+=4}if(intent==='ARMOR SHATTER'&&!guard)hit+=Math.min(12,state.armor);if(intent==='VENOM BITE'&&!guard){b.poison=3}if(b.poison>0){hit+=3;b.poison--}state.hp=Math.max(0,state.hp-hit);b.log=(d?'You dealt '+d+' damage. ':guard?'You brace for impact. ':action==='focus'?'You recover mana. ':'You recover health. ')+'The guardian deals '+hit+' damage.';b.turn++;if(state.hp<=0){state.dead=true;bossFight=null;save();openDeath();return}persistCampaign();bossScreen();render()}
 function attack(){if(state.chapter==='create'||state.chapter==='surface')return;if(state.dead||bossFight||sanctuaryAt(state.x,state.y))return;if(partyGuest()){if(!state.dead&&attackCooldown<=0){attackCooldown=.48;attackStarted=performance.now();window.DCKNet.sendIntent('attack')}return}let guardian=entities.find(e=>e.boss&&e.alive&&(!state.arena||inArena(state.x,state.y))&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);if(guardian){beginBoss(guardian);return}if(state.dead||attackCooldown>0)return;attackCooldown=.48;attackStarted=performance.now();let targets=entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);targets=targets.filter(e=>e.type==='enemy'&&!e.boss);if(!targets.length){beep(110,.06);return}targets.sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y));let e=targets[0];if(!window.DCKNet?.inRoom){beginBoss(e);return}let dmg=state.power+Math.floor(Math.random()*5);e.hp-=dmg;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+dmg});beep(230,.08,'sawtooth');feed('You strike '+e.name+' for <b>'+dmg+'</b> damage.');if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;if(state.kills===1)ridiculous('Local Pest Control');if(state.kills===10)ridiculous('Unlicensed Exterminator','Silver');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===30)ridiculous('The Neighborhood Is Quiet Now','Gold');if(Math.random()<.08)awardBox('Bronze');if(e.boss)ridiculous('Management Has Been Terminated','Gold');state.xp+=e.xp;state.gold+=Math.floor(5+Math.random()*12);feed('<b>'+e.name+'</b> falls. Remains left behind. +'+e.xp+' XP.');particles.push({x:e.x,y:e.y,t:0,kind:'death'});checkLevel();if(state.kills>=1)unlock('First blood');if(e.boss){state.gold+=100;state.xp+=100;unlock('Warden breaker');ai('The Warden is down. The audience is… cautiously impressed.');$('#bossbar').classList.add('hidden')}if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true})}render();}
 
-function jump(){if(state.hall)return;if(state.chapter==='create'||state.chapter==='surface')return;if(bossFight)return;if(state.dead||step)return;state.jumps=(state.jumps||0)+1;if(state.jumps===10)ridiculous('Gravity Is a Suggestion');jumpAt=performance.now();let dx=state.facing==='left'?-1:state.facing==='right'?1:0,dy=state.facing==='up'?-1:state.facing==='down'?1:0;let nx=state.x+dx,ny=state.y+dy;if(!solid(nx,ny)&&!entities.some(e=>e.alive&&e.x===nx&&e.y===ny)){particles.push({x:state.x,y:state.y,t:0,kind:'jump'});state.x=nx;state.y=ny;const hall=state.sanctuaries?.find(q=>q.door&&(q.door.x===nx&&q.door.y===ny||sanctuaryAt(nx,ny)===q));if(hall){enterHall(hall);return}reveal();if(tile(nx,ny)===3)nextFloor();else render();notify('You leap across the flagstones.')}else{particles.push({x:state.x,y:state.y,t:0,kind:'jump'});notify('No room to jump there.')}beep(300,.08,'triangle')}
 function spell(){if(state.chapter==='create'||state.chapter==='surface')return;if(state.dead||bossFight||sanctuaryAt(state.x,state.y))return;if(partyGuest()){if(!state.dead&&state.mp>=10){state.mp-=10;window.DCKNet.sendIntent('spell');particles.push({x:state.x,y:state.y,t:0,kind:'pulse'})}return}let guardian=entities.find(e=>e.boss&&e.alive&&(!state.arena||inArena(state.x,state.y))&&Math.hypot(e.x-state.x,e.y-state.y)<=4);if(guardian){beginBoss(guardian);return}if(!window.DCKNet?.inRoom){let target=entities.find(e=>e.type==='enemy'&&e.alive&&!e.boss&&Math.hypot(e.x-state.x,e.y-state.y)<=3.2);if(target){beginBoss(target);return}}
 if(state.dead||state.mp<10){notify('Not enough mana.');return}state.mp-=10;state.spells=(state.spells||0)+1;if(state.spells===5)ridiculous('Unauthorized Indoor Fireworks');let hits=entities.filter(e=>e.type==='enemy'&&e.alive&&!e.boss&&Math.hypot(e.x-state.x,e.y-state.y)<=3.2);for(let e of hits){let d=16+Math.floor(state.power*.8)+(state.spellBonus||0);e.hp-=d;particles.push({x:e.x,y:e.y,t:0,kind:'magic',text:'-'+d});if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;if(state.kills===1)ridiculous('Local Pest Control');if(state.kills===10)ridiculous('Unlicensed Exterminator','Silver');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===30)ridiculous('The Neighborhood Is Quiet Now','Gold');if(Math.random()<.08)awardBox('Bronze');if(e.boss)ridiculous('Management Has Been Terminated','Gold');state.xp+=e.xp;state.gold+=8;if(e.boss){state.gold+=100;unlock('Warden breaker')}unlock('First blood');feed('<b>'+e.name+'</b> is consumed by arcane force.');checkLevel()}}particles.push({x:state.x,y:state.y,t:0,kind:'pulse'});feed('You unleash <b>Arc Pulse</b>. '+hits.length+' target(s) caught.');beep(520,.22,'sine');render()}
 function takeDamage(n,e){if(state.dead)return;if(sanctuaryAt(state.x,state.y))return;hurtAt=performance.now();let d=Math.max(1,n-state.armor);state.hp=Math.max(0,state.hp-d);particles.push({x:state.x,y:state.y,t:0,kind:'hurt',text:'-'+d});feed('<b>'+e.name+'</b> hits you for '+d+' damage.');beep(90,.12,'sawtooth');if(state.hp<=0){state.dead=true;feed('<b>You have fallen.</b> The dungeon claims another crawler.');unlock('Down but not out');notify('CRAWLER DOWN — TAP REVIVE');save();setTimeout(()=>openDeath(),600)}}
@@ -407,16 +419,58 @@ function achievementBanner(name,tier){
   awardQueue.push({name,tier});if(!awardShowing)playAchievement();
 }
 function playAchievement(){
-  if(!awardQueue.length){awardShowing=false;return}
-  awardShowing=true;
-  if(modalOpen()||document.body.classList.contains('status-open')){setTimeout(playAchievement,200);return}
+  const el=$('#awardScreen');
   const next=awardQueue.shift();
-  const el=$('#achievementBanner');
-  el.querySelector('strong').textContent=next.name;
-  el.querySelector('small').textContent=next.tier?'Achievement · '+next.tier+' loot box':'Achievement unlocked';
-  el.classList.remove('active');void el.offsetWidth;el.classList.add('active');
+  if(!next){
+    awardShowing=false;el.close();resumeInspectionClock();return;
+  }
+  if(!awardShowing){pauseInspectionClock();awardShowing=true}
+  $('#awardName').textContent=next.name;
+  $('#awardReward').textContent=next.tier?next.tier+' loot box awarded':'The audience insists you acknowledge this.';
+  if(!el.open)el.showModal();
+  $('#awardSkip').focus({preventScroll:true});
   beep(523,.09,'sine');setTimeout(()=>beep(784,.15,'sine'),95);
-  setTimeout(()=>{el.classList.remove('active');playAchievement()},2800);
+}
+let pauseStarted=null;
+function pauseInspectionClock(){if(pauseStarted===null)pauseStarted=performance.now();clearMovement()}
+function resumeInspectionClock(){
+  if(pauseStarted===null||awardShowing||$('#inspectScreen').open)return;
+  if(step)step.start+=performance.now()-pauseStarted;
+  pauseStarted=null;last=0;updatePace();
+}
+$('#awardScreen').oncancel=e=>e.preventDefault();
+$('#awardSkip').onclick=playAchievement;
+function inspectItem(item,label,action){
+  if(!item||awardShowing)return;
+  const screen=$('#inspectScreen');
+  const base=item.id.replace(/-\d+$/,'');
+  const art=base.startsWith('box-')?'box':base.startsWith('gear-')?(item.slot==='armor'?'echo-mail':'dock-knife'):base;
+  const known=['box','tonic','shard','torch','gold',...rewardCatalog.map(i=>i.id)];
+  const display=$('#inspectArt');display.replaceChildren();
+  if(item.art!==undefined){
+    const c=document.createElement('canvas');c.width=c.height=32;
+    const paint=()=>c.getContext('2d').drawImage(sceneryArt,item.art*32,0,32,32,0,0,32,32);
+    if(sceneryArt.naturalWidth)paint();else sceneryArt.addEventListener('load',paint,{once:true});
+    display.append(c);
+  }else{
+    const img=document.createElement('img');img.alt=item.name;
+    img.src='item-art.svg#'+(known.includes(art)?art:'satchel');display.append(img);
+  }
+  $('#inspectType').textContent=item.art!==undefined?'Field discovery':item.slot||'Inventory item';
+  $('#inspectTitle').textContent=item.name;
+  $('#inspectText').textContent=item.desc||'';
+  const confirm=$('#inspectAction');confirm.hidden=!action;confirm.textContent=label||'';
+  const dismiss=()=>{screen.close();resumeInspectionClock()};
+  $('#inspectBack').onclick=dismiss;screen.oncancel=e=>{e.preventDefault();dismiss()};
+  confirm.onclick=()=>{dismiss();action?.()};
+  pauseInspectionClock();if(!screen.open)screen.showModal();
+}
+function inspectOwned(item,duplicate=false){
+  if(!item)return;
+  const equipped=item.slot&&state.equipment?.[item.slot]===item.id;
+  const usable=item.effect||item.slot||['torch','tonic','shard'].includes(item.id)||item.id.startsWith('box-');
+  inspectItem(item,item.slot?(equipped?'Unequip':'Equip'):item.id.startsWith('box-')?'Open':'Use',
+    usable&&!(duplicate&&equipped)?()=>useItem(item.id):null);
 }
 function unlock(n,tier=null){if(!state.achievements.includes(n)){state.achievements.push(n);achievementBanner(n,tier);feed('Achievement unlocked: <b>'+n+'</b>.');}}
 const rewardCatalog=[
@@ -606,27 +660,21 @@ function drawStrike(g,p,dir='side',aim=0){
 function playDuelStrike(stage,battle){
   const canvas=stage.querySelector('.strike-pose'),g=canvas.getContext('2d');
   const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const start=performance.now(),duration=gearLook().weapon==='hammer'?640:520;
-  return new Promise(resolve=>{
-    function frame(now){
-      if(bossFight!==battle||!stage.isConnected){resolve();return}
-      const p=Math.min(1,(now-start)/duration);
-      g.clearRect(0,0,72,48);g.save();g.imageSmoothingEnabled=false;g.translate(36,47);
-      drawStrike(g,reduced?.45:p);g.restore();
-      if(p<1&&!reduced)requestAnimationFrame(frame);else resolve();
-    }
-    frame(start);
-  });
+  const duration=gearLook().weapon==='hammer'?640:520;
+  return battleFrames(reduced?1:duration,p=>{
+    g.clearRect(0,0,72,48);g.save();g.imageSmoothingEnabled=false;g.translate(36,47);
+    drawStrike(g,reduced?.45:p);g.restore();
+  },()=>bossFight===battle&&stage.isConnected);
 }
 function drawHero(x,y){
   const now=performance.now(),px=x*TILE+16,ground=y*TILE+27;
-  const p=step?Math.min(1,Math.max(0,(now-step.start)/STEP_MS)):0;
+  const p=step?Math.min(1,Math.max(0,(now-step.start)/step.duration)):0;
   const phase=step?((stepCount-1+p)*.5)%1:0;
   const bob=step?Math.sin(p*Math.PI)*1.15:0;
-  const jumpLift=Math.sin(Math.PI*Math.min(1,Math.max(0,(now-jumpAt)/420)))*14;
+
   const dir=state.facing==='up'?'up':state.facing==='down'?'down':'side';
   ctx.fillStyle='#0008';ctx.beginPath();ctx.ellipse(px,ground,9,3,0,0,Math.PI*2);ctx.fill();
-  ctx.save();ctx.translate(px,ground-bob-jumpLift);
+  ctx.save();ctx.translate(px,ground-bob);
   if(state.facing==='left')ctx.scale(-1,1);
   ctx.imageSmoothingEnabled=false;if(now-hurtAt<160)ctx.globalAlpha=.55;
   if(attackCooldown>0&&now-attackStarted<480){
@@ -695,7 +743,7 @@ if(sceneryArt.complete&&sceneryArt.naturalWidth)for(const p of state.scenery||[]
  if(p.art>=6&&!state.investigated?.includes(p.y*W+p.x)){ctx.fillStyle='#9bd7ce';ctx.fillRect(p.x*TILE+15,p.y*TILE+3,3,3)}
 }
 for(let e of entities){if(!seen[e.y]?.[e.x])continue;if(e.type==='loot'&&e.alive){ctx.fillStyle='#e4c16a';ctx.fillRect(e.x*TILE+12,e.y*TILE+12,9,9);ctx.fillStyle='#fff0b3';ctx.fillRect(e.x*TILE+14,e.y*TILE+10,5,3)}else if(e.type==='enemy'&&e.alive)drawEnemy(e);else if(e.type==='enemy'&&!e.alive&&!e.looted)drawRemains(e)}for(const q of state.sanctuaries||[state.safe].filter(Boolean))drawGuildEntrance(q);if(state.npc&&seen[state.npc.y]?.[state.npc.x]){spriteDraw('hero-front',state.npc.x*TILE+16,state.npc.y*TILE+25,30,44);ctx.fillStyle='#7ce4df';ctx.font='10px monospace';ctx.fillText(state.floor===1?'ROPE KEEPER':'CRAWLER',state.npc.x*TILE-8,state.npc.y*TILE-24)}drawHero(visualX,visualY);for(const [id,p] of Object.entries(netPlayers)){if(p.floor!==state.floor||p.hall)continue;const px=p.x*TILE+16,py=p.y*TILE+25;ctx.save();ctx.globalAlpha=.82;ctx.strokeStyle='#65c9d5';ctx.lineWidth=2;ctx.beginPath();ctx.arc(px,py-18,15,0,Math.PI*2);ctx.stroke();ctx.drawImage(crawlerPose('down',0,p.character||{},p.gear||{}),px-12,py-30,24,32);ctx.fillStyle='#a7e6ee';ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText((p.name||'ALLY').slice(0,10),px,py-51);ctx.restore();}
-for(let p of particles){let x=p.x*TILE+16,y=p.y*TILE+16;if(p.kind==='pulse'){ctx.strokeStyle='#60c9e2';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,15+p.t*100,0,Math.PI*2);ctx.stroke()}if(p.kind==='magic'||p.kind==='hit'||p.kind==='hurt'){ctx.fillStyle=p.kind==='magic'?'#77d9ee':'#f0a18b';ctx.font='bold 15px monospace';ctx.fillText(p.text||'',x,y-p.t*24)}if(p.kind==='death'||p.kind==='dodge'||p.kind==='jump'){ctx.fillStyle=p.kind==='death'?'#d6d8d4':'#9fdbe2';ctx.globalAlpha=Math.max(0,1-p.t*2);ctx.fillRect(x-7,y-7,14,14);ctx.globalAlpha=1}}
+for(let p of particles){let x=p.x*TILE+16,y=p.y*TILE+16;if(p.kind==='pulse'){ctx.strokeStyle='#60c9e2';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,15+p.t*100,0,Math.PI*2);ctx.stroke()}if(p.kind==='magic'||p.kind==='hit'||p.kind==='hurt'){ctx.fillStyle=p.kind==='magic'?'#77d9ee':'#f0a18b';ctx.font='bold 15px monospace';ctx.fillText(p.text||'',x,y-p.t*24)}if(p.kind==='death'||p.kind==='dodge'){ctx.fillStyle=p.kind==='death'?'#d6d8d4':'#9fdbe2';ctx.globalAlpha=Math.max(0,1-p.t*2);ctx.fillRect(x-7,y-7,14,14);ctx.globalAlpha=1}}
 ctx.restore();let glow=ctx.createRadialGradient(canvas.width/2,canvas.height/2,40,canvas.width/2,canvas.height/2,canvas.width*(state.torchTurns>0?.68:.43));glow.addColorStop(0,'rgba(255,177,83,.08)');glow.addColorStop(.5,'rgba(0,0,0,0)');glow.addColorStop(1,'rgba(2,5,12,.78)');ctx.fillStyle=glow;ctx.fillRect(0,0,canvas.width,canvas.height);if(performance.now()-hurtAt<220){ctx.fillStyle='rgba(180,20,25,.15)';ctx.fillRect(0,0,canvas.width,canvas.height)}}
 function drawMini(){if(state.hall){
 mini.fillStyle='#182222';mini.fillRect(0,0,240,180);mini.fillStyle='#725e48';mini.fillRect(24,25,188,128);
@@ -724,8 +772,19 @@ state.skillPoints+=Object.values(ranks).reduce((sum,n)=>sum+n,0);state.branches=
 function chooseClass(n){if(personalMenusLocked()){lockHint();return}if(state.floor<4||state.specialization===n||!['Vanguard','Arcanist','Reaver'].includes(n))return;
 const missingHp=state.maxHp-state.hp,missingMp=state.maxMp-state.mp;if(state.specialization)removeClass();state.specialization=n;if(n==='Vanguard'){state.maxHp+=15;state.hp+=15;state.armor+=2}else if(n==='Arcanist'){state.maxMp+=20;state.mp+=20}else state.power+=4;state.hp=Math.max(1,state.maxHp-missingHp);state.mp=Math.max(0,state.maxMp-missingMp);save();render();openTab('skills')}function openTab(t){if(personalMenusLocked()){lockHint();return}if(t==='skills'){bagSection='skills';backpack();return}if(t==='inventory'){backpack();return}tab=t;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));let c=$('#tabContent');if(t==='journal'){c.innerHTML='<div class="panel-title">DUNGEON FEED <span class="muted">LIVE</span></div><div id="feed" class="feed"></div>';renderFeed()}else if(t==='map'){c.innerHTML='<div class="panel-title">CARTOGRAPHER’S MAP</div><p class="feed-line">The map reveals itself as you explore. Red marks living threats; white marks fallen enemies; gold marks your position and the exit.</p><div class="feed-line">Explored tiles: '+seen.flat().filter(Boolean).length+' / '+(W*H)+'</div>'}else if(t==='inventory'){c.innerHTML='<div class="panel-title">CRAWLER INVENTORY</div><div class="equipment-strip">⚔ Weapon • ⬟ Armor</div><div class="item-list inventory-grid">'+state.inventory.map(i=>`<div class="item-row"><span class="ico">${i.icon}</span><div><b>${i.name} ×${i.qty}</b><small>${i.desc}</small></div>${(['tonic','torch','shard'].includes(i.id)||i.id.startsWith('box-')||i.slot)?`<button class="smallbtn" data-use="${i.id}">${i.slot?(state.equipment?.[i.slot]===i.id?'EQUIPPED':'EQUIP'):i.id.startsWith('box-')?'OPEN':'USE'}</button>`:''}</div>`).join('')+'</div><button class="widebtn" id="addItem">＋ ADD CUSTOM ITEM</button>'}else if(t==='party'){c.innerHTML='<div class="panel-title">PRIVATE CRAWLER PARTY</div><p>Connect to a hosted Dungeon Crawler relay to create an invite-only room. This alpha synchronizes party presence and positions; combat and dungeon state are not yet authoritative/shared.</p><div class="item-list"><label>SERVER WSS URL<input id="netEndpoint" class="modal-input" placeholder="wss://your-relay-host.example" value="'+safeAttr(localStorage.getItem('dck-net-url')||'')+'"></label><label>CRAWLER NAME<input id="netName" class="modal-input" maxlength="16" value="'+safeAttr(localStorage.getItem('dck-net-name')||'Crawler')+'"></label><div class="item-row"><button class="smallbtn" id="netCreate">CREATE PRIVATE ROOM</button><button class="smallbtn" id="netJoin">JOIN WITH CODE</button><button class="smallbtn" id="netLeave">LEAVE</button></div><div class="item-row"><span class="ico">♙</span><div><b id="netStatus">'+(window.DCKNet?.connected?'CONNECTED':'SOLO MODE')+'</b><small id="netRoom">'+(window.DCKNet?.roomCode?'ROOM '+window.DCKNet.roomCode:'No active room')+'</small></div><span class="achievement">ALPHA</span></div><div id="netRoster" class="feed-line">Remote crawlers: '+Object.keys(netPlayers).length+'</div></div><p>Use a secure WSS address for public hosting. Room codes are private invite codes, not user accounts or strong authentication.</p>'}}
 function modalOpen(){return !$('#modal').classList.contains('hidden')}
+function strideDuration(){return runPointer!==null||keys.shift?RUN_MS:WALK_MS}
+function updatePace(){
+  const duration=strideDuration();
+  if(step&&duration!==step.duration&&pauseStarted===null){
+    const now=performance.now();
+    step.start=now-Math.min(1,Math.max(0,(now-step.start)/step.duration))*duration;
+    step.duration=duration;
+  }
+  $('#runButton').setAttribute('aria-pressed',String(duration===RUN_MS));
+}
 function clearMovement(){
-keys={};
+runPointer=null;
+keys={};updatePace();
 joyX=joyY=0;
 joystickAxis=null;
 $('#joyKnob').style.transform='';
@@ -749,9 +808,17 @@ function sizePlayfield(){
 }
 function bind(){
 sizePlayfield();new ResizeObserver(sizePlayfield).observe($('.canvas-wrap'));
+const run=$('#runButton');
+run.onpointerdown=e=>{
+  if(runPointer!==null||pauseStarted!==null||modalOpen())return;
+  e.preventDefault();runPointer=e.pointerId;run.setPointerCapture(e.pointerId);updatePace();
+};
+for(const event of ['pointerup','pointercancel','lostpointercapture'])run.addEventListener(event,e=>{
+  if(e.pointerId===runPointer){runPointer=null;updatePace()}
+});
 const status=$('#mobileStatus');status.onclick=()=>{if(personalMenusLocked()){lockHint();return}document.body.classList.add('status-open')};
 $('#statusClose').onclick=()=>document.body.classList.remove('status-open');
-let field=document.createElement('div');field.className='field-map';field.innerHTML='<canvas width="240" height="180" id="fieldMini"></canvas>';$('.canvas-wrap').appendChild(field);const joy=$('#joystick'),knob=$('#joyKnob');if(joy&&knob){let pointer=null;const update=e=>{let b=joy.getBoundingClientRect(),x=e.clientX-b.left-b.width/2,y=e.clientY-b.top-b.height/2,d=Math.hypot(x,y),m=Math.min(1,36/Math.max(1,d));knob.style.transform=`translate(${x*m}px,${y*m}px)`;if(d<=12||modalOpen()){
+let field=document.createElement('div');field.className='field-map';field.innerHTML='<canvas width="240" height="180" id="fieldMini"></canvas>';$('.canvas-wrap').appendChild(field);const joy=$('#joystick'),knob=$('#joyKnob');if(joy&&knob){let pointer=null;const update=e=>{let b=joy.getBoundingClientRect(),x=e.clientX-b.left-b.width/2,y=e.clientY-b.top-b.height/2,d=Math.hypot(x,y),m=Math.min(1,36/Math.max(1,d));knob.style.transform=`translate(${x*m}px,${y*m}px)`;if(d<=6||modalOpen()||pauseStarted!==null){
 joyX=joyY=0;
 joystickAxis=null;
 return;
@@ -761,13 +828,22 @@ if(joystickAxis==='x'&&vertical>horizontal*1.25)joystickAxis='y';
 else if(joystickAxis==='y'&&horizontal>vertical*1.25)joystickAxis='x';
 else if(!joystickAxis)joystickAxis=horizontal>=vertical?'x':'y';
 joyX=joystickAxis==='x'?Math.sign(x):0;
-joyY=joystickAxis==='y'?Math.sign(y):0};joy.addEventListener('pointerdown',e=>{if(pointer!==null)return;pointer=e.pointerId;joy.setPointerCapture(pointer);update(e);if(joyX||joyY)move(joyX,joyY);joyClock=0});joy.addEventListener('pointermove',e=>{if(e.pointerId===pointer)update(e)});const stop=e=>{if(e.pointerId!==pointer)return;pointer=null;joyX=joyY=0;joystickAxis=null;knob.style.transform=''};for(const ev of ['pointerup','pointercancel','lostpointercapture'])joy.addEventListener(ev,stop)}window.addEventListener('blur',clearMovement);
+joyY=joystickAxis==='y'?Math.sign(y):0;
+const now=performance.now();
+if(step&&joyX===step.x-step.nx&&joyY===step.y-step.ny){
+  const p=Math.min(1,Math.max(0,(now-step.start)/step.duration));
+  [step.x,step.nx]=[step.nx,step.x];[step.y,step.ny]=[step.ny,step.y];
+  step.start=now-(1-p)*step.duration;step.returning=!step.returning;
+  state.facing=joyX<0?"left":joyX>0?"right":joyY<0?"up":"down";
+}
+if(!step)move(joyX,joyY,now);
+};joy.addEventListener('pointerdown',e=>{if(pointer!==null)return;pointer=e.pointerId;joy.setPointerCapture(pointer);update(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===pointer)update(e)});const stop=e=>{if(e.pointerId!==pointer)return;pointer=null;joyX=joyY=0;joystickAxis=null;knob.style.transform=''};for(const ev of ['pointerup','pointercancel','lostpointercapture'])joy.addEventListener(ev,stop)}window.addEventListener('blur',clearMovement);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clearMovement()});
 document.addEventListener('keydown',e=>{
-if(modalOpen()||document.body.classList.contains('status-open')||e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable]'))return;
+if(pauseStarted!==null||modalOpen()||document.body.classList.contains('status-open')||e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable]'))return;
 if(e.target instanceof Element&&e.target.closest('button')&&[' ','Enter'].includes(e.key))return;
-let k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();keys[k]=true;if(k===' '||k==='j')attack();if(k==='e'&&!e.repeat)interact();if(k==='r')spell();if(k==='f')loot();if(k==='q')jump();if(k==='w'||k==='arrowup')move(0,-1);if(k==='s'||k==='arrowdown')move(0,1);if(k==='a'||k==='arrowleft')move(-1,0);if(k==='d'||k==='arrowright')move(1,0);});document.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);$$('[data-move]').forEach(b=>{let fn=()=>{let d=b.dataset.move;move(d==='left'?-1:d==='right'?1:0,d==='up'?-1:d==='down'?1:0)};b.addEventListener('pointerdown',e=>{e.preventDefault();fn();touchMove=setInterval(fn,150)});['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>clearInterval(touchMove)))});$$('[data-action]').forEach(b=>b.addEventListener('click',()=>action(b.dataset.action)));$$('[data-tab]').forEach(b=>b.addEventListener('click',()=>openTab(b.dataset.tab)));$('#tabContent').addEventListener('click',e=>{let u=e.target.closest('[data-use]');if(u)useItem(u.dataset.use);if(e.target.id==='addItem')addItem();let a=e.target.closest('[data-action]');if(a)action(a.dataset.action);if(e.target.id==='netCreate'||e.target.id==='netJoin'){if(state.chapter==='surface'||state.chapter==='create'){notify('Descend into the mine to join a party.');return}const endpoint=$('#netEndpoint')?.value.trim(),name=($('#netName')?.value.trim()||'Crawler').slice(0,16);if(!endpoint){notify('Enter your hosted WSS server URL first.');return}localStorage.setItem('dck-net-url',endpoint);localStorage.setItem('dck-net-name',name);const btn=e.target;btn.disabled=true;window.DCKNet.connect(endpoint,name).then(()=>e.target.id==='netCreate'?window.DCKNet.createRoom():window.DCKNet.joinRoom(prompt('Enter your 6-character party code:')||'')).then(()=>{notify('PARTY CONNECTED');openTab('party')}).catch(err=>notify('CO-OP: '+err.message)).finally(()=>{btn.disabled=false})}if(e.target.id==='netLeave'){window.DCKNet?.leave();netPlayers={};openTab('party')}});$('#quickItems').addEventListener('click',e=>{let b=e.target.closest('[data-item]');if(b)useItem(b.dataset.item)});$('#saveBtn').onclick=save;$('#soundBtn').onclick=()=>{sound=!sound;$('#soundBtn').textContent=sound?'♫':'♩';notify(sound?'AUDIO ON':'AUDIO OFF')};$('#newRun').onclick=()=>{if(confirm('Abandon this run and start a new crawler?')){startStory()}};$('#modalClose').onclick=closeModal;$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});window.addEventListener('beforeunload',save);}
-function storageMenu(q){state.storage??=[];let available=state.inventory.filter(i=>i.qty>0&&state.equipment?.[i.slot]!==i.id);showModal('<h2>CRAWLER LOCKER</h2><p>Shared across sanctuaries and floors.</p><h3>Deposit</h3>'+available.map((i,n)=>'<button class="widebtn" data-deposit="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<h3>Withdraw</h3>'+state.storage.map((i,n)=>'<button class="widebtn" data-withdraw="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<button class="widebtn" id="storageBack">BACK</button>');let transfer=(from,to,item)=>{if(!item||item.qty<1)return;let existing=to.find(i=>i.id===item.id);if(existing)existing.qty++;else to.push({...item,qty:1});item.qty--;if(!item.qty)from.splice(from.indexOf(item),1);save();storageMenu(q)};$$('[data-deposit]').forEach(b=>b.onclick=()=>transfer(state.inventory,state.storage,available[Number(b.dataset.deposit)]));$$('[data-withdraw]').forEach(b=>b.onclick=()=>transfer(state.storage,state.inventory,state.storage[Number(b.dataset.withdraw)]));$('#storageBack').onclick=()=>sanctuaryMenu(q)}function sanctuaryMenu(q){showModal('<h2>SANCTUARY</h2><p>Protected quarters • Gold: '+state.gold+'</p><button class="widebtn" id="restSafe">'+(q.rested?'BED — USED':'REST AT BED')+'</button><button class="widebtn" id="buySafe">MERCHANT: TONIC — 15 GOLD</button><button class="widebtn" id="stashSafe">'+(q.cache?'STORAGE — EMPTY':'OPEN SUPPLY CHEST')+'</button><button class="widebtn" id="lockerSafe">PERSONAL STORAGE</button><button class="widebtn" id="leaveSafe">RETURN</button>');$('#restSafe').onclick=()=>{if(!q.rested){q.rested=true;state.hp=state.maxHp;state.mp=state.maxMp;unlock('Safe harbor');save();render()}sanctuaryMenu(q)};$('#buySafe').onclick=()=>{if(state.gold>=15){state.gold-=15;giveItem('tonic',1);save();render()}sanctuaryMenu(q)};$('#stashSafe').onclick=()=>{if(q.cache)return;const nearby=nearbyContainers(state);if(!nearby.some(c=>c.source===q)){notify('Move closer to the supply chest.');return}if(partyGuest()){closeModal();window.DCKNet.sendIntent('loot')}else startLoot(nearby,null)};$('#lockerSafe').onclick=()=>storageMenu(q);$('#leaveSafe').onclick=closeModal}function giveItem(id,n){let i=state.inventory.find(v=>v.id===id);if(i)i.qty+=n;else{let names={tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};state.inventory.push({id,name:names[id]||id,icon:'✦',qty:n,desc:'Dungeon supply'})}}let bagPage=0, activeLoot=null, remoteLoot=null, lootSignature='';
+let k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();keys[k]=true;if(k==='shift')updatePace();if(k===' '||k==='j')attack();if(k==='e'&&!e.repeat)interact();if(k==='r')spell();if(k==='f')loot();if(k==='w'||k==='arrowup')move(0,-1);if(k==='s'||k==='arrowdown')move(0,1);if(k==='a'||k==='arrowleft')move(-1,0);if(k==='d'||k==='arrowright')move(1,0);});document.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;if(e.key==='Shift')updatePace()});$$('[data-move]').forEach(b=>{let fn=()=>{let d=b.dataset.move;move(d==='left'?-1:d==='right'?1:0,d==='up'?-1:d==='down'?1:0)};b.addEventListener('pointerdown',e=>{e.preventDefault();fn();touchMove=setInterval(fn,150)});['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>clearInterval(touchMove)))});$$('[data-action]').forEach(b=>b.addEventListener('click',()=>action(b.dataset.action)));$$('[data-tab]').forEach(b=>b.addEventListener('click',()=>openTab(b.dataset.tab)));$('#tabContent').addEventListener('click',e=>{let u=e.target.closest('[data-use]');if(u)inspectOwned(state.inventory.find(i=>i.id===u.dataset.use));if(e.target.id==='addItem')addItem();let a=e.target.closest('[data-action]');if(a)action(a.dataset.action);if(e.target.id==='netCreate'||e.target.id==='netJoin'){if(state.chapter==='surface'||state.chapter==='create'){notify('Descend into the mine to join a party.');return}const endpoint=$('#netEndpoint')?.value.trim(),name=($('#netName')?.value.trim()||'Crawler').slice(0,16);if(!endpoint){notify('Enter your hosted WSS server URL first.');return}localStorage.setItem('dck-net-url',endpoint);localStorage.setItem('dck-net-name',name);const btn=e.target;btn.disabled=true;window.DCKNet.connect(endpoint,name).then(()=>e.target.id==='netCreate'?window.DCKNet.createRoom():window.DCKNet.joinRoom(prompt('Enter your 6-character party code:')||'')).then(()=>{notify('PARTY CONNECTED');openTab('party')}).catch(err=>notify('CO-OP: '+err.message)).finally(()=>{btn.disabled=false})}if(e.target.id==='netLeave'){window.DCKNet?.leave();netPlayers={};openTab('party')}});$('#quickItems').addEventListener('click',e=>{let b=e.target.closest('[data-item]');if(b)inspectOwned(state.inventory.find(i=>i.id===b.dataset.item))});$('#saveBtn').onclick=save;$('#soundBtn').onclick=()=>{sound=!sound;$('#soundBtn').textContent=sound?'♫':'♩';notify(sound?'AUDIO ON':'AUDIO OFF')};$('#newRun').onclick=()=>{if(confirm('Abandon this run and start a new crawler?')){startStory()}};$('#modalClose').onclick=closeModal;$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});window.addEventListener('beforeunload',save);}
+function storageMenu(q){state.storage??=[];let available=state.inventory.filter(i=>i.qty>0&&state.equipment?.[i.slot]!==i.id);showModal('<h2>CRAWLER LOCKER</h2><p>Shared across sanctuaries and floors.</p><h3>Deposit</h3>'+available.map((i,n)=>'<button class="widebtn" data-deposit="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<h3>Withdraw</h3>'+state.storage.map((i,n)=>'<button class="widebtn" data-withdraw="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<button class="widebtn" id="storageBack">BACK</button>');let transfer=(from,to,item)=>{if(!item||item.qty<1)return;let existing=to.find(i=>i.id===item.id);if(existing)existing.qty++;else to.push({...item,qty:1});item.qty--;if(!item.qty)from.splice(from.indexOf(item),1);save();storageMenu(q)};$$('[data-deposit]').forEach(b=>b.onclick=()=>{const i=available[Number(b.dataset.deposit)];inspectItem(i,"Deposit",()=>transfer(state.inventory,state.storage,i))});$$('[data-withdraw]').forEach(b=>b.onclick=()=>{const i=state.storage[Number(b.dataset.withdraw)];inspectItem(i,"Withdraw",()=>transfer(state.storage,state.inventory,i))});$('#storageBack').onclick=()=>sanctuaryMenu(q)}function sanctuaryMenu(q){showModal('<h2>SANCTUARY</h2><p>Protected quarters • Gold: '+state.gold+'</p><button class="widebtn" id="restSafe">'+(q.rested?'BED — USED':'REST AT BED')+'</button><button class="widebtn" id="buySafe">MERCHANT: TONIC — 15 GOLD</button><button class="widebtn" id="stashSafe">'+(q.cache?'STORAGE — EMPTY':'OPEN SUPPLY CHEST')+'</button><button class="widebtn" id="lockerSafe">PERSONAL STORAGE</button><button class="widebtn" id="leaveSafe">RETURN</button>');$('#restSafe').onclick=()=>{if(!q.rested){q.rested=true;state.hp=state.maxHp;state.mp=state.maxMp;unlock('Safe harbor');save();render()}sanctuaryMenu(q)};$('#buySafe').onclick=()=>{if(state.gold>=15){state.gold-=15;giveItem('tonic',1);save();render()}sanctuaryMenu(q)};$('#stashSafe').onclick=()=>{if(q.cache)return;const nearby=nearbyContainers(state);if(!nearby.some(c=>c.source===q)){notify('Move closer to the supply chest.');return}if(partyGuest()){closeModal();window.DCKNet.sendIntent('loot')}else startLoot(nearby,null)};$('#lockerSafe').onclick=()=>storageMenu(q);$('#leaveSafe').onclick=closeModal}function giveItem(id,n){let i=state.inventory.find(v=>v.id===id);if(i)i.qty+=n;else{let names={tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};state.inventory.push({id,name:names[id]||id,icon:'✦',qty:n,desc:'Dungeon supply'})}}let bagPage=0, activeLoot=null, remoteLoot=null, lootSignature='';
 const lootNames={'box-Bronze':'Bronze loot box',gold:'Gold coins',tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};
 const lootIcons={'box-Bronze':'🎁',gold:'◉',tonic:'🧪',torch:'🔥',shard:'🔷'};
 let outfitAngle=0;
@@ -805,7 +881,7 @@ function backpack(){
   else if(bagSection==='equipped'){
     body=['weapon','armor','charm'].map(slot=>{
       const item=state.inventory.find(i=>i.id===state.equipment?.[slot]);
-      return '<div class="worn-row"><div><small>'+slot+'</small><b>'+safeAttr(item?.name||({weapon:'Unarmed',armor:'Everyday clothes',charm:'None'})[slot])+'</b>'+(item?'<span>'+safeAttr(item.desc)+'</span>':'')+'</div>'+(item?'<button class="smallbtn" data-remove="'+safeAttr(item.id)+'">Unequip</button>':'')+'</div>';
+      return '<div class="worn-row"><div><small>'+slot+'</small><b>'+safeAttr(item?.name||({weapon:'Unarmed',armor:'Everyday clothes',charm:'None'})[slot])+'</b>'+(item?'<span>'+safeAttr(item.desc)+'</span>':'')+'</div>'+(item?'<button class="smallbtn" data-remove="'+safeAttr(item.id)+'">Inspect</button>':'')+'</div>';
     }).join('');
   }else{
     body='<div class="bag-grid">'+slots.join('')+'</div><div class="bag-nav"><button id="bagPrev" '+(!bagPage?'disabled':'')+'>‹</button><span>Pocket '+(bagPage+1)+' / '+pages+'</span><button id="bagNext" '+(bagPage+1>=pages?'disabled':'')+'>›</button><button id="bagAdd">Add item</button></div><div id="bagDetail" aria-live="polite">'+(items.length?'Select an item to inspect it.':'No loose items in your backpack.')+'</div>';
@@ -813,7 +889,7 @@ function backpack(){
   showModal('<div class="bag-layout"><h2>Backpack</h2>'+outfitPanel()+statLine+'<nav class="bag-sections" aria-label="Backpack sections">'+sections+'</nav><div class="bag-section-body">'+body+'</div></div>');
   drawOutfit();$('#turnOutfit').onclick=()=>{outfitAngle=(outfitAngle+1)%4;drawOutfit()};
   $$('[data-bag-section]').forEach(button=>button.onclick=()=>{bagSection=button.dataset.bagSection;backpack()});
-  $$('[data-remove]').forEach(button=>button.onclick=()=>useItem(button.dataset.remove));
+  $$('[data-remove]').forEach(button=>button.onclick=()=>inspectOwned(state.inventory.find(i=>i.id===button.dataset.remove)));
   if(bagSection==='skills'){
     $$('[data-up]').forEach(button=>{button.disabled=state.skillPoints<1;button.onclick=()=>{
       if(state.skillPoints<1)return;
@@ -828,12 +904,7 @@ function backpack(){
   $('#bagAdd').onclick=addItem;
   $$('[data-slot]').forEach(button=>button.onclick=()=>{
     const item=entries[Number(button.dataset.slot)];
-    const detail=$('#bagDetail');detail.textContent=item.desc+' ';
-    if(item.slot&&state.equipment?.[item.slot]===item.id){detail.append('Another copy is equipped.');return}
-    if(item.effect||item.slot||['torch','tonic','shard'].includes(item.id)||item.id.startsWith('box-')){
-      const use=document.createElement('button');use.textContent=item.slot?'Equip':item.id.startsWith('box-')?'Open':'Use';
-      use.onclick=()=>useItem(item.id);detail.appendChild(use);
-    }
+    inspectOwned(item,true);
   });
 }
 const LOOT_RADIUS=3;
@@ -871,7 +942,12 @@ function drawLoot(session,canTake){
   showModal('<small>GAME PAUSED</small><h2>Nearby loot</h2><p>'+(canTake?'Choose items from bodies and chests within three tiles.':'A party member is searching nearby containers.')+'</p><div class="loot-pocket">'+rows+'</div>'+(canTake?'<div class="bag-nav"><button id="takeAll">Take all</button><button id="leaveLoot">Leave</button></div>':''));
   if(!canTake)return;
   const take=id=>partyGuest()?window.DCKNet.sendIntent('take_'+id):transferLoot(id);
-  $$('[data-take]').forEach(b=>b.onclick=()=>take(b.dataset.take));
+  $$('[data-take]').forEach(b=>b.onclick=()=>{
+    const row=session.rows.find(r=>String(r.key??r.id)===b.dataset.take);
+    if(!row)return;
+    const desc={gold:'Currency accepted by sanctuary merchants.',tonic:'Drink to recover health.',torch:'Lights nearby dungeon tiles.',shard:'Restores mana.','box-Bronze':'Open from your backpack for a random reward.'};
+    inspectItem({id:row.id,name:lootNames[row.id]||row.id,desc:desc[row.id]},'Take ×'+row.qty,()=>take(b.dataset.take));
+  });
   $('#takeAll').onclick=()=>take('all');$('#leaveLoot').onclick=closeModal;
 }
 function finishLoot(){
@@ -916,7 +992,7 @@ function syncLoot(session){
 
 function loot(){if(state.hall&&!state.dead&&!activeLoot&&!remoteLoot){hallInteract();return}if(state.dead||activeLoot||remoteLoot)return;if(state.chapter==='create'||state.chapter==='surface')return;if(bossFight)return;const nearby=nearbyContainers(state);
 if(nearby.length){if(partyGuest())window.DCKNet.sendIntent('loot');else startLoot(nearby,null);return}
-let sanctuary=sanctuaryAt(state.x,state.y);if(sanctuary){sanctuaryMenu(sanctuary);return}notify('No remains or cache nearby.')}function action(a){if(a==='loot')loot();if(a==='attack')attack();if(a==='interact')interact();if(a==='jump')jump();if(a==='spell')spell()}
+let sanctuary=sanctuaryAt(state.x,state.y);if(sanctuary){sanctuaryMenu(sanctuary);return}notify('No remains or cache nearby.')}function action(a){if(a==='loot')loot();if(a==='attack')attack();if(a==='interact')interact();if(a==='spell')spell()}
 let worldClock=0;const remoteCooldown=new Map();
 function partyGuest(){return !!window.DCKNet?.inRoom&&!window.DCKNet.isHost}
 function sendPartyWorld(){if(!window.DCKNet?.isHost)return;window.DCKNet.sendWorld({floor:state.floor,loot:activeLoot,scenery:state.scenery,chests:(state.sanctuaries||[]).map(q=>!!q.cache),enemies:entities.map((e,i)=>({i,x:e.x,y:e.y,hp:e.hp,alive:e.alive,looted:!!e.looted})),collapse:Math.ceil(state.collapseLeft)})}
@@ -933,10 +1009,11 @@ if(activeLoot?.owner&&d.type==='player_left'&&activeLoot.owner===d.id)finishLoot
 if(activeLoot?.owner&&!window.DCKNet?.inRoom)finishLoot();
 if(d.type==='loot_bundle'){if(partyGuest()){receiveLoot(d.items);persistCampaign();render()}}else if(d.type==='reward'){if(partyGuest()){if(d.guardian)recordGuardian(d.guardian.floor,d.guardian.name);state.gold+=d.gold||0;state.xp+=d.xp||0;if(d.item)giveItem(d.item,1);checkLevel();save();render();notify('PARTY REWARD RECEIVED')}}else if(d.type==='world'){applyPartyWorld(d.world)}else if(d.type==='combat_intent'){partyIntent(d)}else if(d.type==='players'){netPlayers=d.players||{};render();updatePartyRoster()}else if(d.type==='player_state'){netPlayers[d.id]=d.player;render();updatePartyRoster()}else if(d.type==='player_left'){delete netPlayers[d.id];render();updatePartyRoster()}else if(d.type==='room'){notify('PRIVATE ROOM '+d.code);render()}else if(d.type==='status'){const el=$('#netStatus');if(el)el.textContent=d.text;const room=$('#netRoom');if(room)room.textContent=d.code?'ROOM '+d.code:'No active room';updatePartyRoster()}else if(d.type==='error'){notify('CO-OP: '+d.message)}});
 function collapseTick(dt){if(state.hall&&!window.DCKNet?.inRoom)return;if(bossFight&&!window.DCKNet?.inRoom)return;if(state.chapter==='surface'||state.chapter==='create'||state.dead)return;state.collapseLeft=Math.max(0,(state.collapseLeft??900)-dt);let n=Math.ceil(state.collapseLeft),el=$('#collapseClock');if(el){el.textContent='COLLAPSE '+Math.floor(n/60)+':'+String(n%60).padStart(2,'0');el.style.color=n<=60?'#ff7766':'#e6c47d'}for(let t of [300,60,10])if(n<=t&&!state.warned.includes(t)){state.warned.push(t);ai('Floor collapse in '+t+' seconds. Find the stairs, crawler.');notify('COLLAPSE WARNING: '+t+'s')}if(n===0){bossFight=null;state.collapsed=true;state.dead=true;state.hp=0;save();showModal('<h2>FLOOR COLLAPSED</h2><p>You failed to reach the stairs in time.</p><button class="widebtn" id="collapseRestart">NEW RUN</button>');$('#collapseRestart').onclick=()=>{startStory()}}}document.addEventListener('click',e=>{let b=e.target.closest('[data-class]');if(b)chooseClass(b.dataset.class);let t=e.target.closest('[data-branch]');if(t)trainBranch(t.dataset.branch)});function tick(ts){
+if(pauseStarted!==null){last=ts;requestAnimationFrame(tick);return}
 if(bossFight&&!window.DCKNet?.inRoom){last=ts;requestAnimationFrame(tick);return}
-if(activeLoot||remoteLoot){last=ts;requestAnimationFrame(tick);return}let elapsed=last?Math.max(0,(ts-last)/1000||0):0,dt=Math.min(.05,elapsed);let nextStepStart=ts;last=ts;collapseTick(Math.min(elapsed,1));if(step){let p=Math.min(1,(ts-step.start)/STEP_MS);p=Math.max(0,p);visualX=step.x+(step.nx-step.x)*p;visualY=step.y+(step.ny-step.y)*p;if(p>=1){let done=step;nextStepStart=Math.max(ts-32,done.start+STEP_MS);finishStep(done.nx,done.ny);step=null;visualX=(state.hall||state).x;visualY=(state.hall||state).y}}else{visualX=(state.hall||state).x;visualY=(state.hall||state).y}if(!state.dead){if(!step){let x=joyX||((keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)),y=joyY||((keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0));if(x||y){if(Math.abs(x)>Math.abs(y))move(Math.sign(x),0,nextStepStart);else move(0,Math.sign(y),nextStepStart);
+if(activeLoot||remoteLoot){last=ts;requestAnimationFrame(tick);return}let elapsed=last?Math.max(0,(ts-last)/1000||0):0,dt=Math.min(.05,elapsed);let nextStepStart=ts;last=ts;collapseTick(Math.min(elapsed,1));if(step){let p=Math.min(1,(ts-step.start)/step.duration);p=Math.max(0,p);visualX=step.x+(step.nx-step.x)*p;visualY=step.y+(step.ny-step.y)*p;if(p>=1){let done=step;nextStepStart=Math.max(ts-32,done.start+done.duration);if(!done.returning)finishStep(done.nx,done.ny);step=null;visualX=(state.hall||state).x;visualY=(state.hall||state).y}}else{visualX=(state.hall||state).x;visualY=(state.hall||state).y}if(!state.dead){if(!step){let x=joyX||((keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)),y=joyY||((keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0));if(x||y){if(Math.abs(x)>Math.abs(y))move(Math.sign(x),0,nextStepStart);else move(0,Math.sign(y),nextStepStart);
 if(step){
-  const progress=(ts-step.start)/STEP_MS;
+  const progress=(ts-step.start)/step.duration;
   visualX=step.x+(step.nx-step.x)*progress;
   visualY=step.y+(step.ny-step.y)*progress;
 }
