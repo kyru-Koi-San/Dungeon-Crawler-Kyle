@@ -140,3 +140,6 @@ body:has(#modal:not(.hidden)){overflow:hidden}.modal,.modal-card{overscroll-beha
  .bag-layout .bag-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
  .bag-layout .bag-nav{margin:4px 0}.bag-layout .bag-sections{margin:2px 0}
 }
+
+.crawler-hud-name{max-width:22ch;overflow-wrap:anywhere;color:#ffe2a0}
+#heroName,.bag-outfit dd{overflow-wrap:anywhere}

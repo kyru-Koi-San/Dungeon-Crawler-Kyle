@@ -28,12 +28,17 @@ function caption(speaker,line,story=false){
     feed('<b>'+speaker+'</b> · '+line);
   }
 }
+function crawlerTitle(){
+  const wins=state.guardianRecord?.length||0;
+  return (state.character?.name||'Crawler')+(wins?' '+ '★'.repeat(wins):'');
+}
 function showCreator(){if(state.chapter!=='create'&&personalMenusLocked()){lockHint();return}
   const current=state.character||{race:'Human',skin:2,gender:'Nonbinary'};
   const choices=(list,value)=>list.map((name,i)=>'<option value="'+i+'" '+(i===value?'selected':'')+'>'+name+'</option>').join('');
-  showModal('<h2>Your crawler</h2><form id="creator"><canvas id="look" width="192" height="84" aria-label="Front, side, and back hairstyle preview"></canvas><label>Race<select name="race" '+(state.floor<4?'disabled':'')+'>'+choices(state.floor<4?['Human']:ancestries,ancestries.indexOf(current.race))+'</select></label><label>Skin tone<select name="skin">'+choices(['Porcelain','Sand','Amber','Copper','Umber','Deep brown'],current.skin)+'</select></label><label>Gender<select name="gender" aria-label="Gender">'+choices(genders,genders.indexOf(current.gender))+'</select></label><label>Hairstyle<select name="hair" aria-label="Hairstyle">'+choices(hairStyles,Math.max(0,hairStyles.indexOf(current.hair)))+'</select></label><button class="widebtn">'+(state.chapter==='create'?'Begin on the surface':'Save character')+'</button></form>');
+  showModal('<h2>Your crawler</h2><form id="creator"><label>Crawler name<input name="crawlerName" maxlength="24" placeholder="Crawler" autocomplete="off"></label><canvas id="look" width="192" height="84" aria-label="Front, side, and back hairstyle preview"></canvas><label>Race<select name="race" '+(state.floor<4?'disabled':'')+'>'+choices(state.floor<4?['Human']:ancestries,ancestries.indexOf(current.race))+'</select></label><label>Skin tone<select name="skin">'+choices(['Porcelain','Sand','Amber','Copper','Umber','Deep brown'],current.skin)+'</select></label><label>Gender<select name="gender" aria-label="Gender">'+choices(genders,genders.indexOf(current.gender))+'</select></label><label>Hairstyle<select name="hair" aria-label="Hairstyle">'+choices(hairStyles,Math.max(0,hairStyles.indexOf(current.hair)))+'</select></label><button class="widebtn">'+(state.chapter==='create'?'Begin on the surface':'Save character')+'</button></form>');
   const form=$('#creator');
-  const selection=()=>({race:state.floor<4?'Human':ancestries[form.elements.race.value],skin:Number(form.elements.skin.value),gender:genders[form.elements.gender.value],hair:hairStyles[form.elements.hair.value]});
+  form.elements.crawlerName.value=current.name||'';
+  const selection=()=>({name:form.elements.crawlerName.value.trim().slice(0,24)||'Crawler',race:state.floor<4?'Human':ancestries[form.elements.race.value],skin:Number(form.elements.skin.value),gender:genders[form.elements.gender.value],hair:hairStyles[form.elements.hair.value]});
   function preview(){
     const g=$('#look').getContext('2d');
     g.clearRect(0,0,192,84);g.imageSmoothingEnabled=false;
@@ -53,15 +58,60 @@ function showCreator(){if(state.chapter!=='create'&&personalMenusLocked()){lockH
 const guildArt=new Image();guildArt.src='guild-hall.png';
 const guildLessons=[
   ['Explore','Use the joystick or arrow keys to walk. The minimap fills in as you explore. Tap Interact beside a person, sign, or discovery.'],
-  ['Fight','In solo combat, choose a move when it is your turn. Read the incoming attack. Guard reduces damage, and Focus restores mana for your next spell.'],
-  ['Loot and equip','Tap Loot near a body or chest. The game pauses while you choose what to take. Inspect gear in your backpack before equipping it: some items carry penalties.'],
+  ['Fight','In solo combat, choose a move when it is your turn. Read the incoming attack. Punch or swing to attack. Guard reduces incoming damage.'],
+  ['Loot and equip','Choose a consumable for X in your backpack. Tap Loot near a body or chest. The game pauses while you choose what to take. Inspect gear in your backpack before equipping it: some items carry penalties.'],
   ['Return to the guild','Walk through a sanctuary door to find me on any floor. Use the bed to recover once per shelter. After a guardian victory, ask me to review the fight.']
 ];
+const hallStyles=[
+ {name:'Elliott Bay Pilothouse',object:'Tide gauge',lore:'Three high-water marks cross the brass dial. The newest is labeled “after the stairs appeared.”',color:'#4a959a',wood:'#28494b',x:2,y:6},
+ {name:'Volunteer Park Glasshouse',object:'Seed cabinet',lore:'Each envelope names a Seattle street. Someone is saving a little of the surface for spring.',color:'#a4bf74',wood:'#465641',x:4,y:4},
+ {name:'SoDo Switch House',object:'Signal lever',lore:'One scratched lever still points toward King Street. The signal lamp blinks twice when you touch it.',color:'#daa155',wood:'#624938',x:8,y:6},
+ {name:'Gas Works Observatory',object:'Star chart',lore:'The painted stars match the sky over Lake Union. A second constellation outlines the tunnels below.',color:'#9fa5df',wood:'#3c4159',x:3,y:5}
+];
+function hallTheme(h=state.hall){return (3*(state.floor-1)+h.index)%hallStyles.length}
+const hallScenes=new Map();
+function hallBackdrop(h){
+  const id=hallTheme(h),theme=hallStyles[id];
+  const roomKey=state.floor+'-'+h.index;
+  if(hallScenes.has(roomKey))return hallScenes.get(roomKey);
+  if(!guildArt.naturalWidth)return null;
+  const art=document.createElement('canvas');art.width=416;art.height=320;
+  const g=art.getContext('2d'),rect=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x,y,w,h)};
+  const line=(x,y,a,b,c,width=2)=>{g.strokeStyle=c;g.lineWidth=width;g.beginPath();g.moveTo(x,y);g.lineTo(a,b);g.stroke()};
+  g.drawImage(guildArt,0,0);
+  rect(114,130,188,110,theme.wood);g.strokeStyle=theme.color;g.strokeRect(117,133,181,103);
+  for(let j=0;j<5;j++)for(let i=0;i<9;i++){
+    const x=128+i*19,y=144+j*20;
+    if(id===0){line(x,y+3,x+5,y,theme.color,1);line(x+5,y,x+10,y+3,theme.color,1)}
+    if(id===1){rect(x,y,3,5,'#64794d');rect(x+3,y-2,3,3,'#80945f')}
+    if(id===2){rect(x,y,9,2,'#8b7353');rect(x+3,y-2,2,6,'#8b7353')}
+    if(id===3){rect(x+(j%2)*4,y,2,2,'#797c9b')}
+  }
+  // Change the rear wall from shelves into windows, planting bays or instrument panels.
+  for(const x of [27,319]){
+    rect(x,12,70,48,'#161d24');rect(x+3,15,64,40,theme.wood);
+    if(id===0){rect(x+4,17,62,17,'#71989d');rect(x+4,34,62,19,'#345866');for(let i=0;i<5;i++)rect(x+7+i*11,39+(i%3)*3,8,1,'#82b1b6');rect(x+32,15,4,40,'#c8ae87')}
+    if(id===1){for(let i=0;i<5;i++){const xx=x+9+i*11;rect(xx,41,7,9,'#aa6e4d');line(xx+3,41,xx+2,23+i%3*3,'#8ab172');rect(xx-1,29+i%3*3,5,3,'#b6c787')}}
+    if(id===2){line(x+6,42,x+61,23,'#ebbb6b');line(x+6,30,x+56,44,'#b9c6a1');for(let i=0;i<4;i++)rect(x+8+i*14,39-i*4,4,4,'#fff2bf')}
+    if(id===3){for(let i=0;i<15;i++)rect(x+6+i*17%56,18+i*13%32,2,2,'#dfd5b4');line(x+12,22,x+32,37,'#898bab',1);line(x+32,37,x+51,29,'#898bab',1)}
+  }
+  const x=theme.x*32+16,y=theme.y*32+20;
+  rect(x-12,y,24,4,'#22262a');
+  if(id===0){rect(x-4,y-31,8,32,'#a98a60');for(let i=0;i<6;i++)rect(x-3,y-27+i*4,4,1,'#e4cd92');rect(x-7,y-12,14,3,'#73bac1')}
+  if(id===1){rect(x-13,y-21,26,21,'#916b44');for(let i=0;i<6;i++){rect(x-10+i%3*7,y-17+Math.floor(i/3)*7,5,5,'#d6bc7c')}rect(x-6,y-28,12,7,'#699768')}
+  if(id===2){rect(x-12,y-6,24,6,'#887969');line(x,y-5,x+8,y-24,'#b2a79a',4);rect(x+4,y-26,10,5,'#cd6549')}
+  if(id===3){line(x,y-12,x-9,y,'#bca079');line(x,y-12,x+9,y,'#bca079');line(x-9,y-14,x+10,y-25,'#bac1d9',7);rect(x+7,y-27,6,5,'#e4cf94')}
+  const rand=rng(state.floor*331+h.index*9391);
+  for(let i=0;i<9;i++){const x=117+i*20;rect(x,249,8,5,'#51473e');rect(x+1,250,2+Math.floor(rand()*5),2,rand()>.5?theme.color:'#cbb78f')}
+  if(hallScenes.size>24)hallScenes.clear();
+  hallScenes.set(roomKey,art);return art;
+}
+
 const guildStations=[
  {x:6,y:3,label:'Talk',kind:'master'}, {x:2,y:3,label:'Rest',kind:'bed'},
  {x:10,y:3,label:'Locker',kind:'locker'}, {x:10,y:5,label:'Supplies',kind:'chest'}
 ];
-function guildStation(){const h=state.hall;return h&&guildStations.find(s=>Math.hypot(s.x-h.x,s.y-h.y)<=1.6)}
+function guildStation(){const h=state.hall;if(!h)return;const t=hallStyles[hallTheme(h)];return [...guildStations,{x:t.x,y:t.y,kind:"discovery",label:t.object}].filter(s=>Math.hypot(s.x-h.x,s.y-h.y)<=1.6).sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0]}
 function personalMenusLocked(){return state.guildTrained!==true}
 function lockHint(){
   if(state.hall||state.chapter==='surface'||state.chapter==='create'){notify(state.hall?'Walk up the rug and tap Interact beside Rowan.':'Descend into the mine to meet Guild Master Rowan.');return}
@@ -69,6 +119,7 @@ function lockHint(){
   const q=doors[0];notify(q?'Guild induction: nearest sanctuary at X '+q.x+', Y '+q.y+' (green on map).':'Speak to Guild Master Rowan in a sanctuary.');
 }
 function hallWalkable(x,y){
+  const t=hallStyles[hallTheme()];if(x===t.x&&y===t.y)return false;
   return (x===6&&y===8)||(x>=1&&x<=11&&y>=2&&y<=7&&!guildStations.some(s=>s.x===x&&s.y===y));
 }
 function enterHall(q){
@@ -103,7 +154,7 @@ function hallTutorial(page=state.guildLesson||0,review=false){
   showModal('<small>GUILD MASTER ROWAN · '+(page+1)+' / 4</small><h2>'+heading+'</h2><p>'+line+'</p><button id="guildNext" class="widebtn">'+(page<3?'Continue':review?'Done':'Finish induction & unlock menu')+'</button>');
   $('#guildNext').onclick=()=>{
     if(page<3){if(!review){state.guildLesson=page+1;persistCampaign()}hallTutorial(page+1,review);return}
-    if(!review){state.guildTrained=true;delete state.guildLesson;unlock('Guild inductee');persistCampaign();openTab('journal')}
+    if(!review){state.guildTrained=true;giveItem("food",2);delete state.guildLesson;unlock('Guild inductee');persistCampaign();openTab('journal')}
     closeModal();caption('Guild Master Rowan',review?'My door is always open.':'You’re on the guild register. Your backpack, map, skills and party menu are ready.',true);render();persistCampaign();
   };
 }
@@ -118,7 +169,7 @@ function guildReview(){
   if(records.length){
     const select=$('#guildFight');const read=()=>{
       const r=records[Number(select.value)];
-      const advice=r.floor%9===6?'Guard against Venom Bite to prevent poison.':r.floor%9===0?'Guard against Mana Drain to protect your spell reserve.':r.floor>3?'Guard against Armor Shatter. Use quieter turns to Focus.':'Watch for Devastating Strike on every third turn. Save Guard or your one-use arena trap for that turn.';
+      const advice=r.floor%9===6?'Guard against Venom Bite to prevent poison.':r.floor%9===0?'Guard against Mana Drain to protect your spell reserve.':r.floor>3?'Guard against Armor Shatter. Use quieter turns to land a hit.':'Watch for Devastating Strike on every third turn. Save Guard or your one-use arena trap for that turn.';
       $('#guildTip').textContent=(r.turns?'You won in '+r.turns+' turns and guarded '+r.guards+' times. ':'')+advice;
     };select.onchange=read;read();
   }
@@ -135,6 +186,18 @@ function hallInteract(){
   if(!station){notify('Approach Rowan, the bed, the locker or the supply chest.');return}
   if(station.kind==='master'){guildMaster();return}
   if(personalMenusLocked()){lockHint();return}
+  if(station.kind==='discovery'){
+    const id=hallTheme(),t=hallStyles[id];let detail='';
+    if(id===3){const y=tiles.findIndex(row=>row.includes(3));if(y>=0)detail='A brass pin marks the stairs at X '+tiles[y].indexOf(3)+', Y '+y+'.'}
+    if(q&&!q.discoveryRead){
+      q.discoveryRead=true;
+      if(id===0){for(let y=Math.max(0,q.y-7);y<Math.min(H,q.y+8);y++)for(let x=Math.max(0,q.x-7);x<Math.min(W,q.x+8);x++)if(Math.hypot(x-q.x,y-q.y)<=7)seen[y][x]=true;detail='You copy the surrounding passages onto your map.'}
+      if(id===1){giveItem('food',1);detail='You take a trail ration from the cabinet.'}
+      if(id===2){giveItem('torch',1);detail='You find a spare torch under the switchboard.'}
+      persistCampaign();
+    }
+    showModal('<small>'+t.name+'</small><h2>'+t.object+'</h2><p>'+t.lore+'</p><p>'+detail+'</p>');return
+  }
   if(station.kind==='locker'){storageMenu(q);return}
   sanctuaryMenu(q);
 }
@@ -145,11 +208,12 @@ function drawHall(){
   // Fit the room to the displayed viewport, including portrait and landscape phones.
   const scale=Math.min(cw/416,ch/320),sx=scale*canvas.width/cw,sy=scale*canvas.height/ch;
   g.save();g.translate((canvas.width-416*sx)/2,(canvas.height-320*sy)/2);g.scale(sx,sy);g.imageSmoothingEnabled=false;
-  if(guildArt.complete&&guildArt.naturalWidth)g.drawImage(guildArt,0,0);else{g.fillStyle='#584638';g.fillRect(0,0,416,320)}
+  const backdrop=hallBackdrop(h);if(backdrop)g.drawImage(backdrop,0,0);else{g.fillStyle='#584638';g.fillRect(0,0,416,320)}
   const look={armor:'coat',charm:'bell'};
   g.drawImage(crawlerPose('down',0,{skin:3,race:'Human'},look),193,85,30,40);
   g.fillStyle='#d3d1c4';g.fillRect(204,93,7,2);g.fillRect(205,98,6,4);
   g.font='bold 11px monospace';g.textAlign='center';g.fillStyle='#161b1e';g.fillRect(149,71,118,14);g.fillStyle='#eed19a';g.fillText('Guild Master Rowan',208,81);
+  g.font='bold 12px monospace';g.textAlign='center';g.fillStyle='#19212a';g.fillRect(91,265,234,16);g.fillStyle=hallStyles[hallTheme()].color;g.fillText(hallStyles[hallTheme()].name+' · '+state.floor+'-'+(h.index+1),208,277);
   drawHero(x,y);
   for(const ally of Object.values(netPlayers))if(ally.floor===state.floor&&ally.hall?.index===h.index)g.drawImage(crawlerPose('down',0,ally.character||{},ally.gear||{}),ally.hall.x*32+4,ally.hall.y*32-4,24,32);
   g.restore();
@@ -190,9 +254,9 @@ function surfaceTile(x,y,t){
 }
 function chapterHUD(){
   const surface=state.chapter==='create'||state.chapter==='surface';
-  $('#heroName').textContent=state.character?state.character.race+' · '+state.character.gender:'THE CRAWLER';
+  $('#heroName').textContent=crawlerTitle();
   if(state.hall){
-    $('#roomName').textContent='SEATTLE GUILD HALL';$('#floorTag').textContent='SANCTUARY';
+    $('#roomName').textContent=hallStyles[hallTheme()].name;$('#floorTag').textContent='SANCTUARY';
     $('#objective').textContent=personalMenusLocked()?'SPEAK TO ROWAN':'EXIT VIA THE SOUTH STAIRS';
     $('#coords').textContent='HALL '+(state.hall.index+1);$('#bossbar').classList.add('hidden');
     $('#goals').textContent=personalMenusLocked()?'Walk to the guild master and tap Interact.':'Rest, use your locker or review a completed guardian battle.';
@@ -212,7 +276,7 @@ function chapterHUD(){
   $('#objective').textContent='FOLLOW THE LAMPS SOUTH';
 }
 
-function fresh(){return {floor:1,x:15,y:9,hp:100,maxHp:100,mp:35,maxMp:35,xp:0,nextXp:100,level:1,power:8,armor:0,gold:25,kills:0,steps:0,inventory:[],achievements:[],rooms:0,dead:false,feed:[],boss:null,stairs:false,torchTurns:0,weapon:null,skillPoints:0,coinsFound:0,facing:'down'};}
+function fresh(){return {floor:1,x:15,y:9,hp:100,maxHp:100,mp:0,maxMp:0,xp:0,nextXp:100,level:1,power:8,armor:0,gold:25,kills:0,steps:0,inventory:[],achievements:[],rooms:0,dead:false,feed:[],boss:null,stairs:false,torchTurns:0,weapon:null,skillPoints:0,coinsFound:0,facing:'down'};}
 function rng(seed){let x=seed>>>0;return()=>{x=(x*1664525+1013904223)>>>0;return x/4294967296}}
 const sceneryArt=new Image();sceneryArt.src='scenery.png';
 const sights=[
@@ -277,11 +341,76 @@ function drawGuildEntrance(q){
   rect(12,1,8,5,'#37494a');rect(15,1,2,5,'#d8ba73');rect(13,3,6,1,'#d8ba73');
   ctx.restore();
 }
+const supplies={
+  torch:{name:'Torch',short:'Torch',icon:'🔥',desc:'Lights your surroundings for 40 steps.'},
+  food:{name:'Trail ration',short:'Food',icon:'🍞',desc:'Restores 15 health, or 7 while sick.'},
+  tonic:{name:'Health potion',short:'Potion',icon:'⚗',desc:'Restores 35 health and treats wounds, poison, and sickness.'},
+  biscuit:{name:'Enchanted biscuit',icon:'✧',desc:'Feed this to your pet to register it as a crawler. It will gain levels and assist your strikes.'}
+};
+const hotItems=['torch','food','tonic'];
+function quantity(id){return state.inventory.find(i=>i.id===id)?.qty||0}
+function chooseHot(){
+  if(personalMenusLocked()){lockHint();return}
+  showModal('<h2>X · Hot list</h2>'+hotItems.map(id=>'<button class="widebtn" data-hot="'+id+'">'+supplies[id].name+' ×'+quantity(id)+(state.hotItem===id?' ✓':'')+'</button>').join(''));
+  for(const btn of $$('[data-hot]'))btn.onclick=()=>{state.hotItem=btn.dataset.hot;closeModal();persistCampaign();render()};
+}
+function hotUse(){
+  if(personalMenusLocked()){lockHint();return}
+  if(state.dead||bossFight||modalOpen())return;
+  if(!hotItems.includes(state.hotItem)||!quantity(state.hotItem)){chooseHot();return}
+  useItem(state.hotItem,true);
+}
+const animalNames={cat:'Alley cat',dog:'Lost terrier',rabbit:'Cottontail'};
+function placeAnimal(){
+  state.wildAnimal=null;
+  if(state.floor!==1&&Math.random()>.78)return;
+  const queue=[[state.x,state.y]],visited=new Set([state.y*W+state.x]),spots=[];
+  for(let n=0;n<queue.length;n++){
+    const [x,y]=queue[n];
+    const distance=Math.abs(x-state.x)+Math.abs(y-state.y);
+    if(distance>=4&&distance<=15&&!sanctuaryAt(x,y)&&!inArena(x,y)&&!entities.some(e=>e.x===x&&e.y===y)&&!state.scenery?.some(p=>p.x===x&&p.y===y))spots.push({x,y});
+    if(distance>=18)continue;
+    for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]){
+      const a=x+dx,b=y+dy,k=b*W+a;if(visited.has(k)||solid(a,b)||tile(a,b)!==1)continue;
+      visited.add(k);queue.push([a,b]);
+    }
+  }
+  if(spots.length)state.wildAnimal={...spots[Math.floor(Math.random()*spots.length)],species:['cat','dog','rabbit'][Math.floor(Math.random()*3)]};
+}
+function meetAnimal(){
+  const animal=state.wildAnimal;if(!animal)return;
+  const name=animalNames[animal.species];
+  showModal('<h2>'+name+'</h2><p>'+ (state.pet?'It noses a guild parcel toward your companion.':'It came down from the surface and waits for you to approach.')+'</p><button class="widebtn" id="befriend">'+(state.pet?'Accept pet supplies':'Befriend '+name)+'</button><button class="widebtn" id="animalLeave">Leave it be</button>');
+  $('#animalLeave').onclick=closeModal;
+  $('#befriend').onclick=()=>{if(!state.pet)state.pet={species:animal.species,crawler:false,level:1,wins:0};
+    state.wildAnimal=null;awardBox('Pet');persistCampaign();closeModal();render();caption(name,'A pet loot box is tucked into your backpack.',true)};
+}
+function petVictory(){
+  const pet=state.pet;if(!pet)return;
+  pet.wins++;if(pet.crawler)pet.level=1+Math.floor(pet.wins/4);
+  if(pet.wins%5===0)awardBox('Pet');
+}
+function drawAnimal(species,x,y,crawler,walking=false){
+  const px=Math.round(x*TILE+16),py=Math.round(y*TILE+24);
+  const fur={cat:'#bcb6ba',dog:'#bc845a',rabbit:'#e4cfaa'}[species];
+  const bob=walking?Math.round(Math.sin(performance.now()/65)):0;
+  ctx.save();ctx.translate(px,py+bob);
+  const rect=(x,y,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(x,y,w,h)};
+  rect(-8,0,15,2,'#141b20');rect(-6,-8,11,7,fur);rect(1,-12,8,8,fur);
+  if(species==='rabbit'){rect(1,-19,2,8,fur);rect(5,-18,2,7,fur);rect(-9,-7,4,4,'#fae7cc')}
+  else if(species==='cat'){rect(1,-15,3,4,fur);rect(6,-15,3,4,fur);rect(-8,-12,3,8,fur)}
+  else{rect(0,-12,3,7,'#704632');rect(7,-8,5,3,fur);rect(-9,-10,4,4,fur)}
+  rect(-5,-2,3,3,fur);rect(3,-2,3,3,fur);rect(6,-10,2,2,'#1a2027');
+  if(crawler){rect(0,-6,6,2,'#5bc4cb');rect(1,-4,2,3,'#ffd575')}
+  ctx.restore();
+}
+
 function interactionTarget(){
   if(state.hall){const s=guildStation();return s&&{kind:'hall',label:s.kind==='master'?'Talk to Rowan':s.label}}
   if(state.chapter==='surface'&&Math.hypot(state.x-10,state.y-12)<=2)return {kind:'sign',label:'Read sign'};
   const n=state.npc;
   if(n&&Math.hypot(n.x-state.x,n.y-state.y)<=1.7)return {kind:'npc',label:state.floor===1?'Talk to Iven':'Talk to crawler'};
+  if(state.wildAnimal&&Math.hypot(state.x-state.wildAnimal.x,state.y-state.wildAnimal.y)<=1.65)return {kind:"animal",label:"Meet "+animalNames[state.wildAnimal.species]};
   const site=state.scenery?.find(p=>p.art>=3&&Math.hypot(p.x-state.x,p.y-state.y)<=1.6);
   if(site)return {kind:'site',label:site.art>=6?'Examine site':'Inspect hideout',site};
   const door=state.sanctuaries?.find(q=>Math.hypot((q.door||q).x-state.x,(q.door||q).y-state.y)<=1.1);
@@ -292,6 +421,7 @@ function interact(){
   if(state.dead||bossFight||modalOpen()||activeLoot||remoteLoot)return;
   const target=interactionTarget();
   if(!target){notify('Move beside a person, sign, or doorway.');return}
+  if(target.kind==='animal'){meetAnimal();return}
   if(target.kind==='combat'){attack();return}
   if(target.kind==='hall'){hallInteract();return}
   if(target.kind==='door'){enterHall(target.door);return}
@@ -312,16 +442,36 @@ function investigate(selected){if(state.hall){hallInteract();return}
   caption(name,line,true);persistCampaign();render();inspectItem({id:"discovery",art:p.art,name,desc:line});
 }
 
+// Guild construction can replace the first room's center with masonry.
+// Pick a landing on the connected dungeon floor after the walls have been built.
+function chooseLanding(){
+  const visited=new Set(),dirs=[[0,1],[1,0],[0,-1],[-1,0]];
+  const open=(x,y)=>!solid(x,y)&&!sanctuaryAt(x,y)&&!state.sanctuaries?.some(q=>q.door?.x===x&&q.door?.y===y);
+  let best=[],stairsRegion;
+  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){
+    const k=y*W+x;if(visited.has(k)||!open(x,y))continue;
+    const region=[[x,y]];visited.add(k);
+    for(let i=0;i<region.length;i++){
+      const [a,b]=region[i];if(tile(a,b)===3)stairsRegion=region;
+      for(const [dx,dy] of dirs){const nx=a+dx,ny=b+dy,key=ny*W+nx;if(!visited.has(key)&&open(nx,ny)){visited.add(key);region.push([nx,ny])}}
+    }
+    if(region.length>best.length)best=region;
+  }
+  const eligible=(stairsRegion||best).filter(([x,y])=>tile(x,y)===1&&!entities.some(e=>e.alive&&e.x===x&&e.y===y));
+  eligible.sort((a,b)=>Math.hypot(a[0]-state.x,a[1]-state.y)-Math.hypot(b[0]-state.x,b[1]-state.y));
+  if(eligible.length)[state.x,state.y]=eligible[0];
+}
+
 function generate(){state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;W=72;H=48;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
 // carve connected rooms and corridors
 let rooms=[];for(let i=0;i<32;i++){let rw=4+Math.floor(r()*6),rh=3+Math.floor(r()*5),rx=1+Math.floor(r()*((state.floor%3===0?W-12:W)-rw-2)),ry=1+Math.floor(r()*(H-rh-2));let room={x:rx,y:ry,w:rw,h:rh,cx:Math.floor(rx+rw/2),cy:Math.floor(ry+rh/2)};for(let y=ry;y<ry+rh;y++)for(let x=rx;x<rx+rw;x++)tiles[y][x]=1;if(rooms.length){let p=rooms[rooms.length-1];let x=room.cx,y=room.cy;while(x!==p.cx){tiles[y][x]=1;x+=Math.sign(p.cx-x)}while(y!==p.cy){tiles[y][x]=1;y+=Math.sign(p.cy-y)}}rooms.push(room)}
 // walls around corridors
 for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++)if(tiles[y][x]===0){for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(tiles[y+dy]?.[x+dx]===1){tiles[y][x]=2;break}}
-state.x=rooms[0].cx;state.y=rooms[0].cy;state.rooms=rooms.length;let safe=rooms[0];state.safe={x:safe.cx,y:safe.cy};state.sanctuaries=[{...state.safe,rested:false}];for(let room of rooms.slice(2,-1)){if(state.sanctuaries.length>=6)break;if(r()<.28&&state.sanctuaries.every(q=>Math.hypot(q.x-room.cx,q.y-room.cy)>8))state.sanctuaries.push({x:room.cx,y:room.cy,rested:false})}buildSanctuaries();let npc=rooms[1];state.npc={x:npc.cx,y:npc.cy,met:false};state.rested=false;
+state.x=rooms[0].cx;state.y=rooms[0].cy;state.rooms=rooms.length;let safe=rooms[0];state.safe={x:safe.cx,y:safe.cy};state.sanctuaries=[{...state.safe,rested:false}];for(let room of rooms.slice(2,-1)){if(state.sanctuaries.length>=6)break;if(r()<.28&&state.sanctuaries.every(q=>Math.hypot(q.x-room.cx,q.y-room.cy)>8))state.sanctuaries.push({x:room.cx,y:room.cy,rested:false})}buildSanctuaries();chooseLanding();let npc=rooms[1];state.npc={x:npc.cx,y:npc.cy,met:false};state.rested=false;
 for(let i=0;i<Math.min(24+state.floor*2,65);i++){let room=rooms[1+Math.floor(r()*(rooms.length-1))],ex=room.cx+Math.floor(r()*3)-1,ey=room.cy+Math.floor(r()*3)-1;if(!sanctuaryAt(ex,ey)&&!solid(ex,ey)&&!entities.some(e=>e.x===ex&&e.y===ey)&&Math.abs(ex-state.x)+Math.abs(ey-state.y)>5)spawnEnemy(ex,ey,r)}
-let dist=Array.from({length:H},()=>Array(W).fill(-1)),queue=[[state.x,state.y]];dist[state.y][state.x]=0;for(let i=0;i<queue.length;i++){let [x,y]=queue[i];for(let [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){let a=x+dx,b=y+dy;if(tile(a,b)===1&&dist[b][a]<0){dist[b][a]=dist[y][x]+1;queue.push([a,b])}}}let end=rooms.slice(1).sort((a,b)=>dist[b.cy][b.cx]-dist[a.cy][a.cx])[0];tiles[end.cy][end.cx]=3;state.stairs=true;
+let dist=Array.from({length:H},()=>Array(W).fill(-1)),queue=[[state.x,state.y]];dist[state.y][state.x]=0;for(let i=0;i<queue.length;i++){let [x,y]=queue[i];for(let [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){let a=x+dx,b=y+dy;if(tile(a,b)===1&&!sanctuaryAt(a,b)&&!state.sanctuaries.some(q=>q.door?.x===a&&q.door?.y===b)&&dist[b][a]<0){dist[b][a]=dist[y][x]+1;queue.push([a,b])}}}let end=rooms.slice(1).sort((a,b)=>dist[b.cy][b.cx]-dist[a.cy][a.cx])[0];const far=queue[queue.length-1];if(dist[end.cy][end.cx]<1||sanctuaryAt(end.cx,end.cy))end={...end,cx:far[0],cy:far[1]};tiles[end.cy][end.cx]=3;state.stairs=true;
 if(state.floor%3===0){let candidates=[];for(let y=2;y<H-9;y++)for(let x=2;x<W-11;x++){let w=8,h=6,clear=true;for(let j=y-1;j<=y+h;j++)for(let i=x-1;i<=x+w;i++)if(tile(i,j)===1||tile(i,j)===3)clear=false;if(!clear)continue;for(let [dx,dy] of [[0,-1],[0,1],[-1,0],[1,0]]){let gx=dx<0?x-1:dx>0?x+w:x+4,gy=dy<0?y-1:dy>0?y+h:y+3;if(tile(gx+dx,gy+dy)===1&&dist[gy+dy][gx+dx]>12)candidates.push({x,y,w,h,gx,gy,score:dist[gy+dy][gx+dx]})}}candidates.sort((a,b)=>b.score-a.score);let a=candidates[0];if(!a){let x=W-10,y=H-10,w=8,h=6,gx=x-1,gy=y+3;let nearest=queue.filter(([i,j])=>i<gx).sort((p,q)=>Math.abs(p[0]-gx)+Math.abs(p[1]-gy)-Math.abs(q[0]-gx)-Math.abs(q[1]-gy))[0];if(nearest){let [i,j]=nearest;while(j!==gy){tiles[j][i]=1;j+=Math.sign(gy-j)}while(i<gx){tiles[j][i]=1;i++}a={x,y,w,h,gx,gy}}}if(a){for(let j=a.y-1;j<=a.y+a.h;j++)for(let i=a.x-1;i<=a.x+a.w;i++)tiles[j][i]=i>=a.x&&i<a.x+a.w&&j>=a.y&&j<a.y+a.h?1:2;tiles[a.gy][a.gx]=1;state.arena={x:a.x,y:a.y,w:a.w,h:a.h,gates:[{x:a.gx,y:a.gy}]};spawnBoss(a.x+4,a.y+3)}else{let room=rooms.filter(q=>q!==end&&dist[q.cy][q.cx]>12).sort((a,b)=>b.w*b.h-a.w*a.h)[0]||rooms[1];state.arena={x:room.x,y:room.y,w:room.w,h:room.h,gates:[]};entities=entities.filter(e=>!(e.x>=room.x&&e.x<room.x+room.w&&e.y>=room.y&&e.y<room.y+room.h));spawnBoss(room.cx,room.cy)}}else state.arena=null;
-furnishFloor();feed('You descend into <b>'+names[(state.floor-1)%names.length]+'</b>.');ai(quips[Math.floor(r()*quips.length)]);reveal();render();}
+furnishFloor();placeAnimal();feed('You descend into <b>'+names[(state.floor-1)%names.length]+'</b>.');ai(quips[Math.floor(r()*quips.length)]);reveal();render();}
 function spawnEnemy(x,y,r=Math.random){
 if(state.floor<=3){
  const rat=r()<.85-state.floor*.13;
@@ -354,9 +504,10 @@ function encounterScreen(){
   const battle=bossFight;
   if(!battle||animatingTurn)return;
   const enemy=battle.e;
-  const moves=[['attack',state.equipment?.weapon?'Swing':'Punch'],['guard','Guard'],['spell','Arc pulse · 10 MP'],['heal','Tonic'],['focus','Focus · +8 MP']];
+  const moves=[['attack',state.equipment?.weapon?'Swing':'Punch'],['guard','Guard'],['heal','Health potion']];
+  if(canMend())moves.push(['mend','Mend · 8 MP']);
   if(enemy.boss)moves.push(['trap',battle.trapUsed?'Trap spent':'Spring trap']);
-  showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><small>'+state.mp+' MP · Incoming: '+bossIntent(battle)+'</small><div class="duel-actions">'+moves.map(([id,label])=>'<button class="widebtn" data-boss="'+id+'" '+((id==='trap'&&battle.trapUsed)||(id==='spell'&&state.mp<10)||(id==='heal'&&!state.inventory.some(i=>i.id==='tonic'&&i.qty>0))?'disabled':'')+'>'+label+'</button>').join('')+'</div></div>');
+  showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions">'+moves.map(([id,label])=>'<button class="widebtn" data-boss="'+id+'" '+((id==='mend'&&(state.mp<8||(state.hp===state.maxHp&&!conditionText())))||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!state.inventory.some(i=>i.id==='tonic'&&i.qty>0))?'disabled':'')+'>'+label+'</button>').join('')+'</div></div>');
   $('#duelHero').src=crawlerPose('side',0).toDataURL();
   const stage=$('.duel-stage');stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
   if(state.equipment?.weapon)stage.classList.add('armed');
@@ -378,8 +529,8 @@ async function animateTurn(action){
   const battle=bossFight;
   if(!battle||animatingTurn||state.dead)return;
   const stage=$('.duel-stage');
-  const strike=action==='attack'?state.power+Math.floor(Math.random()*5):0;
-  const damage=strike+(action==='spell'?state.power*2+8+(state.spellBonus||0):action==='trap'?25+state.level*3:0)+(battle.assist||0);
+  const strike=action==='attack'?state.power+(state.pet?.crawler?state.pet.level+1:0)+Math.floor(Math.random()*5):0;
+  const damage=strike+(action==='trap'?25+state.level*3:0)+(battle.assist||0);
   animatingTurn=true;
   const wait=ms=>battleFrames(ms,null,()=>bossFight===battle);
   try{
@@ -395,24 +546,22 @@ async function animateTurn(action){
 }
 
 function bossScreen(){encounterScreen()}
-function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='focus'){state.mp=Math.min(state.maxMp,state.mp+8)}if(action==='spell'){if(state.mp<10){b.log='Not enough mana.';bossScreen();return}state.mp-=10;d=state.power*2+8+(state.spellBonus||0)}if(action==='guard')guard=true;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;state.hp=Math.min(state.maxHp,state.hp+35)}d+=b.assist||0;b.assist=0;e.hp-=d;if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;if(!e.boss){
+function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(35)}d+=b.assist||0;b.assist=0;e.hp-=d;if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;petVictory();if(!e.boss){
 state.xp+=e.xp;state.gold+=5+Math.floor(Math.random()*12);bossFight=null;
 const milestones={10:['Unlicensed Exterminator','Silver'],30:['The Neighborhood Is Quiet Now','Gold'],100:['Population Control Department','Celestial']};
 if(milestones[state.kills])ridiculous(...milestones[state.kills]);
 if(Math.random()<.08)awardBox('Bronze');
 if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true});
 closeModal();if(state.kills===1){unlock('First blood');ridiculous('Local Pest Control')}checkLevel();feed(e.name+' falls. Search its belongings with Loot.');persistCampaign();render();return
-}recordGuardian(state.floor,e.name,b.turn,b.guards||0);state.xp+=e.xp+100;state.gold+=100;if(window.DCKNet?.isHost)for(let [id,p] of Object.entries(netPlayers))if(p.floor===state.floor&&Math.hypot(p.x-e.x,p.y-e.y)<=8)window.DCKNet.sendReward(id,50,e.xp||100,'tonic',{floor:state.floor,name:e.name});if(state.achievements.includes('Management Has Been Terminated'))awardBox('Gold');else ridiculous('Management Has Been Terminated','Gold');checkLevel();$('#bossbar').classList.add('hidden');bossFight=null;showModal('<h2>GUARDIAN DEFEATED</h2><p>Gold loot box awarded. Loot the remains in the dungeon.</p><button class="widebtn" id="bossDone">CONTINUE</button>');if(state.floor===3&&state.foundKeeper){state.minersFree=true;caption('Iven','Hear that? Three bells. The cage is moving. My crew is going home.',true)}$('#bossDone').onclick=closeModal;save();render();return}let hit=Math.max(1,Math.floor((e.atk*(intent==='DEVASTATING STRIKE'?1.7:intent==='ENRAGED ATTACK'?1.25:1)-state.armor)*(guard?.25:1)));if(intent==='MANA DRAIN'&&!guard){state.mp=Math.max(0,state.mp-8);hit+=4}if(intent==='ARMOR SHATTER'&&!guard)hit+=Math.min(12,state.armor);if(intent==='VENOM BITE'&&!guard){b.poison=3}if(b.poison>0){hit+=3;b.poison--}state.hp=Math.max(0,state.hp-hit);b.log=(d?'You dealt '+d+' damage. ':guard?'You brace for impact. ':action==='focus'?'You recover mana. ':'You recover health. ')+'The guardian deals '+hit+' damage.';b.turn++;if(state.hp<=0){state.dead=true;bossFight=null;save();openDeath();return}persistCampaign();bossScreen();render()}
-function attack(){if(state.chapter==='create'||state.chapter==='surface')return;if(state.dead||bossFight||sanctuaryAt(state.x,state.y))return;if(partyGuest()){if(!state.dead&&attackCooldown<=0){attackCooldown=.48;attackStarted=performance.now();window.DCKNet.sendIntent('attack')}return}let guardian=entities.find(e=>e.boss&&e.alive&&(!state.arena||inArena(state.x,state.y))&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);if(guardian){beginBoss(guardian);return}if(state.dead||attackCooldown>0)return;attackCooldown=.48;attackStarted=performance.now();let targets=entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);targets=targets.filter(e=>e.type==='enemy'&&!e.boss);if(!targets.length){beep(110,.06);return}targets.sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y));let e=targets[0];if(!window.DCKNet?.inRoom){beginBoss(e);return}let dmg=state.power+Math.floor(Math.random()*5);e.hp-=dmg;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+dmg});beep(230,.08,'sawtooth');feed('You strike '+e.name+' for <b>'+dmg+'</b> damage.');if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;if(state.kills===1)ridiculous('Local Pest Control');if(state.kills===10)ridiculous('Unlicensed Exterminator','Silver');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===30)ridiculous('The Neighborhood Is Quiet Now','Gold');if(Math.random()<.08)awardBox('Bronze');if(e.boss)ridiculous('Management Has Been Terminated','Gold');state.xp+=e.xp;state.gold+=Math.floor(5+Math.random()*12);feed('<b>'+e.name+'</b> falls. Remains left behind. +'+e.xp+' XP.');particles.push({x:e.x,y:e.y,t:0,kind:'death'});checkLevel();if(state.kills>=1)unlock('First blood');if(e.boss){state.gold+=100;state.xp+=100;unlock('Warden breaker');ai('The Warden is down. The audience is… cautiously impressed.');$('#bossbar').classList.add('hidden')}if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true})}render();}
+}recordGuardian(state.floor,e.name,b.turn,b.guards||0);state.xp+=e.xp+100;state.gold+=100;if(window.DCKNet?.isHost)for(let [id,p] of Object.entries(netPlayers))if(p.floor===state.floor&&Math.hypot(p.x-e.x,p.y-e.y)<=8)window.DCKNet.sendReward(id,50,e.xp||100,'tonic',{floor:state.floor,name:e.name});if(state.achievements.includes('Management Has Been Terminated'))awardBox('Gold');else ridiculous('Management Has Been Terminated','Gold');checkLevel();$('#bossbar').classList.add('hidden');bossFight=null;showModal('<h2>GUARDIAN DEFEATED</h2><p>Gold loot box awarded. Loot the remains in the dungeon.</p><button class="widebtn" id="bossDone">CONTINUE</button>');if(state.floor===3&&state.foundKeeper){state.minersFree=true;caption('Iven','Hear that? Three bells. The cage is moving. My crew is going home.',true)}$('#bossDone').onclick=closeModal;save();render();return}let hit=Math.max(1,Math.floor((e.atk*(intent==='DEVASTATING STRIKE'?1.7:intent==='ENRAGED ATTACK'?1.25:1)-state.armor)*(guard?.25:1)));if(intent==='MANA DRAIN'&&!guard){state.mp=Math.max(0,state.mp-8);hit+=4}if(intent==='ARMOR SHATTER'&&!guard)hit+=Math.min(12,state.armor);if(state.wounds?.poison||b.poison>0)hit+=2;if(state.wounds?.bleed&&!guard)hit+=1;state.hp=Math.max(0,state.hp-hit);registerHit(e,hit,guard,intent==='VENOM BITE');b.log=(d?'You dealt '+d+' damage. ':guard?'You brace for impact. ':action==='focus'?'You recover mana. ':'You recover health. ')+'The guardian deals '+hit+' damage.';b.turn++;if(state.hp<=0){state.dead=true;bossFight=null;save();openDeath();return}persistCampaign();bossScreen();render()}
+function attack(){if(state.chapter==='create'||state.chapter==='surface')return;if(state.dead||bossFight||sanctuaryAt(state.x,state.y))return;if(partyGuest()){if(!state.dead&&attackCooldown<=0){attackCooldown=.48;attackStarted=performance.now();window.DCKNet.sendIntent('attack')}return}let guardian=entities.find(e=>e.boss&&e.alive&&(!state.arena||inArena(state.x,state.y))&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);if(guardian){beginBoss(guardian);return}if(state.dead||attackCooldown>0)return;attackCooldown=.48;attackStarted=performance.now();let targets=entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);targets=targets.filter(e=>e.type==='enemy'&&!e.boss);if(!targets.length){beep(110,.06);return}targets.sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y));let e=targets[0];if(!window.DCKNet?.inRoom){beginBoss(e);return}let dmg=state.power+(state.pet?.crawler?state.pet.level+1:0)+Math.floor(Math.random()*5);e.hp-=dmg;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+dmg});beep(230,.08,'sawtooth');feed('You strike '+e.name+' for <b>'+dmg+'</b> damage.');if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;petVictory();if(state.kills===1)ridiculous('Local Pest Control');if(state.kills===10)ridiculous('Unlicensed Exterminator','Silver');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===30)ridiculous('The Neighborhood Is Quiet Now','Gold');if(Math.random()<.08)awardBox('Bronze');if(e.boss)ridiculous('Management Has Been Terminated','Gold');state.xp+=e.xp;state.gold+=Math.floor(5+Math.random()*12);feed('<b>'+e.name+'</b> falls. Remains left behind. +'+e.xp+' XP.');particles.push({x:e.x,y:e.y,t:0,kind:'death'});checkLevel();if(state.kills>=1)unlock('First blood');if(e.boss){state.gold+=100;state.xp+=100;unlock('Warden breaker');ai('The Warden is down. The audience is… cautiously impressed.');$('#bossbar').classList.add('hidden')}if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true})}render();}
 
-function spell(){if(state.chapter==='create'||state.chapter==='surface')return;if(state.dead||bossFight||sanctuaryAt(state.x,state.y))return;if(partyGuest()){if(!state.dead&&state.mp>=10){state.mp-=10;window.DCKNet.sendIntent('spell');particles.push({x:state.x,y:state.y,t:0,kind:'pulse'})}return}let guardian=entities.find(e=>e.boss&&e.alive&&(!state.arena||inArena(state.x,state.y))&&Math.hypot(e.x-state.x,e.y-state.y)<=4);if(guardian){beginBoss(guardian);return}if(!window.DCKNet?.inRoom){let target=entities.find(e=>e.type==='enemy'&&e.alive&&!e.boss&&Math.hypot(e.x-state.x,e.y-state.y)<=3.2);if(target){beginBoss(target);return}}
-if(state.dead||state.mp<10){notify('Not enough mana.');return}state.mp-=10;state.spells=(state.spells||0)+1;if(state.spells===5)ridiculous('Unauthorized Indoor Fireworks');let hits=entities.filter(e=>e.type==='enemy'&&e.alive&&!e.boss&&Math.hypot(e.x-state.x,e.y-state.y)<=3.2);for(let e of hits){let d=16+Math.floor(state.power*.8)+(state.spellBonus||0);e.hp-=d;particles.push({x:e.x,y:e.y,t:0,kind:'magic',text:'-'+d});if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;if(state.kills===1)ridiculous('Local Pest Control');if(state.kills===10)ridiculous('Unlicensed Exterminator','Silver');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===30)ridiculous('The Neighborhood Is Quiet Now','Gold');if(Math.random()<.08)awardBox('Bronze');if(e.boss)ridiculous('Management Has Been Terminated','Gold');state.xp+=e.xp;state.gold+=8;if(e.boss){state.gold+=100;unlock('Warden breaker')}unlock('First blood');feed('<b>'+e.name+'</b> is consumed by arcane force.');checkLevel()}}particles.push({x:state.x,y:state.y,t:0,kind:'pulse'});feed('You unleash <b>Arc Pulse</b>. '+hits.length+' target(s) caught.');beep(520,.22,'sine');render()}
-function takeDamage(n,e){if(state.dead)return;if(sanctuaryAt(state.x,state.y))return;hurtAt=performance.now();let d=Math.max(1,n-state.armor);state.hp=Math.max(0,state.hp-d);particles.push({x:state.x,y:state.y,t:0,kind:'hurt',text:'-'+d});feed('<b>'+e.name+'</b> hits you for '+d+' damage.');beep(90,.12,'sawtooth');if(state.hp<=0){state.dead=true;feed('<b>You have fallen.</b> The dungeon claims another crawler.');unlock('Down but not out');notify('CRAWLER DOWN — TAP REVIVE');save();setTimeout(()=>openDeath(),600)}}
+function takeDamage(n,e){if(state.dead)return;if(sanctuaryAt(state.x,state.y))return;hurtAt=performance.now();let d=Math.max(1,n-state.armor);state.hp=Math.max(0,state.hp-d);registerHit(e,d);particles.push({x:state.x,y:state.y,t:0,kind:'hurt',text:'-'+d});feed('<b>'+e.name+'</b> hits you for '+d+' damage.');beep(90,.12,'sawtooth');if(state.hp<=0){state.dead=true;feed('<b>You have fallen.</b> The dungeon claims another crawler.');unlock('Down but not out');notify('CRAWLER DOWN — TAP REVIVE');save();setTimeout(()=>openDeath(),600)}}
 function sanctuaryAt(x,y){return (state.sanctuaries||[state.safe].filter(Boolean)).find(q=>q.room?x>=q.room.x&&x<q.room.x+q.room.w&&y>=q.room.y&&y<q.room.y+q.room.h:Math.hypot(x-q.x,y-q.y)<=2)}function buildSanctuaries(){for(let q of state.sanctuaries){let candidates=[];for(let y=2;y<H-6;y++)for(let x=2;x<W-8;x++){let clear=true;for(let b=y-1;b<=y+4;b++)for(let a=x-1;a<=x+5;a++)if(tile(a,b)===1||tile(a,b)===3)clear=false;if(!clear)continue;for(let [dx,dy] of [[0,-2],[0,5],[-2,0],[6,0]]){let a=x+(dx===0?2:dx),b=y+(dy===0?1:dy);if(tile(a,b)===1)candidates.push({x,y,a,b,dx,dy})}}candidates.sort((a,b)=>Math.hypot(a.x-q.x,a.y-q.y)-Math.hypot(b.x-q.x,b.y-q.y));let c=candidates[0];if(!c)continue;let {x,y,a,b,dx,dy}=c;for(let j=y-1;j<=y+4;j++)for(let i=x-1;i<=x+5;i++)tiles[j][i]=(i>=x&&i<x+5&&j>=y&&j<y+4)?1:2;let door={x:dx<0?x-1:dx>0?x+5:x+2,y:dy<0?y-1:dy>0?y+4:y+1};tiles[door.y][door.x]=1;q.x=x+2;q.y=y+2;q.room={x,y,w:5,h:4};q.door=door;}state.sanctuaries=state.sanctuaries.filter(q=>q.room);if(state.sanctuaries.length)state.safe={x:state.sanctuaries[0].x,y:state.sanctuaries[0].y}}function enemyTick(dt){if(state.hall||state.dead||bossFight||partyGuest())return;let guardian=entities.find(e=>e.boss&&e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=3);if(guardian&&!sanctuaryAt(state.x,state.y)&&(!state.arena||inArena(state.x,state.y))){beginBoss(guardian);return}if(state.npc&&!state.npc.met&&Math.random()<dt*.65){let n=state.npc,opts=[[1,0],[-1,0],[0,1],[0,-1]],a=opts[Math.floor(Math.random()*4)],x=n.x+a[0],y=n.y+a[1];if(!solid(x,y)&&tile(x,y)!==3&&!(x===state.x&&y===state.y)&&!entities.some(e=>e.alive&&e.x===x&&e.y===y)){n.x=x;n.y=y}}if(sanctuaryAt(state.x,state.y))return;for(let e of entities){if(!e.alive||e.type!=='enemy'||e.boss)continue;e.cool-=dt;if(Math.hypot(e.x-state.x,e.y-state.y)<1.4){if(!window.DCKNet?.inRoom){beginBoss(e);return}if(e.cool<=0){e.attackAt=performance.now();takeDamage(e.atk,e);e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<dt*.72){
 const chasing=Math.hypot(e.x-state.x,e.y-state.y)<7;
 const target=chasing?state:e.den;if(!target)continue;
 let dx=Math.sign(target.x-e.x),dy=Math.sign(target.y-e.y);let opts=Math.random()<.5?[[dx,0],[0,dy]]:[[0,dy],[dx,0]];for(let [ax,ay] of opts)if((ax||ay)&&!(step&&e.x+ax===step.nx&&e.y+ay===step.ny)&&!solid(e.x+ax,e.y+ay)&&!sanctuaryAt(e.x+ax,e.y+ay)&&!entities.some(q=>q!==e&&q.alive&&q.x===e.x+ax&&q.y===e.y+ay)){e.x+=ax;e.y+=ay;break}}}}
-function checkLevel(){while(state.xp>=state.nextXp){state.xp-=state.nextXp;state.level++;state.nextXp=Math.floor(state.nextXp*1.35);state.maxHp+=12;state.hp=state.maxHp;state.maxMp+=4;state.mp=state.maxMp;state.power+=2;state.skillPoints++;feed('<b>LEVEL UP!</b> You reached level '+state.level+'. Stats increased.');notify('LEVEL UP — LEVEL '+state.level);unlock('Getting stronger');beep(660,.2,'sine')}}
+function checkLevel(){while(state.xp>=state.nextXp){state.xp-=state.nextXp;state.level++;state.nextXp=Math.floor(state.nextXp*1.35);state.maxHp+=12;restoreHealth(state.maxHp);if(state.floor>=4){state.maxMp+=4;state.mp=state.maxMp}state.power+=2;state.skillPoints++;feed('<b>LEVEL UP!</b> You reached level '+state.level+'. Stats increased.');notify('LEVEL UP — LEVEL '+state.level);unlock('Getting stronger');beep(660,.2,'sine')}}
 function awardBox(tier){let id='box-'+tier,it=state.inventory.find(i=>i.id===id);if(it)it.qty++;else state.inventory.push({id,name:tier+' loot box',icon:'🎁',qty:1,desc:'Open for randomized dungeon rewards.'});notify(tier.toUpperCase()+' LOOT BOX AWARDED');}function ridiculous(n,tier='Bronze'){if(state.achievements.includes(n))return;const bonus=tier!=='Bronze'||n==='Local Pest Control';unlock(n,bonus?tier:null);if(bonus)awardBox(tier);ai('NEW ACHIEVEMENT: '+n+'.'+(bonus?' A '+tier+' box lands in your backpack.':' The audience noticed.'));if(tab==='inventory')openTab(tab)}const awardQueue=[];
 let awardShowing=false;
 function achievementBanner(name,tier){
@@ -445,7 +594,7 @@ function inspectItem(item,label,action){
   const screen=$('#inspectScreen');
   const base=item.id.replace(/-\d+$/,'');
   const art=base.startsWith('box-')?'box':base.startsWith('gear-')?(item.slot==='armor'?'echo-mail':'dock-knife'):base;
-  const known=['box','tonic','shard','torch','gold',...rewardCatalog.map(i=>i.id)];
+  const known=['box','tonic','shard','torch','gold','food','biscuit',...rewardCatalog.map(i=>i.id)];
   const display=$('#inspectArt');display.replaceChildren();
   if(item.art!==undefined){
     const c=document.createElement('canvas');c.width=c.height=32;
@@ -468,7 +617,7 @@ function inspectItem(item,label,action){
 function inspectOwned(item,duplicate=false){
   if(!item)return;
   const equipped=item.slot&&state.equipment?.[item.slot]===item.id;
-  const usable=item.effect||item.slot||['torch','tonic','shard'].includes(item.id)||item.id.startsWith('box-');
+  const usable=item.effect||item.slot||['torch','tonic','shard','biscuit','food'].includes(item.id)||item.id.startsWith('box-');
   inspectItem(item,item.slot?(equipped?'Unequip':'Equip'):item.id.startsWith('box-')?'Open':'Use',
     usable&&!(duplicate&&equipped)?()=>useItem(item.id):null);
 }
@@ -509,16 +658,26 @@ function equipItem(item){
   if(previous===item)delete state.equipment[item.slot];
   else{apply(item,1);state.equipment[item.slot]=item.id}
 }
-function useItem(id){if(personalMenusLocked()){lockHint();return}let it=state.inventory.find(i=>i.id===id&&i.qty>0);if(!it)return;
+function useItem(id,quick=false){if(personalMenusLocked()){lockHint();return}let it=state.inventory.find(i=>i.id===id&&i.qty>0);if(!it)return;
+if(id==='box-Pet'){
+  const reward=Math.random()<.08?'biscuit':'food';it.qty--;giveItem(reward,1);
+  persistCampaign();render();backpack();inspectItem({id:reward,...supplies[reward]});return
+}
+if(id==='biscuit'){
+  if(!state.pet||state.pet.crawler){notify('An untransformed pet must be with you.');return}
+  it.qty--;Object.assign(state.pet,{crawler:true,level:1,wins:0});persistCampaign();render();if(modalOpen())backpack();unlock('Four paws, one crawler');persistCampaign();return
+}
+if(id==='food'){const heal=Math.min(state.wounds?.sick?7:15,state.maxHp-state.hp);if(!heal){notify('Health already full.');return}state.hp+=heal;it.qty--;persistCampaign();render();if(!quick&&modalOpen())backpack();notify('Trail ration restores '+heal+' HP.');return}
 if(it.slot){equipItem(it);save();render();openTab('inventory');return}
+if(it.effect==='boon'&&state.floor<4){notify('Spell boons unlock on Floor 4.');return}
 if(it.effect==='buff'){state.power-=state.teaPower||0;state.teaPower=2+it.rank;state.power+=state.teaPower;it.qty--;notify('Ember tea active on this floor.')}
 else if(it.effect==='boon'){if(state.mp<5){notify('Requires 5 MP.');return}state.mp-=5;state.spellBonus=(state.spellBonus||0)+it.rank;it.qty--;notify('Spell boon learned.')}
-else if(id.startsWith('box-')){it.qty--;const tier=id.slice(4),reward=rollReward(tier);showModal('<div class="box-reveal"><h2>'+safeAttr(tier)+' loot box</h2><div class="reward-chest">'+reward.icon+'</div><h3>'+reward.name+'</h3><p>'+reward.desc+'</p><button class="widebtn" id="rewardDone">Back to backpack</button></div>');$('#rewardDone').onclick=backpack;feed('Unboxed '+reward.name+'.')}else if(id==='tonic'){let v=Math.min(35,state.maxHp-state.hp);if(!v){notify('Health already full.');return}state.hp+=v;it.qty--;feed('Health tonic restores '+v+' HP.')}else if(id==='shard'){let v=Math.min(20,state.maxMp-state.mp);if(!v){notify('Mana already full.');return}state.mp+=v;it.qty--;feed('Mana shard restores '+v+' MP.')}else if(id==='torch'){state.torchTurns=40;it.qty--;reveal();feed('You light a torch. The shadows retreat.')}save();render();if(!id.startsWith('box-'))openTab('inventory')}
+else if(id.startsWith('box-')){it.qty--;const tier=id.slice(4),reward=rollReward(tier);showModal('<div class="box-reveal"><h2>'+safeAttr(tier)+' loot box</h2><div class="reward-chest">'+reward.icon+'</div><h3>'+reward.name+'</h3><p>'+reward.desc+'</p><button class="widebtn" id="rewardDone">Back to backpack</button></div>');$('#rewardDone').onclick=backpack;feed('Unboxed '+reward.name+'.')}else if(id==='tonic'){let v=Math.min(35,state.maxHp-state.hp);if(!v&&!conditionText()){notify('Health already full.');return}restoreHealth(v);it.qty--;feed('Health potion restores '+v+' HP and treats injuries.')}else if(id==='shard'){let v=Math.min(20,state.maxMp-state.mp);if(!v){notify('Mana already full.');return}state.mp+=v;it.qty--;feed('Mana shard restores '+v+' MP.')}else if(id==='torch'){state.torchTurns=40;it.qty--;reveal();feed('You light a torch. The shadows retreat.')}save();render();if(!quick&&!id.startsWith('box-'))openTab('inventory')}
 function nextFloor(){if(state.chapter==='surface'){
 state.chapter='mine';generate();$('#objective').textContent='FIND THE STAIRS • SURVIVE';
 caption('Beneath Seattle','Street noise fades above you. A blue bell rope trails under Seattle. Beside it, someone has scratched three words: Find the keeper.',true);
 const guild=state.sanctuaries?.find(q=>q.door);if(guild&&personalMenusLocked())enterHall(guild);persistCampaign();return}
-if(partyGuest()){notify('Wait for the party host to descend.');return}if(entities.some(e=>e.boss&&e.alive)){notify('Defeat the guardian before descending.');return}ridiculous('Elevator Out of Service','Silver');state.floor++;state.hp=Math.min(state.maxHp,state.hp+18);state.mp=Math.min(state.maxMp,state.mp+8);state.gold+=10;unlock('Deeper down');feed('You descend to floor '+state.floor+'. +10 gold, recovered vitality.');generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();
+if(partyGuest()){notify('Wait for the party host to descend.');return}if(entities.some(e=>e.boss&&e.alive)){notify('Defeat the guardian before descending.');return}ridiculous('Elevator Out of Service','Silver');state.floor++;if(state.floor===4&&state.maxMp===0){state.maxMp=35;state.mp=35}state.hp=Math.min(state.maxHp,state.hp+18);state.mp=Math.min(state.maxMp,state.mp+8);state.gold+=10;unlock('Deeper down');feed('You descend to floor '+state.floor+'. +10 gold, recovered vitality.');generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();
 const reports={
 2:['Iven’s radio','Elliott Bay is leaking through the west wall. Follow the blue pipes to the cage motor.'],
 3:['Rescue frequency','The SoDo lift is drawing power again. Something is holding the cage below the platform.'],
@@ -529,7 +688,7 @@ const reports={
 if(state.floor===4)reports[4][1]+=' Race and class selection are now open. Use Character and Skills.';
 if(reports[state.floor])caption(...reports[state.floor],true);
 save()}
-function openDeath(){showModal(`<h2>THE DUNGEON CLAIMS YOU</h2><p>You reached floor ${state.floor}, defeated ${state.kills} enemies, and reached level ${state.level}.</p><p>Your run can continue, but the dungeon will take a toll.</p><button class="widebtn" id="reviveBtn">REVIVE AT ENTRANCE</button><button class="widebtn danger" id="resetBtn">START A NEW RUN</button>`);$('#reviveBtn').onclick=()=>{if(state.collapsed){startStory();return}state.dead=false;state.hp=Math.min(state.maxHp,Math.max(30,Math.floor(state.maxHp*.5)));state.x=state.safe?.x??state.x;state.y=state.safe?.y??state.y;feed('You claw your way back from the brink.');render();save();closeModal()};$('#resetBtn').onclick=()=>{startStory()}}
+function openDeath(){showModal(`<h2>THE DUNGEON CLAIMS YOU</h2><p>You reached floor ${state.floor}, defeated ${state.kills} enemies, and reached level ${state.level}.</p><p>Your run can continue, but the dungeon will take a toll.</p><button class="widebtn" id="reviveBtn">REVIVE AT ENTRANCE</button><button class="widebtn danger" id="resetBtn">START A NEW RUN</button>`);$('#reviveBtn').onclick=()=>{if(state.collapsed){startStory();return}state.dead=false;state.wounds={};state.hp=Math.min(state.maxHp,Math.max(30,Math.floor(state.maxHp*.5)));state.x=state.safe?.x??state.x;state.y=state.safe?.y??state.y;feed('You claw your way back from the brink.');render();save();closeModal()};$('#resetBtn').onclick=()=>{startStory()}}
 function writeCampaign(){
 const encounter=bossFight?{...bossFight,e:entities.indexOf(bossFight.e)}:null;
 localStorage.setItem(saveKey,JSON.stringify({state,tiles,seen,entities,encounter}));
@@ -553,7 +712,13 @@ if(!state.dead&&guardian?.type==='enemy'&&guardian.alive)bossFight={...o.encount
 return true}}catch(e){}return false}
 function inArena(x,y){let a=state.arena;return !!a&&x>=a.x&&x<a.x+a.w&&y>=a.y&&y<a.y+a.h}const terrainCache=new Map();
 function terrainArt(biome,variant,wall){let key=[biome,variant,wall].join(':');if(terrainCache.has(key))return terrainCache.get(key);let c=document.createElement('canvas');c.width=c.height=32;let g=c.getContext('2d'),r=rng(1009+biome*997+variant*53+(wall?9999:0));let pal=[['#34434a','#46545a','#202d35'],['#55413a','#735749','#342822'],['#34483c','#4c624a','#24372d'],['#344957','#516b78','#23343e'],['#42394e','#62536d','#292535'],['#52352d','#775044','#342521']][biome];let f=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)};f(0,0,32,32,pal[2]);for(let row=0;row<3;row++){let y=row*11;for(let x=-(row%2)*8;x<32;x+=16){f(x+1,y+1,14,9,pal[0]);f(x+1,y+1,14,1,pal[1]);f(x+1,y+2,1,7,pal[1]);for(let k=0;k<6;k++)f(x+2+Math.floor(r()*11),y+3+Math.floor(r()*5),1+Math.floor(r()*2),1,r()<.5?'#ffffff12':'#00000025')}}if(wall){f(0,0,32,3,pal[1]);f(0,26,32,6,pal[2]);f(0,26,32,1,'#0008')}terrainCache.set(key,c);return c}
-function drawTile(x,y,t){if(state.chapter==="surface"||state.chapter==="create")return surfaceTile(x,y,t);const px=x*TILE,py=y*TILE,seed=Math.abs(Math.sin(x*12.9898+y*78.233)*43758.5453)%1;if(t===0){ctx.fillStyle='#080c11';ctx.fillRect(px,py,TILE,TILE);return}if(t===2){ctx.fillStyle='#151f28';ctx.fillRect(px,py,TILE,TILE);ctx.fillStyle=seed>.5?'#26323b':'#202c35';ctx.fillRect(px+1,py+1,30,29);ctx.fillStyle='#10171d';ctx.fillRect(px+2,py+14,28,2);ctx.fillStyle='#52616a';ctx.fillRect(px+2,py+2,28,2);ctx.fillStyle='#090e14';ctx.fillRect(px+1,py+26,30,5);for(let i=0;i<9;i++){ctx.fillStyle=i%2?'#ffffff0d':'#00000025';ctx.fillRect(px+3+(i*7+x*3)%25,py+4+(i*11+y*5)%20,3,2)}ctx.fillRect(px+14,py+2,2,12);ctx.fillRect(px+21,py+16,2,13);ctx.fillStyle='#43515a';ctx.fillRect(px+4,py+4,8,1);ctx.fillRect(px+18,py+19,9,1);ctx.fillStyle='#0b1117';ctx.fillRect(px+3,py+28,25,2);ctx.drawImage(terrainArt((state.floor-1)%6,Math.floor(seed*12),true),px,py);if(seed>.91){let flicker=Math.sin(performance.now()/95+x*7+y)*.15+.85;let glow=ctx.createRadialGradient(px+8,py+7,1,px+8,py+7,25);glow.addColorStop(0,'rgba(255,171,73,'+(.25*flicker)+')');glow.addColorStop(1,'rgba(255,171,73,0)');ctx.fillStyle=glow;ctx.fillRect(px-17,py-18,50,50);ctx.fillStyle='#c17b42';ctx.fillRect(px+7,py+7,3,7);ctx.fillStyle='#ffb45e';ctx.fillRect(px+8,py+4,2,4);ctx.fillStyle='#e48a43';ctx.fillRect(px+5,py+6,7,2)}}else{let palettes=[['#49463c','#3b3932','#34332e'],['#514039','#40322e','#332824'],['#3e4940','#303b34','#27322c'],['#394750','#303c46','#26323b'],['#484054','#393345','#30293b'],['#584036','#47312b','#362522']];let pal=palettes[(state.floor-1)%palettes.length];let tone=pal[seed>.72?0:seed>.38?1:2];ctx.fillStyle=tone;ctx.fillRect(px,py,TILE,TILE);ctx.fillStyle='#555044';ctx.fillRect(px+1,py+1,30,1);for(let i=0;i<13;i++){let a=(x*17+y*11+i*13)%28+2,b=(x*7+y*19+i*9)%28+2;ctx.fillStyle=i%3?'#00000016':'#ffffff13';ctx.fillRect(px+a,py+b,2+i%3,1+i%2)}ctx.fillRect(px+1,py+1,1,30);ctx.fillStyle='#292b29';ctx.fillRect(px+1,py+30,30,1);ctx.fillRect(px+30,py+1,1,30);ctx.fillStyle='#252927';ctx.fillRect(px+((x*7+y*3)%23)+4,py+((x*11+y*5)%22)+4,2,2);if(seed>.82){ctx.strokeStyle='#77705d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(px+7,py+6);ctx.lineTo(px+11,py+11);ctx.lineTo(px+9,py+16);ctx.stroke()}if(seed>.93){ctx.fillStyle='#211d19';ctx.fillRect(px+6,py+19,12,5);ctx.fillStyle='#918574';ctx.fillRect(px+8,py+17,3,8);ctx.fillRect(px+13,py+19,7,2)}if(seed<.12){ctx.fillStyle='#68724d';ctx.fillRect(px+4,py+24,5,2);ctx.fillRect(px+7,py+22,2,2)}}if(t===1){ctx.drawImage(terrainArt((state.floor-1)%6,Math.floor(seed*12),false),px,py);let biome=(state.floor-1)%6;if(biome===2&&seed<.22){ctx.fillStyle='#203f36';ctx.fillRect(px+4,py+8,22,17);ctx.fillStyle='#57816a';ctx.fillRect(px+7,py+12+Math.floor(performance.now()/450)%3,13,1)}if(biome===3&&seed<.25){ctx.fillStyle='#648b9b';ctx.fillRect(px+3,py+20,14,2);ctx.fillStyle='#a1c7cf';ctx.fillRect(px+6,py+17,5,2)}if(biome===5&&seed<.2){ctx.fillStyle='#8b3926';ctx.fillRect(px+3,py+8,3,19);ctx.fillRect(px+6,py+25,12,2);ctx.fillStyle='#e18b43';ctx.fillRect(px+4,py+11,1,12)}for(let j=0;j<2;j++){let off=(j*16+(y%2)*8)%32;ctx.fillStyle='#171b1b55';ctx.fillRect(px,py+j*16+15,32,1);ctx.fillRect(px+off,py+j*16,1,16);ctx.fillStyle='#c3b28b18';ctx.fillRect(px+1,py+j*16+1,30,1)}if(seed<.08){ctx.fillStyle='#394b36';for(let k=0;k<8;k++)ctx.fillRect(px+2+(k*7)%12,py+18+(k*3)%12,3,2)}if(tile(x,y-1)===2){ctx.fillStyle='#00000038';ctx.fillRect(px,py,32,6);ctx.fillStyle='#a69a7518';ctx.fillRect(px,py+6,32,1)}if(seed>.96){ctx.fillStyle='#30271e';ctx.fillRect(px+5,py+8,10,10);ctx.fillStyle='#826344';ctx.fillRect(px+6,py+9,8,8);ctx.fillStyle='#b28b56';ctx.fillRect(px+6,py+10,8,1);ctx.fillStyle='#4b3525';ctx.fillRect(px+9,py+9,2,8)}}if(state.arena?.gates?.some(g=>g.x===x&&g.y===y)){ctx.fillStyle='#69513b';ctx.fillRect(px+2,py+2,28,3);ctx.fillRect(px+2,py+27,28,3);let closed=bossFight?1:0;for(let i=0;i<5;i++){let h=closed?24:5;ctx.fillStyle='#a7a39a';ctx.fillRect(px+5+i*5,py+4,2,h)}}if(t===1&&inArena(x,y)){ctx.fillStyle='#9a463133';ctx.fillRect(px,py,32,32);ctx.strokeStyle='#a57b48';ctx.strokeRect(px+3,py+3,26,26);if(seed>.65){ctx.fillStyle='#a35e37';ctx.fillRect(px+14,py+8,4,16);ctx.fillRect(px+8,py+14,16,4)}}if(t===3){let g=ctx.createRadialGradient(px+16,py+16,2,px+16,py+16,25);g.addColorStop(0,'#ffe7a0');g.addColorStop(.35,'#d79c49');g.addColorStop(1,'#8b542500');ctx.fillStyle=g;ctx.fillRect(px-5,py-5,42,42);ctx.fillStyle='#8b6338';ctx.fillRect(px+6,py+6,20,21);ctx.fillStyle='#f0c66d';for(let i=0;i<4;i++)ctx.fillRect(px+8+i*4,py+8+i*3,14-i*4,2)}}
+function drawTile(x,y,t){if(state.chapter==="surface"||state.chapter==="create")return surfaceTile(x,y,t);const px=x*TILE,py=y*TILE,seed=Math.abs(Math.sin(x*12.9898+y*78.233)*43758.5453)%1;if(t===0){ctx.fillStyle='#080c11';ctx.fillRect(px,py,TILE,TILE);return}if(t===2){ctx.fillStyle='#151f28';ctx.fillRect(px,py,TILE,TILE);ctx.fillStyle=seed>.5?'#26323b':'#202c35';ctx.fillRect(px+1,py+1,30,29);ctx.fillStyle='#10171d';ctx.fillRect(px+2,py+14,28,2);ctx.fillStyle='#52616a';ctx.fillRect(px+2,py+2,28,2);ctx.fillStyle='#090e14';ctx.fillRect(px+1,py+26,30,5);for(let i=0;i<9;i++){ctx.fillStyle=i%2?'#ffffff0d':'#00000025';ctx.fillRect(px+3+(i*7+x*3)%25,py+4+(i*11+y*5)%20,3,2)}ctx.fillRect(px+14,py+2,2,12);ctx.fillRect(px+21,py+16,2,13);ctx.fillStyle='#43515a';ctx.fillRect(px+4,py+4,8,1);ctx.fillRect(px+18,py+19,9,1);ctx.fillStyle='#0b1117';ctx.fillRect(px+3,py+28,25,2);ctx.drawImage(terrainArt((state.floor-1)%6,Math.floor(seed*12),true),px,py);if(seed>.91){let flicker=Math.sin(performance.now()/95+x*7+y)*.15+.85;let glow=ctx.createRadialGradient(px+8,py+7,1,px+8,py+7,25);glow.addColorStop(0,'rgba(255,171,73,'+(.25*flicker)+')');glow.addColorStop(1,'rgba(255,171,73,0)');ctx.fillStyle=glow;ctx.fillRect(px-17,py-18,50,50);ctx.fillStyle='#c17b42';ctx.fillRect(px+7,py+7,3,7);ctx.fillStyle='#ffb45e';ctx.fillRect(px+8,py+4,2,4);ctx.fillStyle='#e48a43';ctx.fillRect(px+5,py+6,7,2)}}else{let palettes=[['#49463c','#3b3932','#34332e'],['#514039','#40322e','#332824'],['#3e4940','#303b34','#27322c'],['#394750','#303c46','#26323b'],['#484054','#393345','#30293b'],['#584036','#47312b','#362522']];let pal=palettes[(state.floor-1)%palettes.length];let tone=pal[seed>.72?0:seed>.38?1:2];ctx.fillStyle=tone;ctx.fillRect(px,py,TILE,TILE);ctx.fillStyle='#555044';ctx.fillRect(px+1,py+1,30,1);for(let i=0;i<13;i++){let a=(x*17+y*11+i*13)%28+2,b=(x*7+y*19+i*9)%28+2;ctx.fillStyle=i%3?'#00000016':'#ffffff13';ctx.fillRect(px+a,py+b,2+i%3,1+i%2)}ctx.fillRect(px+1,py+1,1,30);ctx.fillStyle='#292b29';ctx.fillRect(px+1,py+30,30,1);ctx.fillRect(px+30,py+1,1,30);ctx.fillStyle='#252927';ctx.fillRect(px+((x*7+y*3)%23)+4,py+((x*11+y*5)%22)+4,2,2);if(seed>.82){ctx.strokeStyle='#77705d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(px+7,py+6);ctx.lineTo(px+11,py+11);ctx.lineTo(px+9,py+16);ctx.stroke()}if(seed>.93){ctx.fillStyle='#211d19';ctx.fillRect(px+6,py+19,12,5);ctx.fillStyle='#918574';ctx.fillRect(px+8,py+17,3,8);ctx.fillRect(px+13,py+19,7,2)}if(seed<.12){ctx.fillStyle='#68724d';ctx.fillRect(px+4,py+24,5,2);ctx.fillRect(px+7,py+22,2,2)}}if(t===1){ctx.drawImage(terrainArt((state.floor-1)%6,Math.floor(seed*12),false),px,py);let biome=(state.floor-1)%6;if(biome===2&&seed<.22){ctx.fillStyle='#203f36';ctx.fillRect(px+4,py+8,22,17);ctx.fillStyle='#57816a';ctx.fillRect(px+7,py+12+Math.floor(performance.now()/450)%3,13,1)}if(biome===3&&seed<.25){ctx.fillStyle='#648b9b';ctx.fillRect(px+3,py+20,14,2);ctx.fillStyle='#a1c7cf';ctx.fillRect(px+6,py+17,5,2)}if(biome===5&&seed<.2){ctx.fillStyle='#8b3926';ctx.fillRect(px+3,py+8,3,19);ctx.fillRect(px+6,py+25,12,2);ctx.fillStyle='#e18b43';ctx.fillRect(px+4,py+11,1,12)}for(let j=0;j<2;j++){let off=(j*16+(y%2)*8)%32;ctx.fillStyle='#171b1b55';ctx.fillRect(px,py+j*16+15,32,1);ctx.fillRect(px+off,py+j*16,1,16);ctx.fillStyle='#c3b28b18';ctx.fillRect(px+1,py+j*16+1,30,1)}if(seed<.08){ctx.fillStyle='#394b36';for(let k=0;k<8;k++)ctx.fillRect(px+2+(k*7)%12,py+18+(k*3)%12,3,2)}if(tile(x,y-1)===2){ctx.fillStyle='#00000038';ctx.fillRect(px,py,32,6);ctx.fillStyle='#a69a7518';ctx.fillRect(px,py+6,32,1)}if(seed>.96){ctx.fillStyle='#30271e';ctx.fillRect(px+5,py+8,10,10);ctx.fillStyle='#826344';ctx.fillRect(px+6,py+9,8,8);ctx.fillStyle='#b28b56';ctx.fillRect(px+6,py+10,8,1);ctx.fillStyle='#4b3525';ctx.fillRect(px+9,py+9,2,8)}}if(state.arena?.gates?.some(g=>g.x===x&&g.y===y)){ctx.fillStyle='#69513b';ctx.fillRect(px+2,py+2,28,3);ctx.fillRect(px+2,py+27,28,3);let closed=bossFight?1:0;for(let i=0;i<5;i++){let h=closed?24:5;ctx.fillStyle='#a7a39a';ctx.fillRect(px+5+i*5,py+4,2,h)}}if(t===2){
+  ctx.fillStyle='#0a101947';ctx.fillRect(px,py,32,32);
+  const edge=(dx,dy,a,b,w,h)=>{if([1,3].includes(tile(x+dx,y+dy))){ctx.fillStyle='#172027';ctx.fillRect(px+a,py+b,w,h);ctx.fillStyle='#bcab89';ctx.fillRect(px+a,py+b,w===32?32:1,h===32?32:1)}};
+  edge(0,1,0,28,32,4);edge(0,-1,0,0,32,3);edge(-1,0,0,0,3,32);edge(1,0,29,0,3,32);
+}
+if(t===1){ctx.fillStyle='#dec79520';ctx.fillRect(px,py,32,32)}
+if(t===1&&inArena(x,y)){ctx.fillStyle='#9a463133';ctx.fillRect(px,py,32,32);ctx.strokeStyle='#a57b48';ctx.strokeRect(px+3,py+3,26,26);if(seed>.65){ctx.fillStyle='#a35e37';ctx.fillRect(px+14,py+8,4,16);ctx.fillRect(px+8,py+14,16,4)}}if(t===3){let g=ctx.createRadialGradient(px+16,py+16,2,px+16,py+16,25);g.addColorStop(0,'#ffe7a0');g.addColorStop(.35,'#d79c49');g.addColorStop(1,'#8b542500');ctx.fillStyle=g;ctx.fillRect(px-5,py-5,42,42);ctx.fillStyle='#8b6338';ctx.fillRect(px+6,py+6,20,21);ctx.fillStyle='#f0c66d';for(let i=0;i<4;i++)ctx.fillRect(px+8+i*4,py+8+i*3,14-i*4,2)}}
 function drawRemains(e){const px=e.x*TILE,py=e.y*TILE;let age=performance.now()-(e.deathAt||-1000);if(age>=0&&age<300){ctx.save();ctx.globalAlpha=1-age/300;spriteDraw(enemySprite(e),px+16,py+25,39,43*(1-age/400));ctx.restore();return}ctx.save();ctx.globalAlpha=.78;ctx.fillStyle='#c8c9c1';ctx.beginPath();ctx.arc(px+16,py+16,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#818b8b';ctx.fillRect(px+8,py+18,16,3);ctx.fillRect(px+10,py+22,5,2);ctx.fillRect(px+18,py+22,5,2);ctx.fillStyle='#252b2d';ctx.fillRect(px+14,py+15,2,2);ctx.fillRect(px+19,py+15,2,2);ctx.restore()}
 
 function spriteDraw(name,x,y,w,h){const im=sprites[name];if(!im||!im.complete||!im.naturalWidth)return false;ctx.drawImage(im,x-w/2,y-h+TILE*.18,w,h);return true}
@@ -568,7 +733,45 @@ function gearLook(){
   }
   return look;
 }
-function crawlerPose(dir,frame,character=state?.character,look=gearLook()){let key=[dir,frame,character?.race,character?.skin,character?.gender,character?.hair,look.armor,look.weapon,look.charm].join('/');if(walkArt.has(key))return walkArt.get(key);let c=document.createElement('canvas');c.width=24;c.height=32;let g=c.getContext('2d');let rect=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)},poly=(pts,col)=>{g.fillStyle=col;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fill()};let side=dir==='side',back=dir==='up',stride=Math.sin(frame*Math.PI/8);
+const woundNames={bleed:'Bleeding',fracture:'Broken arm',poison:'Poisoned',sick:'Sick'};
+function conditionText(){return Object.keys(woundNames).filter(k=>state.wounds?.[k]).map(k=>woundNames[k]).join(' · ')}
+function registerHit(enemy,hit,guard=false,venom=false){
+  if(guard)return;
+  const w=state.wounds??={};
+  if(state.hp<=state.maxHp*.55&&hit>=2)w.bleed=true;
+  if(state.hp<=state.maxHp*.3&&hit>=Math.max(4,state.maxHp*.06))w.fracture=true;
+  if(venom)w.poison=true;
+  if(enemy.sprite==='sewer-rat'&&Math.random()<.12)w.sick=true;
+}
+function restoreHealth(amount){
+  state.hp=Math.min(state.maxHp,state.hp+amount);state.wounds={};
+  if(bossFight)bossFight.poison=0;
+}
+function canMend(){return state.floor>=4&&state.specialization==='Arcanist'}
+function mend(){
+  if(!canMend()||state.mp<8)return false;
+  if(state.hp===state.maxHp&&!conditionText())return false;
+  state.mp-=8;restoreHealth(30+(state.spellBonus||0));return true;
+}
+const woundedArt=new WeakMap();
+function crawlerPose(dir,frame,character=state?.character,look=gearLook()){
+  const base=baseCrawlerPose(dir,frame,character,look);
+  if(character!==state?.character||!character)return base;
+  const w=state.wounds||{},low=state.hp<=state.maxHp*.3;
+  const key=[low,w.bleed,w.fracture,w.poison,w.sick].join('/');
+  if(!low&&!w.bleed&&!w.fracture&&!w.poison&&!w.sick)return base;
+  const cached=woundedArt.get(base);if(cached?.key===key)return cached.img;
+  const img=document.createElement('canvas');img.width=base.width;img.height=base.height;
+  const g=img.getContext('2d');g.drawImage(base,0,low?1:0);
+  const mark=(x,y,a,b,color)=>{g.fillStyle=color;g.fillRect(x,y,a,b)};
+  if(low){mark(10,19,3,2,'#514447');mark(13,26,2,2,'#8b725c')}
+  if(w.sick){mark(10,10,5,2,'#aba575');mark(15,10,1,2,'#ede2af')}
+  if(w.bleed){mark(8,15,3,2,'#953e3c');mark(9,17,1,3,'#a74741');mark(13,22,2,2,'#833c3b')}
+  if(w.fracture){mark(15,15,2,7,'#ad865a');mark(14,17,4,1,'#f3e5c5');mark(14,20,4,1,'#ded4ba')}
+  if(w.poison){mark(4,10,2,2,'#9ac369');mark(18,4,2,2,'#c2dd80');mark(3,7,1,1,'#d3dfb0')}
+  woundedArt.set(base,{key,img});return img;
+}
+function baseCrawlerPose(dir,frame,character,look){let key=[dir,frame,character?.race,character?.skin,character?.gender,character?.hair,look.armor,look.weapon,look.charm].join('/');if(walkArt.has(key))return walkArt.get(key);let c=document.createElement('canvas');c.width=24;c.height=32;let g=c.getContext('2d');let rect=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)},poly=(pts,col)=>{g.fillStyle=col;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fill()};let side=dir==='side',back=dir==='up',stride=Math.sin(frame*Math.PI/8);
 const skin=skinTones[character?.skin]||skinTones[2],woman=character?.gender==='Woman';
 const hair=character?.hair&&character.hair!=='Signature'?character.hair:woman?'Ponytail':'Crop';
 const dark='#40312e',light='#795441',mid='#5d4136';
@@ -666,6 +869,7 @@ function playDuelStrike(stage,battle){
   },()=>bossFight===battle&&stage.isConnected);
 }
 function drawHero(x,y){
+  if(state.pet)drawAnimal(state.pet.species,x-.32,y+.25,state.pet.crawler,!!step);
   const now=performance.now(),px=x*TILE+16,ground=y*TILE+27;
   const p=step?Math.min(1,Math.max(0,(now-step.start)/step.duration)):0;
   const phase=step?((stepCount-1+p)*.5)%1:0;
@@ -741,7 +945,7 @@ if(sceneryArt.complete&&sceneryArt.naturalWidth)for(const p of state.scenery||[]
  ctx.drawImage(sceneryArt,p.art*32,0,32,32,p.x*TILE,p.y*TILE,TILE,TILE);
  if(p.art>=6&&!state.investigated?.includes(p.y*W+p.x)){ctx.fillStyle='#9bd7ce';ctx.fillRect(p.x*TILE+15,p.y*TILE+3,3,3)}
 }
-for(let e of entities){if(!seen[e.y]?.[e.x])continue;if(e.type==='loot'&&e.alive){ctx.fillStyle='#e4c16a';ctx.fillRect(e.x*TILE+12,e.y*TILE+12,9,9);ctx.fillStyle='#fff0b3';ctx.fillRect(e.x*TILE+14,e.y*TILE+10,5,3)}else if(e.type==='enemy'&&e.alive)drawEnemy(e);else if(e.type==='enemy'&&!e.alive&&!e.looted)drawRemains(e)}for(const q of state.sanctuaries||[state.safe].filter(Boolean))drawGuildEntrance(q);if(state.npc&&seen[state.npc.y]?.[state.npc.x]){spriteDraw('hero-front',state.npc.x*TILE+16,state.npc.y*TILE+25,30,44);ctx.fillStyle='#7ce4df';ctx.font='10px monospace';ctx.fillText(state.floor===1?'ROPE KEEPER':'CRAWLER',state.npc.x*TILE-8,state.npc.y*TILE-24)}drawHero(visualX,visualY);for(const [id,p] of Object.entries(netPlayers)){if(p.floor!==state.floor||p.hall)continue;const px=p.x*TILE+16,py=p.y*TILE+25;ctx.save();ctx.globalAlpha=.82;ctx.strokeStyle='#65c9d5';ctx.lineWidth=2;ctx.beginPath();ctx.arc(px,py-18,15,0,Math.PI*2);ctx.stroke();ctx.drawImage(crawlerPose('down',0,p.character||{},p.gear||{}),px-12,py-30,24,32);ctx.fillStyle='#a7e6ee';ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText((p.name||'ALLY').slice(0,10),px,py-51);ctx.restore();}
+for(let e of entities){if(!seen[e.y]?.[e.x])continue;if(e.type==='loot'&&e.alive){ctx.fillStyle='#e4c16a';ctx.fillRect(e.x*TILE+12,e.y*TILE+12,9,9);ctx.fillStyle='#fff0b3';ctx.fillRect(e.x*TILE+14,e.y*TILE+10,5,3)}else if(e.type==='enemy'&&e.alive)drawEnemy(e);else if(e.type==='enemy'&&!e.alive&&!e.looted)drawRemains(e)}for(const q of state.sanctuaries||[state.safe].filter(Boolean))drawGuildEntrance(q);if(state.npc&&seen[state.npc.y]?.[state.npc.x]){spriteDraw('hero-front',state.npc.x*TILE+16,state.npc.y*TILE+25,30,44);ctx.fillStyle='#7ce4df';ctx.font='10px monospace';ctx.fillText(state.floor===1?'ROPE KEEPER':'CRAWLER',state.npc.x*TILE-8,state.npc.y*TILE-24)}if(state.wildAnimal&&seen[state.wildAnimal.y]?.[state.wildAnimal.x])drawAnimal(state.wildAnimal.species,state.wildAnimal.x,state.wildAnimal.y,false);drawHero(visualX,visualY);for(const [id,p] of Object.entries(netPlayers)){if(p.floor!==state.floor||p.hall)continue;const px=p.x*TILE+16,py=p.y*TILE+25;ctx.save();ctx.globalAlpha=.82;ctx.strokeStyle='#65c9d5';ctx.lineWidth=2;ctx.beginPath();ctx.arc(px,py-18,15,0,Math.PI*2);ctx.stroke();ctx.drawImage(crawlerPose('down',0,p.character||{},p.gear||{}),px-12,py-30,24,32);ctx.fillStyle='#a7e6ee';ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText((p.name||'ALLY').slice(0,10),px,py-51);ctx.restore();}
 for(let p of particles){let x=p.x*TILE+16,y=p.y*TILE+16;if(p.kind==='pulse'){ctx.strokeStyle='#60c9e2';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,15+p.t*100,0,Math.PI*2);ctx.stroke()}if(p.kind==='magic'||p.kind==='hit'||p.kind==='hurt'){ctx.fillStyle=p.kind==='magic'?'#77d9ee':'#f0a18b';ctx.font='bold 15px monospace';ctx.fillText(p.text||'',x,y-p.t*24)}if(p.kind==='death'||p.kind==='dodge'){ctx.fillStyle=p.kind==='death'?'#d6d8d4':'#9fdbe2';ctx.globalAlpha=Math.max(0,1-p.t*2);ctx.fillRect(x-7,y-7,14,14);ctx.globalAlpha=1}}
 ctx.restore();let glow=ctx.createRadialGradient(canvas.width/2,canvas.height/2,40,canvas.width/2,canvas.height/2,canvas.width*(state.torchTurns>0?.68:.43));glow.addColorStop(0,'rgba(255,177,83,.08)');glow.addColorStop(.5,'rgba(0,0,0,0)');glow.addColorStop(1,'rgba(2,5,12,.78)');ctx.fillStyle=glow;ctx.fillRect(0,0,canvas.width,canvas.height);if(performance.now()-hurtAt<220){ctx.fillStyle='rgba(180,20,25,.15)';ctx.fillRect(0,0,canvas.width,canvas.height)}}
 function drawMini(){if(state.hall){
@@ -752,7 +956,7 @@ let m=$('#minimap'),w=m.width,h=m.height;mini.fillStyle='#070b0f';mini.fillRect(
 mini.fillStyle='#f2d36e';mini.beginPath();mini.arc(ox+(state.x+.5)*s,oy+(state.y+.5)*s,3.5,0,Math.PI*2);mini.fill();for(const p of Object.values(netPlayers)){if(p.floor!==state.floor||p.hall)continue;mini.fillStyle='#65c9d5';mini.beginPath();mini.arc(ox+(p.x+.5)*s,oy+(p.y+.5)*s,3,0,Math.PI*2);mini.fill()}}
 function drawFieldMap(){let m=$('#fieldMini');if(m){let c=m.getContext('2d');c.clearRect(0,0,m.width,m.height);c.drawImage($('#minimap'),0,0,m.width,m.height)}}function drawPortrait(){portrait.fillStyle='#0b1117';portrait.fillRect(0,0,96,96);if(state.character){portrait.imageSmoothingEnabled=false;portrait.drawImage(crawlerPose('down',0),12,0,72,96);return}const im=sprites['hero-front'];if(im?.complete&&im.naturalWidth){let h=88,w=h*im.naturalWidth/im.naturalHeight;portrait.drawImage(im,(96-w)/2,4,w,h)}else{portrait.fillStyle='#1c2b36';portrait.fillRect(18,16,60,65)}portrait.strokeStyle='#a98852';portrait.strokeRect(1,1,94,94)}
 function renderFeed(){let el=$('#feed');if(!el)return;el.innerHTML=(state.feed||[]).slice(0,9).map(x=>`<div class="feed-line"><span class="time">${x.tm}</span>${x.s}</div>`).join('')||'<div class="feed-line">The dungeon is quiet. For now.</div>'}
-function render(){if(!state)return;let hud=$('#fieldHud');if(hud)hud.innerHTML=`<div class="field-stat">HP ${state.hp}/${state.maxHp}<div class="bar hp"><i style="width:${100*state.hp/state.maxHp}%"></i></div></div><div class="field-stat">MP ${state.mp}/${state.maxMp}<div class="bar mp"><i style="width:${100*state.mp/state.maxMp}%"></i></div></div><div class="field-stat">LV ${state.level} · XP ${state.xp}/${state.nextXp}</div>`;$('#hpBar').style.width=100*state.hp/state.maxHp+'%';$('#mpBar').style.width=100*state.mp/state.maxMp+'%';$('#xpBar').style.width=100*state.xp/state.nextXp+'%';$('#hpText').textContent=`${state.hp}/${state.maxHp}`;$('#mpText').textContent=`${state.mp}/${state.maxMp}`;$('#xpText').textContent=`${state.xp}/${state.nextXp}`;$('#heroLevel').textContent=`LEVEL ${state.level} • ${state.level<4?'NOVICE':state.level<8?'DELVER':'VETERAN'}`;$('#powerStat').textContent=state.power;$('#armorStat').textContent=state.armor;$('#goldStat').textContent=state.gold;$('#depthStat').textContent=state.floor;$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();$('#coords').textContent=`X: ${String(state.x).padStart(2,'0')} / Y: ${String(state.y).padStart(2,'0')}`;$('#quickItems').innerHTML=state.inventory.slice(0,4).map(i=>`<button class="quick-slot" data-item="${i.id}" title="${i.name}">${i.icon}<small>${i.qty}</small></button>`).join('');$('#achievements').innerHTML=state.achievements.map(a=>`<span class="achievement">✦ ${a}</span>`).join('')||'<span class="muted">No accolades yet.</span>';$('#goals').innerHTML=`<div class="goal"><em>◈</em> Explore the chamber and find the gold stairs.</div><div class="goal"><em>⚔</em> Enemies defeated: ${state.kills}</div><div class="goal"><em>✧</em> Reach floor ${Math.floor(state.floor/3+1)*3} to face the next guardian.</div>`;let b=entities.find(e=>e.boss&&e.alive);if(b){$('#bossbar').classList.remove('hidden');$('#bossHp').style.width=100*b.hp/b.max+'%';$('#bossHpText').textContent=`${Math.max(0,b.hp)} / ${b.max}`}else $('#bossbar').classList.add('hidden');const target=interactionTarget();
+function render(){if(!state)return;const hotLabel=$('[data-action="hot"] small');if(hotLabel)hotLabel.textContent=supplies[state.hotItem]?.short||'Hot list';let hud=$('#fieldHud');if(hud)hud.innerHTML=`<div class="field-stat crawler-hud-name">${safeAttr(crawlerTitle())}</div><div class="field-stat">HP ${state.hp}/${state.maxHp} ${conditionText()}<div class="bar hp"><i style="width:${100*state.hp/state.maxHp}%"></i></div></div><div class="field-stat">MP ${state.mp}/${state.maxMp}<div class="bar mp"><i style="width:${100*state.mp/Math.max(1,state.maxMp)}%"></i></div></div><div class="field-stat">LV ${state.level} · XP ${state.xp}/${state.nextXp}</div>`;$('#hpBar').style.width=100*state.hp/state.maxHp+'%';$('#mpBar').style.width=100*state.mp/Math.max(1,state.maxMp)+'%';$('#xpBar').style.width=100*state.xp/state.nextXp+'%';$('#hpText').textContent=`${state.hp}/${state.maxHp}`;$('#mpText').textContent=`${state.mp}/${state.maxMp}`;$('#xpText').textContent=`${state.xp}/${state.nextXp}`;$('#heroLevel').textContent=`LEVEL ${state.level} • ${state.level<4?'NOVICE':state.level<8?'DELVER':'VETERAN'}`;$('#powerStat').textContent=state.power;$('#armorStat').textContent=state.armor;$('#goldStat').textContent=state.gold;$('#depthStat').textContent=state.floor;$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();$('#coords').textContent=`X: ${String(state.x).padStart(2,'0')} / Y: ${String(state.y).padStart(2,'0')}`;$('#quickItems').innerHTML=state.inventory.slice(0,4).map(i=>`<button class="quick-slot" data-item="${i.id}" title="${i.name}">${i.icon}<small>${i.qty}</small></button>`).join('');$('#achievements').innerHTML=state.achievements.map(a=>`<span class="achievement">✦ ${a}</span>`).join('')||'<span class="muted">No accolades yet.</span>';$('#goals').innerHTML=`<div class="goal"><em>◈</em> Explore the chamber and find the gold stairs.</div><div class="goal"><em>⚔</em> Enemies defeated: ${state.kills}</div><div class="goal"><em>✧</em> Reach floor ${Math.floor(state.floor/3+1)*3} to face the next guardian.</div>`;let b=entities.find(e=>e.boss&&e.alive);if(b){$('#bossbar').classList.remove('hidden');$('#bossHp').style.width=100*b.hp/b.max+'%';$('#bossHpText').textContent=`${Math.max(0,b.hp)} / ${b.max}`}else $('#bossbar').classList.add('hidden');const target=interactionTarget();
 for(const button of $$('[data-action="interact"]')){
 button.classList.toggle('available',!!target&&!state.dead);
 const label=target?.label||'Interact';if(button.title!==label){button.title=label;button.setAttribute('aria-label','Interact: '+label)}
@@ -841,12 +1045,12 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)clearMoveme
 document.addEventListener('keydown',e=>{
 if($('#audioPanel').open||pauseStarted!==null||modalOpen()||document.body.classList.contains('status-open')||e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable]'))return;
 if(e.target instanceof Element&&e.target.closest('button')&&[' ','Enter'].includes(e.key))return;
-let k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();keys[k]=true;if(k==='shift')updatePace();if(k===' '||k==='j')attack();if(k==='e'&&!e.repeat)interact();if(k==='r')spell();if(k==='f')loot();if(k==='w'||k==='arrowup')move(0,-1);if(k==='s'||k==='arrowdown')move(0,1);if(k==='a'||k==='arrowleft')move(-1,0);if(k==='d'||k==='arrowright')move(1,0);});document.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;if(e.key==='Shift')updatePace()});$$('[data-move]').forEach(b=>{let fn=()=>{let d=b.dataset.move;move(d==='left'?-1:d==='right'?1:0,d==='up'?-1:d==='down'?1:0)};b.addEventListener('pointerdown',e=>{e.preventDefault();fn();touchMove=setInterval(fn,150)});['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>clearInterval(touchMove)))});$$('[data-action]').forEach(b=>b.addEventListener('click',()=>action(b.dataset.action)));$$('[data-tab]').forEach(b=>b.addEventListener('click',()=>openTab(b.dataset.tab)));$('#tabContent').addEventListener('click',e=>{let u=e.target.closest('[data-use]');if(u)inspectOwned(state.inventory.find(i=>i.id===u.dataset.use));let a=e.target.closest('[data-action]');if(a)action(a.dataset.action);if(e.target.id==='netCreate'||e.target.id==='netJoin'){if(state.chapter==='surface'||state.chapter==='create'){notify('Descend into the mine to join a party.');return}const endpoint=$('#netEndpoint')?.value.trim(),name=($('#netName')?.value.trim()||'Crawler').slice(0,16);if(!endpoint){notify('Enter your hosted WSS server URL first.');return}localStorage.setItem('dck-net-url',endpoint);localStorage.setItem('dck-net-name',name);const btn=e.target;btn.disabled=true;window.DCKNet.connect(endpoint,name).then(()=>e.target.id==='netCreate'?window.DCKNet.createRoom():window.DCKNet.joinRoom(prompt('Enter your 6-character party code:')||'')).then(()=>{notify('PARTY CONNECTED');openTab('party')}).catch(err=>notify('CO-OP: '+err.message)).finally(()=>{btn.disabled=false})}if(e.target.id==='netLeave'){window.DCKNet?.leave();netPlayers={};openTab('party')}});$('#quickItems').addEventListener('click',e=>{let b=e.target.closest('[data-item]');if(b)inspectOwned(state.inventory.find(i=>i.id===b.dataset.item))});$('#saveBtn').onclick=save;window.startDungeonAudio({
+let k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();keys[k]=true;if(k==='shift')updatePace();if(k===' '||k==='j')attack();if(k==='e'&&!e.repeat)interact();if(k==='x'&&!e.repeat)hotUse();if(k==='f')loot();if(k==='w'||k==='arrowup')move(0,-1);if(k==='s'||k==='arrowdown')move(0,1);if(k==='a'||k==='arrowleft')move(-1,0);if(k==='d'||k==='arrowright')move(1,0);});document.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;if(e.key==='Shift')updatePace()});$$('[data-move]').forEach(b=>{let fn=()=>{let d=b.dataset.move;move(d==='left'?-1:d==='right'?1:0,d==='up'?-1:d==='down'?1:0)};b.addEventListener('pointerdown',e=>{e.preventDefault();fn();touchMove=setInterval(fn,150)});['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>clearInterval(touchMove)))});$$('[data-action]').forEach(b=>b.addEventListener('click',()=>action(b.dataset.action)));$$('[data-tab]').forEach(b=>b.addEventListener('click',()=>openTab(b.dataset.tab)));$('#tabContent').addEventListener('click',e=>{let u=e.target.closest('[data-use]');if(u)inspectOwned(state.inventory.find(i=>i.id===u.dataset.use));let a=e.target.closest('[data-action]');if(a)action(a.dataset.action);if(e.target.id==='netCreate'||e.target.id==='netJoin'){if(state.chapter==='surface'||state.chapter==='create'){notify('Descend into the mine to join a party.');return}const endpoint=$('#netEndpoint')?.value.trim(),name=($('#netName')?.value.trim()||'Crawler').slice(0,16);if(!endpoint){notify('Enter your hosted WSS server URL first.');return}localStorage.setItem('dck-net-url',endpoint);localStorage.setItem('dck-net-name',name);const btn=e.target;btn.disabled=true;window.DCKNet.connect(endpoint,name).then(()=>e.target.id==='netCreate'?window.DCKNet.createRoom():window.DCKNet.joinRoom(prompt('Enter your 6-character party code:')||'')).then(()=>{notify('PARTY CONNECTED');openTab('party')}).catch(err=>notify('CO-OP: '+err.message)).finally(()=>{btn.disabled=false})}if(e.target.id==='netLeave'){window.DCKNet?.leave();netPlayers={};openTab('party')}});$('#quickItems').addEventListener('click',e=>{let b=e.target.closest('[data-item]');if(b)inspectOwned(state.inventory.find(i=>i.id===b.dataset.item))});$('#saveBtn').onclick=save;window.startDungeonAudio({
   context:()=>audio??=new(window.AudioContext||window.webkitAudioContext)(),
   scene:()=>state.hall?'hall':bossFight?'fight':'dungeon',
   setEffects:enabled=>{sound=enabled}
 });$('#newRun').onclick=()=>{if(confirm('Abandon this run and start a new crawler?')){startStory()}};$('#modalClose').onclick=closeModal;$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});window.addEventListener('beforeunload',save);}
-function storageMenu(q){state.storage??=[];let available=state.inventory.filter(i=>i.qty>0&&state.equipment?.[i.slot]!==i.id);showModal('<h2>CRAWLER LOCKER</h2><p>Shared across sanctuaries and floors.</p><h3>Deposit</h3>'+available.map((i,n)=>'<button class="widebtn" data-deposit="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<h3>Withdraw</h3>'+state.storage.map((i,n)=>'<button class="widebtn" data-withdraw="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<button class="widebtn" id="storageBack">BACK</button>');let transfer=(from,to,item)=>{if(!item||item.qty<1)return;let existing=to.find(i=>i.id===item.id);if(existing)existing.qty++;else to.push({...item,qty:1});item.qty--;if(!item.qty)from.splice(from.indexOf(item),1);save();storageMenu(q)};$$('[data-deposit]').forEach(b=>b.onclick=()=>{const i=available[Number(b.dataset.deposit)];inspectItem(i,"Deposit",()=>transfer(state.inventory,state.storage,i))});$$('[data-withdraw]').forEach(b=>b.onclick=()=>{const i=state.storage[Number(b.dataset.withdraw)];inspectItem(i,"Withdraw",()=>transfer(state.storage,state.inventory,i))});$('#storageBack').onclick=()=>sanctuaryMenu(q)}function sanctuaryMenu(q){showModal('<h2>SANCTUARY</h2><p>Protected quarters • Gold: '+state.gold+'</p><button class="widebtn" id="restSafe">'+(q.rested?'BED — USED':'REST AT BED')+'</button><button class="widebtn" id="buySafe">MERCHANT: TONIC — 15 GOLD</button><button class="widebtn" id="stashSafe">'+(q.cache?'STORAGE — EMPTY':'OPEN SUPPLY CHEST')+'</button><button class="widebtn" id="lockerSafe">PERSONAL STORAGE</button><button class="widebtn" id="leaveSafe">RETURN</button>');$('#restSafe').onclick=()=>{if(!q.rested){q.rested=true;state.hp=state.maxHp;state.mp=state.maxMp;unlock('Safe harbor');save();render()}sanctuaryMenu(q)};$('#buySafe').onclick=()=>{if(state.gold>=15){state.gold-=15;giveItem('tonic',1);save();render()}sanctuaryMenu(q)};$('#stashSafe').onclick=()=>{if(q.cache)return;const nearby=nearbyContainers(state);if(!nearby.some(c=>c.source===q)){notify('Move closer to the supply chest.');return}if(partyGuest()){closeModal();window.DCKNet.sendIntent('loot')}else startLoot(nearby,null)};$('#lockerSafe').onclick=()=>storageMenu(q);$('#leaveSafe').onclick=closeModal}function giveItem(id,n){let i=state.inventory.find(v=>v.id===id);if(i)i.qty+=n;else{let names={tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};state.inventory.push({id,name:names[id]||id,icon:'✦',qty:n,desc:'Dungeon supply'})}}let bagPage=0, activeLoot=null, remoteLoot=null, lootSignature='';
+function storageMenu(q){state.storage??=[];let available=state.inventory.filter(i=>i.qty>0&&state.equipment?.[i.slot]!==i.id);showModal('<h2>CRAWLER LOCKER</h2><p>Shared across sanctuaries and floors.</p><h3>Deposit</h3>'+available.map((i,n)=>'<button class="widebtn" data-deposit="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<h3>Withdraw</h3>'+state.storage.map((i,n)=>'<button class="widebtn" data-withdraw="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+'</button>').join('')+'<button class="widebtn" id="storageBack">BACK</button>');let transfer=(from,to,item)=>{if(!item||item.qty<1)return;let existing=to.find(i=>i.id===item.id);if(existing)existing.qty++;else to.push({...item,qty:1});item.qty--;if(!item.qty)from.splice(from.indexOf(item),1);save();storageMenu(q)};$$('[data-deposit]').forEach(b=>b.onclick=()=>{const i=available[Number(b.dataset.deposit)];inspectItem(i,"Deposit",()=>transfer(state.inventory,state.storage,i))});$$('[data-withdraw]').forEach(b=>b.onclick=()=>{const i=state.storage[Number(b.dataset.withdraw)];inspectItem(i,"Withdraw",()=>transfer(state.storage,state.inventory,i))});$('#storageBack').onclick=()=>sanctuaryMenu(q)}function sanctuaryMenu(q){showModal('<h2>SANCTUARY</h2><p>Protected quarters • Gold: '+state.gold+'</p><button class="widebtn" id="restSafe">'+(q.rested?'BED — USED':'REST AT BED')+'</button><button class="widebtn" id="buySafe">MERCHANT: TONIC — 15 GOLD</button><button class="widebtn" id="stashSafe">'+(q.cache?'STORAGE — EMPTY':'OPEN SUPPLY CHEST')+'</button><button class="widebtn" id="lockerSafe">PERSONAL STORAGE</button><button class="widebtn" id="leaveSafe">RETURN</button>');$('#restSafe').onclick=()=>{if(!q.rested){q.rested=true;restoreHealth(state.maxHp);state.mp=state.maxMp;unlock('Safe harbor');save();render()}sanctuaryMenu(q)};$('#buySafe').onclick=()=>{if(state.gold>=15){state.gold-=15;giveItem('tonic',1);save();render()}sanctuaryMenu(q)};$('#stashSafe').onclick=()=>{if(q.cache)return;const nearby=nearbyContainers(state);if(!nearby.some(c=>c.source===q)){notify('Move closer to the supply chest.');return}if(partyGuest()){closeModal();window.DCKNet.sendIntent('loot')}else startLoot(nearby,null)};$('#lockerSafe').onclick=()=>storageMenu(q);$('#leaveSafe').onclick=closeModal}function giveItem(id,n){let i=state.inventory.find(v=>v.id===id);if(i)i.qty+=n;else{let names={tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};state.inventory.push({id,name:supplies[id]?.name||names[id]||id,icon:supplies[id]?.icon||'✦',qty:n,desc:supplies[id]?.desc||'Dungeon supply'})}}let bagPage=0, activeLoot=null, remoteLoot=null, lootSignature='';
 const lootNames={'box-Bronze':'Bronze loot box',gold:'Gold coins',tonic:'Health tonic',torch:'Torch',shard:'Mana shard'};
 const lootIcons={'box-Bronze':'🎁',gold:'◉',tonic:'🧪',torch:'🔥',shard:'🔷'};
 let outfitAngle=0;
@@ -856,7 +1060,7 @@ function outfitPanel(){
     const item=state.inventory.find(i=>i.id===state.equipment?.[slot]);
     return '<dt>'+label+'</dt><dd>'+safeAttr(item?.name||empty)+'</dd>';
   }).join('');
-  return '<section class="bag-outfit" aria-label="Equipped outfit"><button id="turnOutfit" aria-label="Rotate your crawler"><canvas id="bagCrawler" width="96" height="128"></canvas><small>↻ Rotate</small></button><dl>'+rows+'</dl></section>';
+  return '<section class="bag-outfit" aria-label="Equipped outfit"><button id="turnOutfit" aria-label="Rotate your crawler"><canvas id="bagCrawler" width="96" height="128"></canvas><small>↻ Rotate</small></button><dl><dt>Crawler</dt><dd>'+safeAttr(crawlerTitle())+'</dd>'+rows+'</dl></section>';
 }
 function drawOutfit(){
   const canvas=$('#bagCrawler'),g=canvas.getContext('2d');
@@ -865,7 +1069,7 @@ function drawOutfit(){
   if(outfitAngle===3){g.translate(96,0);g.scale(-1,1)}
   g.drawImage(crawlerPose(dirs[outfitAngle],0),0,0,96,128);g.restore();
 }
-function skillsPanel(){return `<div class="panel-title">ABILITIES & TRAINING</div><div class="item-list"><div class="item-row"><span class="ico">⚔</span><div><b>Weapon mastery</b><small>Increase base strike damage. Current power: ${state.power}</small></div><button class="smallbtn" data-up="power">TRAIN • 1 SP</button></div><div class="item-row"><span class="ico">⬟</span><div><b>Iron constitution</b><small>Increase maximum health and armor.</small></div><button class="smallbtn" data-up="armor">TRAIN • 1 SP</button></div><div class="item-row"><span class="ico">✧</span><div><b>Arc Pulse</b><small>Area spell. Costs 10 MP; damages nearby enemies.</small><button class="smallbtn" data-action="spell">CAST</button></div></div></div><p>Unspent skill points: <b>${state.skillPoints}</b></p><div class="panel-title">SPECIALIZATION</div><p>${state.floor<4?'Race and class unlock on Floor 4':state.specialization||'Choose your class'}</p>${branchUI()}${state.floor<4?'': '<button class="widebtn" data-class="Vanguard">VANGUARD • +15 HP, +2 armor</button><button class="widebtn" data-class="Arcanist">ARCANIST • +20 MP</button><button class="widebtn" data-class="Reaver">REAVER • +4 power</button>'}`}
+function skillsPanel(){return `<div class="panel-title">ABILITIES & TRAINING</div><div class="item-list"><div class="item-row"><span class="ico">⚔</span><div><b>Weapon mastery</b><small>Increase base strike damage. Current power: ${state.power}</small></div><button class="smallbtn" data-up="power">TRAIN • 1 SP</button></div><div class="item-row"><span class="ico">⬟</span><div><b>Iron constitution</b><small>Increase maximum health and armor.</small></div><button class="smallbtn" data-up="armor">TRAIN • 1 SP</button></div></div><p>Unspent skill points: <b>${state.skillPoints}</b></p><div class="panel-title">SPECIALIZATION</div><p>${state.floor<4?'Race and class unlock on Floor 4':state.specialization||'Choose your class'}</p>${branchUI()}${state.floor<4?'': '<button class="widebtn" data-class="Vanguard">VANGUARD • +15 HP, +2 armor</button><button class="widebtn" data-class="Arcanist">ARCANIST • +20 MP</button><button class="widebtn" data-class="Reaver">REAVER • +4 power</button>'}`}
 let bagSection='general';
 const POCKET_SIZE=12;
 function backpack(){
@@ -876,33 +1080,35 @@ function backpack(){
   const pages=Math.max(1,Math.ceil(items.length/POCKET_SIZE));
   bagPage=Math.min(bagPage,pages-1);
   const entries=items.slice(bagPage*POCKET_SIZE,(bagPage+1)*POCKET_SIZE);
+  const hotName=supplies[state.hotItem]?.short||'Choose item';
   const slots=entries.map((item,i)=>'<button class="bag-slot" data-slot="'+i+'"><strong>'+safeAttr(item.icon)+'</strong><span>'+safeAttr(item.name)+'</span><small>×'+count(item)+'</small></button>');
   while(slots.length<POCKET_SIZE)slots.push('<div class="bag-slot empty" aria-hidden="true"></div>');
   const sections=['general','equipped','skills'].map(id=>'<button data-bag-section="'+id+'" aria-pressed="'+(bagSection===id)+'">'+id+'</button>').join('');
-  const statLine='<div class="bag-stats"><span>HP '+state.hp+'/'+state.maxHp+'</span><span>MP '+state.mp+'/'+state.maxMp+'</span><span>Level '+state.level+'</span><span>Power '+state.power+'</span><span>Armor '+state.armor+'</span><span>Gold '+state.gold+'</span><span>XP '+state.xp+'/'+state.nextXp+'</span><span>Spell bonus '+(state.spellBonus||0)+'</span>'+(state.teaPower?'<span>Tea +'+state.teaPower+' power this floor</span>':'')+'</div>';
+  const statLine='<div class="bag-stats">'+(conditionText()?'<span>'+conditionText()+'</span>':'')+'<span>HP '+state.hp+'/'+state.maxHp+'</span><span>MP '+state.mp+'/'+state.maxMp+'</span><span>Level '+state.level+'</span><span>Power '+state.power+'</span><span>Armor '+state.armor+'</span><span>Gold '+state.gold+'</span><span>XP '+state.xp+'/'+state.nextXp+'</span><span>Spell bonus '+(state.spellBonus||0)+'</span>'+(state.pet?'<span>'+animalNames[state.pet.species]+(state.pet.crawler?' · Crawler Lv '+state.pet.level:' · Pet')+'</span>':'')+(state.teaPower?'<span>Tea +'+state.teaPower+' power this floor</span>':'')+'</div>';
   let body;
-  if(bagSection==='skills')body=skillsPanel();
+  if(bagSection==='skills')body=skillsPanel()+(canMend()?'<button class="widebtn" id="bagMend">Mend · 8 MP</button>':'');
   else if(bagSection==='equipped'){
     body=['weapon','armor','charm'].map(slot=>{
       const item=state.inventory.find(i=>i.id===state.equipment?.[slot]);
       return '<div class="worn-row"><div><small>'+slot+'</small><b>'+safeAttr(item?.name||({weapon:'Unarmed',armor:'Everyday clothes',charm:'None'})[slot])+'</b>'+(item?'<span>'+safeAttr(item.desc)+'</span>':'')+'</div>'+(item?'<button class="smallbtn" data-remove="'+safeAttr(item.id)+'">Inspect</button>':'')+'</div>';
     }).join('');
   }else{
-    body='<div class="bag-grid">'+slots.join('')+'</div><div class="bag-nav"><button id="bagPrev" aria-label="Previous pocket" '+(!bagPage?'disabled':'')+'>‹</button><span>Pocket '+(bagPage+1)+' / '+pages+'</span><button id="bagNext" aria-label="Next pocket" '+(bagPage+1>=pages?'disabled':'')+'>›</button></div><div id="bagDetail" aria-live="polite">'+(items.length?'':'No loose items in your backpack.')+'</div>';
+    body='<div class="bag-grid">'+slots.join('')+'</div><div class="bag-nav"><button id="bagHot">X · '+hotName+'</button><button id="bagPrev" aria-label="Previous pocket" '+(!bagPage?'disabled':'')+'>‹</button><span>Pocket '+(bagPage+1)+' / '+pages+'</span><button id="bagNext" aria-label="Next pocket" '+(bagPage+1>=pages?'disabled':'')+'>›</button></div><div id="bagDetail" aria-live="polite">'+(items.length?'':'No loose items in your backpack.')+'</div>';
   }
   showModal('<div class="bag-layout"><h2>Backpack</h2>'+outfitPanel()+statLine+'<nav class="bag-sections" aria-label="Backpack sections">'+sections+'</nav><div class="bag-section-body">'+body+'</div></div>');
   drawOutfit();$('#turnOutfit').onclick=()=>{outfitAngle=(outfitAngle+1)%4;drawOutfit()};
   $$('[data-bag-section]').forEach(button=>button.onclick=()=>{bagSection=button.dataset.bagSection;backpack()});
   $$('[data-remove]').forEach(button=>button.onclick=()=>inspectOwned(state.inventory.find(i=>i.id===button.dataset.remove)));
   if(bagSection==='skills'){
+    if($('#bagMend'))$('#bagMend').onclick=()=>{if(mend()){persistCampaign();render();backpack()}else notify('Mend requires injury and 8 mana.')};
     $$('[data-up]').forEach(button=>{button.disabled=state.skillPoints<1;button.onclick=()=>{
       if(state.skillPoints<1)return;
       state.skillPoints--;if(button.dataset.up==='power')state.power+=2;else{state.maxHp+=15;state.armor++}
       feed('You train your '+button.dataset.up+'.');persistCampaign();render();backpack();
     }});
-    const cast=$('.bag-section-body [data-action="spell"]');if(cast)cast.onclick=()=>{closeModal();spell()};
   }
   if(bagSection!=='general')return;
+  $('#bagHot').onclick=chooseHot;
   $('#bagPrev').onclick=()=>{bagPage--;backpack()};
   $('#bagNext').onclick=()=>{bagPage++;backpack()};
   $$('[data-slot]').forEach(button=>button.onclick=()=>{
@@ -995,22 +1201,22 @@ function syncLoot(session){
 
 function loot(){if(state.hall&&!state.dead&&!activeLoot&&!remoteLoot){hallInteract();return}if(state.dead||activeLoot||remoteLoot)return;if(state.chapter==='create'||state.chapter==='surface')return;if(bossFight)return;const nearby=nearbyContainers(state);
 if(nearby.length){if(partyGuest())window.DCKNet.sendIntent('loot');else startLoot(nearby,null);return}
-let sanctuary=sanctuaryAt(state.x,state.y);if(sanctuary){sanctuaryMenu(sanctuary);return}notify('No remains or cache nearby.')}function action(a){if(a==='loot')loot();if(a==='attack')attack();if(a==='interact')interact();if(a==='spell')spell()}
+let sanctuary=sanctuaryAt(state.x,state.y);if(sanctuary){sanctuaryMenu(sanctuary);return}notify('No remains or cache nearby.')}function action(a){if(a==='loot')loot();if(a==='attack')attack();if(a==='interact')interact();if(a==='hot')hotUse()}
 let worldClock=0;const remoteCooldown=new Map();
 function partyGuest(){return !!window.DCKNet?.inRoom&&!window.DCKNet.isHost}
 function sendPartyWorld(){if(!window.DCKNet?.isHost)return;window.DCKNet.sendWorld({floor:state.floor,loot:activeLoot,scenery:state.scenery,chests:(state.sanctuaries||[]).map(q=>!!q.cache),enemies:entities.map((e,i)=>({i,x:e.x,y:e.y,hp:e.hp,alive:e.alive,looted:!!e.looted})),collapse:Math.ceil(state.collapseLeft)})}
-function applyPartyWorld(w){if(!partyGuest()||!w||!Number.isInteger(w.floor)||w.floor<1||w.floor>999)return;syncLoot(w.loot);if(w.floor!==state.floor){bossFight=null;state.dead=false;state.hp=Math.max(1,state.hp);state.floor=w.floor;generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();closeModal();notify('PARTY FLOOR '+state.floor)}if(Array.isArray(w.scenery))state.scenery=w.scenery;if(Array.isArray(w.chests))(state.sanctuaries||[]).forEach((q,i)=>q.cache=!!w.chests[i]);for(let v of w.enemies||[]){let e=entities[v.i];if(!e||!Number.isInteger(v.x)||!Number.isInteger(v.y)||v.x<0||v.x>=W||v.y<0||v.y>=H)continue;e.x=v.x;e.y=v.y;if(Number.isFinite(v.hp))e.hp=Math.max(0,Math.min(e.max||9999,v.hp));e.alive=!!v.alive;e.looted=!!v.looted}if(Number.isFinite(w.collapse))state.collapseLeft=Math.max(0,w.collapse)}
+function applyPartyWorld(w){if(!partyGuest()||!w||!Number.isInteger(w.floor)||w.floor<1||w.floor>999)return;syncLoot(w.loot);if(w.floor!==state.floor){bossFight=null;state.dead=false;state.hp=Math.max(1,state.hp);state.floor=w.floor;if(state.floor>=4&&!state.maxMp)state.mp=state.maxMp=35;generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();closeModal();notify('PARTY FLOOR '+state.floor)}if(Array.isArray(w.scenery))state.scenery=w.scenery;if(Array.isArray(w.chests))(state.sanctuaries||[]).forEach((q,i)=>q.cache=!!w.chests[i]);for(let v of w.enemies||[]){let e=entities[v.i];if(!e||!Number.isInteger(v.x)||!Number.isInteger(v.y)||v.x<0||v.x>=W||v.y<0||v.y>=H)continue;e.x=v.x;e.y=v.y;if(Number.isFinite(v.hp))e.hp=Math.max(0,Math.min(e.max||9999,v.hp));e.alive=!!v.alive;e.looted=!!v.looted}if(Number.isFinite(w.collapse))state.collapseLeft=Math.max(0,w.collapse)}
 function partyIntent(d){if(!window.DCKNet?.isHost||d.player?.floor!==state.floor)return;
 if(activeLoot){if(activeLoot.owner===d.id){
 if(d.action==='loot_close')finishLoot();else if(d.action.startsWith('take_'))transferLoot(d.action.slice(5))
 }return}
 if(d.action.startsWith('take_')||d.action==='loot_close')return;
-let now=performance.now();if(now-(remoteCooldown.get(d.id)||-1000)<450)return;remoteCooldown.set(d.id,now);let p=d.player;if(d.action!=='loot'&&sanctuaryAt(p.x,p.y))return;let range=d.action==='spell'?3.2:2.15;if(bossFight){let e=bossFight.e;if(!['attack','spell'].includes(d.action)||Math.hypot(e.x-p.x,e.y-p.y)>range)return;bossFight.assist=Math.min(60,(bossFight.assist||0)+8+Math.min(20,p.level||1));bossFight.log='An ally joins the assault. Bonus damage ready: '+bossFight.assist;bossScreen();return}if(d.action==='loot'){const sources=nearbyContainers(p);if(sources.length&&!modalOpen())startLoot(sources,d.id);return}let targets=entities.filter(e=>e.type==='enemy'&&e.alive&&!e.boss&&Math.hypot(e.x-p.x,e.y-p.y)<=range).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));if(d.action==='attack')targets=targets.slice(0,1);for(let e of targets){let damage=8+Math.min(100,p.level||1)*2;e.hp-=damage;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+damage});if(e.hp<=0){e.alive=false;e.deathAt=now;window.DCKNet.sendReward(d.id,8,e.xp||0,null)}}sendPartyWorld()}
+let now=performance.now();if(now-(remoteCooldown.get(d.id)||-1000)<450)return;remoteCooldown.set(d.id,now);let p=d.player;if(d.action!=='loot'&&sanctuaryAt(p.x,p.y))return;if(!['loot','attack'].includes(d.action))return;let range=2.15;if(bossFight){let e=bossFight.e;if(!['attack','spell'].includes(d.action)||Math.hypot(e.x-p.x,e.y-p.y)>range)return;bossFight.assist=Math.min(60,(bossFight.assist||0)+8+Math.min(20,p.level||1));bossFight.log='An ally joins the assault. Bonus damage ready: '+bossFight.assist;bossScreen();return}if(d.action==='loot'){const sources=nearbyContainers(p);if(sources.length&&!modalOpen())startLoot(sources,d.id);return}let targets=entities.filter(e=>e.type==='enemy'&&e.alive&&!e.boss&&Math.hypot(e.x-p.x,e.y-p.y)<=range).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));if(d.action==='attack')targets=targets.slice(0,1);for(let e of targets){let damage=8+Math.min(100,p.level||1)*2;e.hp-=damage;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+damage});if(e.hp<=0){e.alive=false;e.deathAt=now;window.DCKNet.sendReward(d.id,8,e.xp||0,null)}}sendPartyWorld()}
 function updatePartyRoster(){const el=$('#netRoster');if(el)el.textContent='Party members connected: '+(window.DCKNet?.inRoom?Object.keys(netPlayers).length+1:0)+' / 4'}
 window.addEventListener('dcknet',e=>{const d=e.detail||{};if(remoteLoot&&!partyGuest())syncLoot(null);
 if(activeLoot?.owner&&d.type==='player_left'&&activeLoot.owner===d.id)finishLoot();
 if(activeLoot?.owner&&!window.DCKNet?.inRoom)finishLoot();
-if(d.type==='loot_bundle'){if(partyGuest()){receiveLoot(d.items);persistCampaign();render()}}else if(d.type==='reward'){if(partyGuest()){if(d.guardian)recordGuardian(d.guardian.floor,d.guardian.name);state.gold+=d.gold||0;state.xp+=d.xp||0;if(d.item)giveItem(d.item,1);checkLevel();save();render();notify('PARTY REWARD RECEIVED')}}else if(d.type==='world'){applyPartyWorld(d.world)}else if(d.type==='combat_intent'){partyIntent(d)}else if(d.type==='players'){netPlayers=d.players||{};render();updatePartyRoster()}else if(d.type==='player_state'){netPlayers[d.id]=d.player;render();updatePartyRoster()}else if(d.type==='player_left'){delete netPlayers[d.id];render();updatePartyRoster()}else if(d.type==='room'){notify('PRIVATE ROOM '+d.code);render()}else if(d.type==='status'){const el=$('#netStatus');if(el)el.textContent=d.text;const room=$('#netRoom');if(room)room.textContent=d.code?'ROOM '+d.code:'No active room';updatePartyRoster()}else if(d.type==='error'){notify('CO-OP: '+d.message)}});
+if(d.type==='loot_bundle'){if(partyGuest()){receiveLoot(d.items);persistCampaign();render()}}else if(d.type==='reward'){if(partyGuest()){petVictory();if(d.guardian)recordGuardian(d.guardian.floor,d.guardian.name);state.gold+=d.gold||0;state.xp+=d.xp||0;if(d.item)giveItem(d.item,1);checkLevel();save();render();notify('PARTY REWARD RECEIVED')}}else if(d.type==='world'){applyPartyWorld(d.world)}else if(d.type==='combat_intent'){partyIntent(d)}else if(d.type==='players'){netPlayers=d.players||{};render();updatePartyRoster()}else if(d.type==='player_state'){netPlayers[d.id]=d.player;render();updatePartyRoster()}else if(d.type==='player_left'){delete netPlayers[d.id];render();updatePartyRoster()}else if(d.type==='room'){notify('PRIVATE ROOM '+d.code);render()}else if(d.type==='status'){const el=$('#netStatus');if(el)el.textContent=d.text;const room=$('#netRoom');if(room)room.textContent=d.code?'ROOM '+d.code:'No active room';updatePartyRoster()}else if(d.type==='error'){notify('CO-OP: '+d.message)}});
 function collapseTick(dt){if(state.hall&&!window.DCKNet?.inRoom)return;if(bossFight&&!window.DCKNet?.inRoom)return;if(state.chapter==='surface'||state.chapter==='create'||state.dead)return;state.collapseLeft=Math.max(0,(state.collapseLeft??900)-dt);let n=Math.ceil(state.collapseLeft),el=$('#collapseClock');if(el){el.textContent='COLLAPSE '+Math.floor(n/60)+':'+String(n%60).padStart(2,'0');el.style.color=n<=60?'#ff7766':'#e6c47d'}for(let t of [300,60,10])if(n<=t&&!state.warned.includes(t)){state.warned.push(t);ai('Floor collapse in '+t+' seconds. Find the stairs, crawler.');notify('COLLAPSE WARNING: '+t+'s')}if(n===0){bossFight=null;state.collapsed=true;state.dead=true;state.hp=0;save();showModal('<h2>FLOOR COLLAPSED</h2><p>You failed to reach the stairs in time.</p><button class="widebtn" id="collapseRestart">NEW RUN</button>');$('#collapseRestart').onclick=()=>{startStory()}}}document.addEventListener('click',e=>{let b=e.target.closest('[data-class]');if(b)chooseClass(b.dataset.class);let t=e.target.closest('[data-branch]');if(t)trainBranch(t.dataset.branch)});function tick(ts){
 if(pauseStarted!==null){last=ts;requestAnimationFrame(tick);return}
 if(bossFight&&!window.DCKNet?.inRoom){last=ts;requestAnimationFrame(tick);return}
@@ -1024,5 +1230,5 @@ if(step){
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 if(!load()){startStory()}else{if(!state.sanctuaries?.length&&state.safe)state.sanctuaries=[state.safe];if(state.hall&&!state.sanctuaries?.[state.hall.index]?.door)state.hall=null;
   if(!state.hall&&!state.dead){const q=sanctuaryAt(state.x,state.y);if(q?.door)enterHall(q)}
-  if(!Array.isArray(state.scenery))furnishFloor();reveal();render();if(state.chapter==='create')showCreator()}bind();render();if(state.dead)openDeath();else if(bossFight)bossScreen();if(!personalMenusLocked())openTab('journal');if(state.storyLine)caption(state.storyLine.speaker,state.storyLine.line);else if(!state.chapter)ai(quips[0]);$('#packBtn').onclick=backpack;$('#editCrawler').onclick=()=>{if(!state.dead&&!bossFight)showCreator()};requestAnimationFrame(tick);
+  if(!Array.isArray(state.scenery))furnishFloor();if(!state.hall&&!bossFight&&!state.dead&&state.chapter==='mine'&&(solid(state.x,state.y)||sanctuaryAt(state.x,state.y)||[[1,0],[-1,0],[0,-1],[0,1]].every(([dx,dy])=>solid(state.x+dx,state.y+dy))))chooseLanding();if(state.chapter==='mine'&&state.wildAnimal===undefined)placeAnimal();reveal();render();if(state.chapter==='create')showCreator()}bind();render();if(state.dead)openDeath();else if(bossFight)bossScreen();if(!personalMenusLocked())openTab('journal');if(state.storyLine)caption(state.storyLine.speaker,state.storyLine.line);else if(!state.chapter)ai(quips[0]);$('#packBtn').onclick=backpack;$('#editCrawler').onclick=()=>{if(!state.dead&&!bossFight)showCreator()};requestAnimationFrame(tick);
 })();
