@@ -383,13 +383,35 @@ function meetAnimal(){
   const name=animalNames[animal.species];
   showModal('<h2>'+name+'</h2><p>'+ (state.pet?'It noses a guild parcel toward your companion.':'It came down from the surface and waits for you to approach.')+'</p><button class="widebtn" id="befriend">'+(state.pet?'Accept pet supplies':'Befriend '+name)+'</button><button class="widebtn" id="animalLeave">Leave it be</button>');
   $('#animalLeave').onclick=closeModal;
-  $('#befriend').onclick=()=>{if(!state.pet)state.pet={species:animal.species,crawler:false,level:1,wins:0};
+  $('#befriend').onclick=()=>{if(!state.pet){state.pet={species:animal.species,crawler:false,level:1,wins:0};setPetTile(animal)}
     state.wildAnimal=null;awardBox('Pet');persistCampaign();closeModal();render();caption(name,'A pet loot box is tucked into your backpack.',true)};
 }
 function petVictory(){
   const pet=state.pet;if(!pet)return;
   pet.wins++;if(pet.crawler)pet.level=1+Math.floor(pet.wins/4);
   if(pet.wins%5===0)awardBox('Pet');
+}
+function setPetTile(pos){
+  if(state.pet)state.pet.trail={x:pos.x,y:pos.y,floor:state.floor,hall:state.hall?.index??null};
+}
+function petPosition(heroX,heroY){
+  const leader=state.hall||state;
+  const hall=state.hall?.index??null;
+  let trail=state.pet.trail;
+  if(!trail||trail.floor!==state.floor||trail.hall!==hall||Math.abs(trail.x-leader.x)+Math.abs(trail.y-leader.y)!==1){
+    const behind={up:[0,1],down:[0,-1],left:[1,0],right:[-1,0]}[state.facing]||[0,1];
+    for(const [dx,dy] of [behind,[0,1],[0,-1],[-1,0],[1,0]]){
+      const x=leader.x+dx,y=leader.y+dy;
+      if(hall!==null?!hallWalkable(x,y):solid(x,y)||sanctuaryAt(x,y)||entities.some(e=>e.alive&&e.x===x&&e.y===y))continue;
+      setPetTile({x,y});trail=state.pet.trail;break;
+    }
+    if(!trail||trail.floor!==state.floor||trail.hall!==hall||Math.abs(trail.x-leader.x)+Math.abs(trail.y-leader.y)!==1)return null;
+  }
+  const dx=leader.x-trail.x,dy=leader.y-trail.y;
+  const progress=step?Math.min(1,Math.abs(heroX-leader.x)+Math.abs(heroY-leader.y)):0;
+  // When trading places in a narrow corridor, pass shoulder to shoulder.
+  const passing=(heroX-leader.x)*dx+(heroY-leader.y)*dy<0?Math.sin(progress*Math.PI)*.4:0;
+  return {x:trail.x+dx*progress-dy*passing,y:trail.y+dy*progress+dx*passing};
 }
 function drawAnimal(species,x,y,crawler,walking=false){
   const px=Math.round(x*TILE+16),py=Math.round(y*TILE+24);
@@ -488,15 +510,15 @@ function feed(s){let d=new Date(),tm=d.toLocaleTimeString([],{hour:'2-digit',min
 function ai(s){caption("Underfloor",s);$('#aiLine').textContent='“'+s+'”'}function notify(s){let t=$('#toast');t.textContent=s;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),1600)}
 function beep(f=180,d=.07,type='square'){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();let o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+d);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d)}catch(e){}}
 function move(dx,dy,start=performance.now()){if(pauseStarted!==null||bossFight||state.dead||step||modalOpen())return;state.facing=dx<0?'left':dx>0?'right':dy<0?'up':'down';const pos=state.hall||state;let nx=pos.x+dx,ny=pos.y+dy;if(state.hall&&nx===6&&ny===8&&personalMenusLocked()){leaveHall();return}if(state.hall?!hallWalkable(nx,ny):solid(nx,ny)||entities.some(e=>e.type==='enemy'&&e.alive&&e.x===nx&&e.y===ny))return;step={x:pos.x,y:pos.y,nx,ny,start,duration:strideDuration()};stepCount++;return;}function finishStep(nx,ny){
-if(state.hall){if(ny===8&&personalMenusLocked()){leaveHall();return}state.hall.x=nx;state.hall.y=ny;if(ny===8){leaveHall();return}persistCampaign();render();return}
+if(state.hall){if(ny===8&&personalMenusLocked()){leaveHall();return}setPetTile(state.hall);state.hall.x=nx;state.hall.y=ny;if(ny===8){leaveHall();return}persistCampaign();render();return}
 
 if(entities.some(e=>e.type==='enemy'&&e.alive&&e.x===nx&&e.y===ny))return;
 if(state.chapter==='surface'){
-state.x=nx;state.y=ny;
+setPetTile(state);state.x=nx;state.y=ny;
 if(ny>=12&&!state.heardRope){state.heardRope=true;caption('Mara','My brother tied blue cloth to the rope. If you find it, tell him the lamps are still lit.',true)}
 if(tile(nx,ny)===3)nextFloor();else persistCampaign();
 return}
-const shelter=state.sanctuaries?.find(q=>(q.door?.x===nx&&q.door.y===ny)||q.room&&q.door&&sanctuaryAt(nx,ny)===q||!q.room&&q.x===nx&&q.y===ny);if(shelter){enterHall(shelter);return}let wasSafe=sanctuaryAt(state.x,state.y);state.x=nx;state.y=ny;if(wasSafe&&!sanctuaryAt(nx,ny))notify('LEFT SAFE ROOM');if(!wasSafe&&sanctuaryAt(nx,ny)){notify('SAFE ROOM — ATTACKS DISABLED');ridiculous('Even Cowards Need a Break')}walkUntil=performance.now()+340;state.steps++;if(state.steps===50)ridiculous('Congratulations, You Have Legs');if(state.steps===1000)ridiculous('Certified Corridor Enthusiast','Legendary');if(state.steps===250)ridiculous('The Dungeon Is Not a Treadmill','Silver');if(Math.random()<.002)ridiculous('Suspiciously Competent Wandering');if(state.torchTurns>0)state.torchTurns--;reveal();if(tile(nx,ny)===3){nextFloor();return}if(Math.random()<.05)ai(quips[Math.floor(Math.random()*quips.length)]);render();}
+const shelter=state.sanctuaries?.find(q=>(q.door?.x===nx&&q.door.y===ny)||q.room&&q.door&&sanctuaryAt(nx,ny)===q||!q.room&&q.x===nx&&q.y===ny);if(shelter){enterHall(shelter);return}let wasSafe=sanctuaryAt(state.x,state.y);setPetTile(state);state.x=nx;state.y=ny;if(wasSafe&&!sanctuaryAt(nx,ny))notify('LEFT SAFE ROOM');if(!wasSafe&&sanctuaryAt(nx,ny)){notify('SAFE ROOM — ATTACKS DISABLED');ridiculous('Even Cowards Need a Break')}walkUntil=performance.now()+340;state.steps++;if(state.steps===50)ridiculous('Congratulations, You Have Legs');if(state.steps===1000)ridiculous('Certified Corridor Enthusiast','Legendary');if(state.steps===250)ridiculous('The Dungeon Is Not a Treadmill','Silver');if(Math.random()<.002)ridiculous('Suspiciously Competent Wandering');if(state.torchTurns>0)state.torchTurns--;reveal();if(tile(nx,ny)===3){nextFloor();return}if(Math.random()<.05)ai(quips[Math.floor(Math.random()*quips.length)]);render();}
 function nearby(){return entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=1.65).sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y))[0]}
 let bossFight=null;
 function beginBoss(e){if(bossFight||state.dead||modalOpen()||sanctuaryAt(state.x,state.y)||(e.boss&&state.arena&&!inArena(state.x,state.y)))return;bossFight={e,turn:1,log:e.boss?'The arena seals.':'The '+e.name.toLowerCase()+' advances.'};step=null;visualX=state.x;visualY=state.y;joyX=joyY=0;if(e.boss)ai('BOSS BATTLE! Please make your inevitable suffering entertaining.');bossScreen();persistCampaign()}
@@ -905,7 +927,7 @@ function playDuelStrike(stage,battle){
   },()=>bossFight===battle&&stage.isConnected);
 }
 function drawHero(x,y){
-  if(state.pet)drawAnimal(state.pet.species,x-.32,y+.25,state.pet.crawler,!!step);
+  if(state.pet){const pet=petPosition(x,y);if(pet)drawAnimal(state.pet.species,pet.x,pet.y,state.pet.crawler,!!step)}
   const now=performance.now(),px=x*TILE+16,ground=y*TILE+27;
   const p=step?Math.min(1,Math.max(0,(now-step.start)/step.duration)):0;
   const phase=step?((stepCount-1+p)*.5)%1:0;
