@@ -92,3 +92,11 @@ body:has(#modal:not(.hidden)){overflow:hidden}.modal,.modal-card{overscroll-beha
  .bag-layout>.bag-stats,.bag-layout>.bag-grid,.bag-layout>.bag-nav,.bag-layout>#bagDetail{grid-column:2;margin:0}
  .bag-layout .bag-slot{min-height:44px}.bag-layout .bag-grid{padding:5px}.bag-layout .bag-slot strong{font-size:16px}
 }
+
+.controller-pad.actionpad{position:relative;display:block;width:144px;height:144px;flex:none;border-radius:50%;background:radial-gradient(ellipse,#29333aab 20%,#1921269c 64%,transparent 66%);filter:drop-shadow(0 2px 2px #080c11aa)}
+.controller-pad .act{--key:#85d4a9;position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;width:48px;height:48px;margin:0;padding:0;border:2px solid #586065;border-radius:50%;background:radial-gradient(circle at 38% 24%,#454e54,#242d33 64%,#192025);box-shadow:inset 0 1px 1px #949da4,0 3px 0 #10161b;color:#fff;text-shadow:0 1px 1px #000}
+.controller-pad .act b{font:bold 18px/19px system-ui,sans-serif;color:var(--key)}.controller-pad .act small{font:600 8px/10px system-ui,sans-serif;letter-spacing:0;text-transform:uppercase}
+.controller-pad .pad-jump{--key:#f2cf74;top:0;left:48px}.controller-pad .pad-spell{--key:#88caff;left:4px;top:46px}.controller-pad .pad-loot{--key:#f7948d;right:4px;top:46px}.controller-pad .pad-interact{bottom:3px;left:48px}.controller-pad .available{border-color:#9fe3af}.controller-pad .act:active{transform:translateY(2px);box-shadow:inset 0 2px 4px #12181d}
+.bag-sections{display:flex;gap:3px;margin:8px 0;border-bottom:1px solid #756044}.bag-sections button{flex:1;padding:8px 3px;background:#20282c;border:0;border-bottom:2px solid transparent;color:#c1c8c9;font:600 13px system-ui;text-transform:capitalize}.bag-sections button[aria-pressed=true]{color:#ffe1a2;border-bottom-color:#eac079;background:#40372a}
+.worn-row{display:flex;align-items:center;justify-content:space-between;padding:7px;border-bottom:1px solid #465155;gap:8px}.worn-row small,.worn-row span,.worn-row b{display:block}.worn-row small{color:#d5b77e;text-transform:capitalize}.worn-row span{color:#abb9bd;font-size:11px}.bag-section-body{min-width:0}
+@media(orientation:landscape) and (max-height:540px){.bag-layout .bag-sections,.bag-layout .bag-section-body{grid-column:2;margin:0}.bag-section-body{max-height:51dvh;overflow-y:auto;overscroll-behavior:contain}}
