@@ -124,3 +124,7 @@ body:has(#modal:not(.hidden)){overflow:hidden}.modal,.modal-card{overscroll-beha
 @media (orientation:landscape) and (max-height:500px){.inspect-frame{grid-template-columns:100px 1fr;align-items:center}.award-copy{padding-top:36px}.award-label{margin-top:.7em}}
 
 #runButton{touch-action:none;user-select:none;-webkit-touch-callout:none}#runButton[aria-pressed=true]{filter:brightness(1.35);transform:translateY(2px)}
+
+#audioPanel{width:min(300px,90vw);box-sizing:border-box;padding:20px;color:#f7e4bf;background:#171e25;border:2px solid #bd9b65;border-radius:12px}
+#audioPanel::backdrop{background:#06090dbd}
+#audioPanel h2{margin:0 0 8px}#audioPanel label{display:flex;align-items:center;gap:12px;min-height:44px}#audioPanel input{width:20px;height:20px;accent-color:#dbad57}#audioPanel button{margin-top:10px}
