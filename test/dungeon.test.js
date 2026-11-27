@@ -5,7 +5,7 @@ function engine(){
  const el={getContext:()=>({}),classList:{add(){},remove(){},toggle(){}},style:{},dataset:{}};
  let stored=null;
  const context={window:{matchMedia:()=>({matches:false}),addEventListener(){}},document:{querySelector:()=>el,querySelectorAll:()=>[],addEventListener(){}},Image:class{},localStorage:{getItem:()=>stored,setItem:(k,v)=>stored=v},performance:{now:()=>0}};
- const api=vm.runInNewContext(source.slice(0,i)+`return {floorEnemy,fresh,generate,hatchGrub,moveStack,canonicalDrop,writeCampaign,load,solid,sanctuaryAt,snapshot:()=>({state,tiles,seen,entities,W,H}),setup:floor=>{state={...fresh(),floor,chapter:'mine'};bossFight=null;},quiet:()=>{render=()=>{};ai=()=>{};feed=()=>{};notify=()=>{};}};})()`,context);
+ const api=vm.runInNewContext(source.slice(0,i)+`return {nextFloor,chooseSubclass,trainRace,trainBranch,learned,skillPaths, floorEnemy,fresh,generate,hatchGrub,moveStack,canonicalDrop,writeCampaign,load,solid,sanctuaryAt,snapshot:()=>({state,tiles,seen,entities,W,H}),setup:floor=>{state={...fresh(),floor,chapter:'mine'};bossFight=null;},quiet:()=>{render=()=>{};ai=()=>{};feed=()=>{};notify=()=>{};caption=()=>{};ridiculous=()=>{};unlock=()=>{};showModal=()=>{};closeModal=()=>{};guildIdentity=()=>{};enterHall=()=>{state.hall={index:0,x:6,y:7}};backpack=()=>{};openTab=()=>{};highlight=()=>{};}};})()`,context);
  api.quiet();return api;
 }
 test('all eighteen floors shrink, generate one exit and correct guardians',()=>{
@@ -23,4 +23,18 @@ test('inventory stack transfer and campaign save round trip',()=>{
 
 test('all floor exits and guardian arenas are reachable through walkable terrain',()=>{
  const a=engine();for(let f=1;f<=18;f++){a.setup(f);a.generate();const q=a.snapshot(),queue=[[q.state.x,q.state.y]],visited=new Set([q.state.y*q.W+q.state.x]);for(let j=0;j<queue.length;j++){const [x,y]=queue[j];for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]){const nx=x+dx,ny=y+dy,k=ny*q.W+nx;if(nx<0||nx>=q.W||ny<0||ny>=q.H||visited.has(k)||a.solid(nx,ny)||a.sanctuaryAt(nx,ny))continue;visited.add(k);queue.push([nx,ny])}}assert.ok(queue.some(([x,y])=>q.tiles[y][x]===3),'Floor '+f+' exit');const boss=q.entities.find(e=>e.boss);if(boss)assert.ok(visited.has(boss.y*q.W+boss.x),'Floor '+f+' guardian');}
+});
+
+
+test('campaign descent, guardian gates, class training and victory survive all 18 floors',()=>{
+ const a=engine();a.setup(1);a.generate();Object.assign(a.snapshot().state,{guildTrained:true,character:{race:'Human'},skillPoints:30});
+ for(let f=1;f<=18;f++){
+  const q=a.snapshot();assert.equal(q.state.floor,f);const y=q.tiles.findIndex(row=>row.includes(3)),x=q.tiles[y].indexOf(3);q.state.x=x;q.state.y=y;
+  const boss=q.entities.find(e=>e.boss);if(boss){a.nextFloor();assert.equal(q.state.floor,f);assert.ok(!q.state.campaignWon);boss.alive=false;boss.hp=0;}
+  if(f===4){assert.ok(q.state.hall);q.state.hall=null;a.nextFloor();assert.equal(q.state.floor,4);q.state.identityLocked=true;q.state.specialization='Vanguard';}
+  if(f===7){a.chooseSubclass(0);assert.ok(!q.state.subclass);}
+  if(f===8){a.chooseSubclass(0);assert.ok(!q.state.subclass);for(const [n] of a.skillPaths.Vanguard.nodes){a.trainBranch(n);a.trainBranch(n)}a.chooseSubclass(0);assert.equal(q.state.subclass,'Aegis');a.trainRace(1);assert.equal(q.state.racialRanks[1],0);a.trainRace(0);a.trainRace(0);a.trainRace(1);a.trainRace(1);assert.ok(a.learned('racial'));}
+  a.nextFloor();assert.equal(a.snapshot().state.floor,Math.min(18,f+1));
+ }
+ assert.ok(a.snapshot().state.campaignWon);a.writeCampaign();assert.ok(a.load());assert.ok(a.snapshot().state.campaignWon);
 });
