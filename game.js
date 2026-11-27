@@ -15,6 +15,8 @@ for(const name of spriteNames){const img=new Image();img.src=name+'.png';img.onl
 const skinTones=['#f1cdb0','#dfaf87','#bc8b63','#a06c4b','#794f38','#50352c'];
 const ancestries=['Human','Elf','Dwarf'];
 const genders=['Woman','Man','Nonbinary'];
+const clothingColors=['#667565','#414454','#37485a','#a64b49','#d3b68a','#eeeeee','#25252c','#78568c','#397f89'];
+const shirtStyles=['T-shirt','Long sleeve','Tank top','None'],pantsStyles=['Trousers','Shorts','Underwear','Pixelated nude'],shoeStyles=['Boots','Sneakers','Barefoot'];
 const hairStyles=['Signature','Crop','Pixie','Bob','Curls','Ponytail','Braid','Shaved'];
 let captionUntil=0;
 function caption(speaker,line,story=false){
@@ -35,10 +37,12 @@ function crawlerTitle(){
 function showCreator(){if(state.chapter!=='create'&&personalMenusLocked()){lockHint();return}
   const current=state.character||{race:'Human',skin:2,gender:'Nonbinary'};
   const choices=(list,value)=>list.map((name,i)=>'<option value="'+i+'" '+(i===value?'selected':'')+'>'+name+'</option>').join('');
-  showModal('<h2>Your crawler</h2><form id="creator"><label>Crawler name<input name="crawlerName" maxlength="24" placeholder="Crawler" autocomplete="off"></label><canvas id="look" width="192" height="84" aria-label="Front, side, and back hairstyle preview"></canvas><label>Race<select name="race" '+(state.floor<4?'disabled':'')+'>'+choices(state.floor<4?['Human']:ancestries,ancestries.indexOf(current.race))+'</select></label><label>Skin tone<select name="skin">'+choices(['Porcelain','Sand','Amber','Copper','Umber','Deep brown'],current.skin)+'</select></label><label>Gender<select name="gender" aria-label="Gender">'+choices(genders,genders.indexOf(current.gender))+'</select></label><label>Hairstyle<select name="hair" aria-label="Hairstyle">'+choices(hairStyles,Math.max(0,hairStyles.indexOf(current.hair)))+'</select></label><button class="widebtn">'+(state.chapter==='create'?'Begin on the surface':'Save character')+'</button></form><button class="widebtn" data-campaign-menu>Campaign saves</button>');
+  const outfitChoices=(name,list,value)=>'<label>'+name+'<select name="'+name.toLowerCase().replace(' ','')+'">'+choices(list,value)+'</select></label>';
+  const colorChoices=(name,value)=>outfitChoices(name,['Olive','Slate','Blue','Red','Tan','White','Black','Purple','Teal'],Math.max(0,clothingColors.indexOf(value)));
+  showModal('<h2>Your crawler</h2><form id="creator"><label>Crawler name<input name="crawlerName" maxlength="24" placeholder="Crawler" autocomplete="off"></label><canvas id="look" width="192" height="84" aria-label="Front, side, and back hairstyle preview"></canvas><label>Race<select name="race" '+(state.floor<4?'disabled':'')+'>'+choices(state.floor<4?['Human']:ancestries,ancestries.indexOf(current.race))+'</select></label><label>Skin tone<select name="skin">'+choices(['Porcelain','Sand','Amber','Copper','Umber','Deep brown'],current.skin)+'</select></label><label>Gender<select name="gender" aria-label="Gender">'+choices(genders,genders.indexOf(current.gender))+'</select></label><label>Hairstyle<select name="hair" aria-label="Hairstyle">'+choices(hairStyles,Math.max(0,hairStyles.indexOf(current.hair)))+'</select></label>'+outfitChoices('Shirt',shirtStyles,Math.max(0,shirtStyles.indexOf(current.shirt)))+colorChoices('Shirt color',current.shirtColor)+outfitChoices('Pants',pantsStyles,Math.max(0,pantsStyles.indexOf(current.pants)))+colorChoices('Pants color',current.pantsColor||clothingColors[1])+outfitChoices('Shoes',shoeStyles,Math.max(0,shoeStyles.indexOf(current.shoes)))+colorChoices('Shoe color',current.shoeColor||clothingColors[6])+'<button class="widebtn">'+(state.chapter==='create'?'Begin on the surface':'Save character')+'</button></form><button class="widebtn" data-campaign-menu>Campaign saves</button>');
   const form=$('#creator');
   form.elements.crawlerName.value=current.name||'';
-  const selection=()=>({name:form.elements.crawlerName.value.trim().slice(0,24)||'Crawler',race:state.floor<4?'Human':ancestries[form.elements.race.value],skin:Number(form.elements.skin.value),gender:genders[form.elements.gender.value],hair:hairStyles[form.elements.hair.value]});
+  const selection=()=>({name:form.elements.crawlerName.value.trim().slice(0,24)||'Crawler',race:state.floor<4?'Human':ancestries[form.elements.race.value],skin:Number(form.elements.skin.value),gender:genders[form.elements.gender.value],hair:hairStyles[form.elements.hair.value],shirt:shirtStyles[form.elements.shirt.value],shirtColor:clothingColors[form.elements.shirtcolor.value],pants:pantsStyles[form.elements.pants.value],pantsColor:clothingColors[form.elements.pantscolor.value],shoes:shoeStyles[form.elements.shoes.value],shoeColor:clothingColors[form.elements.shoecolor.value]});
   function preview(){
     const g=$('#look').getContext('2d');
     g.clearRect(0,0,192,84);g.imageSmoothingEnabled=false;
@@ -1380,15 +1384,15 @@ function crawlerPose(dir,frame,character=state?.character,look=gearLook()){
   if(w.poison){mark(4,10,2,2,'#9ac369');mark(18,4,2,2,'#c2dd80');mark(3,7,1,1,'#d3dfb0')}
   woundedArt.set(base,{key,img});return img;
 }
-function baseCrawlerPose(dir,frame,character,look){let key=[dir,frame,character?.race,character?.skin,character?.gender,character?.hair,look.armor,look.weapon,look.charm].join('/');if(walkArt.has(key))return walkArt.get(key);let c=document.createElement('canvas');c.width=24;c.height=32;let g=c.getContext('2d');let rect=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)},poly=(pts,col)=>{g.fillStyle=col;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fill()};let side=dir==='side',back=dir==='up',stride=Math.sin(frame*Math.PI/8);
+function baseCrawlerPose(dir,frame,character,look){let key=[dir,frame,character?.race,character?.skin,character?.gender,character?.hair,character?.shirt,character?.shirtColor,character?.pants,character?.pantsColor,character?.shoes,character?.shoeColor,look.armor,look.weapon,look.charm].join('/');if(walkArt.has(key))return walkArt.get(key);let c=document.createElement('canvas');c.width=24;c.height=32;let g=c.getContext('2d');let rect=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)},poly=(pts,col)=>{g.fillStyle=col;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fill()};let side=dir==='side',back=dir==='up',stride=Math.sin(frame*Math.PI/8);
 const skin=skinTones[character?.skin]||skinTones[2],woman=character?.gender==='Woman';
 const hair=character?.hair&&character.hair!=='Signature'?character.hair:woman?'Ponytail':'Crop';
 const dark='#40312e',light='#795441',mid='#5d4136';
-const shirt=woman?'#685567':'#667565',seam=woman?'#99818e':'#879581';
+const bare=character?.shirt==='None',pants=character?.pants||'Trousers',shoes=character?.shoes||'Boots';const shirt=bare?skin:(character?.shirtColor||(woman?'#685567':'#667565')),seam=bare?skin:shirt;
 const sway=Math.round(stride);
 for(let leg=0;leg<2;leg++){
   const swing=leg?stride:-stride,x=(side?9:7)+leg*(side?3:6)+(side?2.8*swing:0),lift=-1.8*Math.max(0,swing);
-  rect(x,19+lift,4,9,woman?'#414454':'#37485a');rect(x-1,27+lift,6,3,'#53504b');rect(x-1,30+lift,6,1,'#c3bda9');
+  rect(x,19+lift,4,9,skin);const length=pants==='Trousers'?9:pants==='Shorts'?5:pants==='Underwear'?3:0;if(length)rect(x,19+lift,4,length,character?.pantsColor||'#414454');rect(x-1,27+lift,6,3,shoes==='Barefoot'?skin:character?.shoeColor||'#53504b');rect(x-1,30+lift,6,1,shoes==='Barefoot'?skin:'#c3bda9');
 }
 if(woman){
   poly([[8,11],[15,11],[17,14],[15,17],[17,22],[7,22],[9,17],[7,14]],shirt);
@@ -1396,7 +1400,7 @@ if(woman){
 }else{rect(7,11,10,10,shirt);rect(8,12,2,8,seam);rect(7,20,10,2,'#495b50')}
 for(let arm=0;arm<2;arm++){
   const x=(arm?(woman?15:16):(woman?6:5))+(side?(arm?-2:2)*stride:0),y=12+(arm?stride:-stride);
-  rect(x,y,3,4,shirt);rect(x,y+4,3,4,skin);
+  rect(x,y,3,8,skin);if(!bare&&character?.shirt!=='Tank top')rect(x,y,3,character?.shirt==='Long sleeve'?7:4,shirt);
 }
 rect(9,3,7,7,skin);rect(woman?10:9,10,woman?5:7,1,skin);
 if(!back){rect(side?15:14,6,1,1,'#312c2a');if(!side)rect(10,6,1,1,'#312c2a')}
@@ -1420,7 +1424,7 @@ if(hair!=='Shaved'){
     rect(x+sway,17,3,1,'#b59c6b');rect(x+sway,18,2,2,mid);
   }
 }
-if(look.armor){const coat=look.armor==='coat';rect(6,12,12,coat?12:8,coat?'#ac843c':look.armor==='mail'?'#55779c':'#687781');rect(8,13,8,1,coat?'#edc678':'#b1c8da');rect(12,14,1,6,'#403e43')}
+if(pants==='Pixelated nude'){for(let j=0;j<3;j++)for(let i=0;i<5;i++)rect(7+i*2,19+j,2,1,(i+j)%2?'#796f69':'#b1a49a')}if(bare&&woman){rect(8,13,8,4,'#9b8f85');for(let i=0;i<4;i++)rect(8+i*2,14,1,2,'#b9aaa0')}if(look.armor){const coat=look.armor==='coat';rect(6,12,12,coat?12:8,coat?'#ac843c':look.armor==='mail'?'#55779c':'#687781');rect(8,13,8,1,coat?'#edc678':'#b1c8da');rect(12,14,1,6,'#403e43')}
 if(look.weapon){const x=back?5:18;rect(x,16,2,9,'#835b38');if(look.weapon==='hammer'){rect(x-3,12,8,5,'#8d9097');rect(x-3,12,7,1,'#d3d6db')}else{rect(x,9,2,9,'#d8e6e5');rect(x-2,17,6,1,'#ba9362')}}
 if(look.charm){rect(11,12,3,2,'#dec789');rect(11,14,3,4,look.charm==='glass'?'#78e5f2':look.charm==='iron'?'#9696a9':'#e0aa41')}
 if(character?.race==='Elf'&&!back){rect(side?13:7,8,2,2,skinTones[character.skin]);rect(side?12:6,7,1,2,skinTones[character.skin])}
