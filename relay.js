@@ -93,7 +93,7 @@ wss.on('connection',(ws,req)=>{
   if(m.type==='round_result'){
  const room=rooms.get(client.room);if(!room||room.host!==id||!/^[a-f0-9]{32}$/.test(m.roundId||'')||!Number.isInteger(m.turn)||m.turn<1||m.turn>99999||!room.players.has(m.target))return;
  room.roundResults??=new Map();const key=m.target+'/'+m.roundId+'/'+m.turn;let entry=room.roundResults.get(key);
- if(!entry){if(room.roundResults.size>=20000)return;entry={target:m.target,acked:false,result:{type:'round_result',roundId:m.roundId,turn:m.turn,damage:clampInt(m.damage,0,9999),mana:clampInt(m.mana,-20,4),heal:clampInt(m.heal,0,140)}};room.roundResults.set(key,entry);dirty=true;if(!persistNow()){room.roundResults.delete(key);return}}
+ if(!entry){if(room.roundResults.size>=20000)return;entry={target:m.target,acked:false,result:{type:'round_result',roundId:m.roundId,turn:m.turn,damage:clampInt(m.damage,0,9999),mana:clampInt(m.mana,-20,1200),heal:clampInt(m.heal,0,140)}};room.roundResults.set(key,entry);dirty=true;if(!persistNow()){room.roundResults.delete(key);return}}
  send(ws,{type:'round_stored',key});if(!entry.acked)send(room.players.get(entry.target)?.ws,entry.result);return;
  }
  if(m.type==='round_ack'){const room=rooms.get(client.room),entry=room?.roundResults?.get(id+'/'+m.roundId+'/'+m.turn);if(entry){entry.acked=true;dirty=true;persistNow()}return}
@@ -109,7 +109,7 @@ wss.on('connection',(ws,req)=>{
    const gender=['Woman','Man','Nonbinary'].includes(s.character?.gender)?s.character.gender:'Nonbinary';
    const character={hair,gender,skin:clampInt(s.character?.skin??2,0,5),race:['Human','Elf','Dwarf','Cat','Dog','Mutant Crab','Wizard','Zombie'].includes(s.character?.race)?s.character.race:'Human'};
    const hall=s.hall?{index:clampInt(s.hall.index,0,5),x:clampInt(s.hall.x,1,11),y:clampInt(s.hall.y,2,8)}:null;
-   p.state={hall,gear,character,name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999),mp:clampInt(s.mp,0,9999),power:clampInt(s.power,1,200),armor:clampInt(s.armor,0,100),spellBonus:clampInt(s.spellBonus,0,100),spells:Array.isArray(s.spells)?s.spells.filter(v=>typeof v==='string'&&/^[a-z]{1,24}$/.test(v)).slice(0,3):[]};
+   p.state={hall,gear,character,name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999),mp:clampInt(s.mp,0,clampInt(s.maxMp??s.mp,0,9999)),maxMp:clampInt(s.maxMp??s.mp,0,9999),power:clampInt(s.power,1,200),armor:clampInt(s.armor,0,100),spellBonus:clampInt(s.spellBonus,0,100),spells:Array.isArray(s.spells)?s.spells.filter(v=>typeof v==='string'&&/^[a-z]{1,24}$/.test(v)).slice(0,3):[]};
    dirty=true;broadcast(room,{type:'player_state',id,player:p.state},id);return;
   }
   send(ws,{type:'error',message:'Unsupported message.'});
