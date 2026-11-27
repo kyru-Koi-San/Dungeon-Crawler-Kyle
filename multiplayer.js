@@ -5,22 +5,30 @@
  const emit=(type,detail={})=>window.dispatchEvent(new CustomEvent('dcknet',{detail:{type,...detail}}));
  const remoteOnly=()=>Object.fromEntries(Object.entries(players).filter(([id])=>id!==clientId));
  let hostId=null,revision=0;let socket=null,roomCode=null,clientId=null,playerName='Crawler',pendingRoom=null,players={};
+ let resumeToken=null,resumeCode=null,relayUrl=null,retryTimer=null,retryUntil=0,retrying=false,hostPaused=false;
+ function stopRetry(){clearTimeout(retryTimer);retryTimer=null;retrying=false;retryUntil=0}
+ function retry(){if(!resumeCode||!resumeToken)return;retrying=true;if(!retryUntil)retryUntil=Date.now()+110000;if(Date.now()>=retryUntil){stopRetry();resumeCode=resumeToken=null;emit('status',{text:'PARTY RECOVERY EXPIRED — SOLO MODE'});return}clearTimeout(retryTimer);retryTimer=setTimeout(async()=>{try{await api.connect(relayUrl,playerName,true);if(api.connected&&retrying)socket.send(JSON.stringify({type:'resume_room',code:resumeCode,token:resumeToken}))}catch{retry()}},2000)}
  const api={
+  get recovering(){return retrying||hostPaused},
   get connected(){return !!socket&&socket.readyState===WebSocket.OPEN},
   get inRoom(){return this.connected&&!!roomCode},
   get playerId(){return clientId},get roomCode(){return roomCode},get isHost(){return this.inRoom&&hostId===clientId},
-  connect(url,name){
+  connect(url,name,recovery=false){
    if(!/^wss?:\/\//i.test(url))return Promise.reject(new Error('Use a ws:// or wss:// server URL.'));
-   if(socket)socket.close();roomCode=null;players={};playerName=(name||'Crawler').replace(/[^\w -]/g,'').slice(0,16)||'Crawler';
+   if(!recovery){stopRetry();resumeCode=resumeToken=null;hostPaused=false}relayUrl=url;if(socket)socket.close();roomCode=null;players={};playerName=(name||'Crawler').replace(/[^\w -]/g,'').slice(0,16)||'Crawler';
    return new Promise((resolve,reject)=>{
     let settled=false;try{socket=new WebSocket(url)}catch(e){reject(e);return}const activeSocket=socket;
     const timeout=setTimeout(()=>{if(!settled){settled=true;socket?.close();reject(new Error('Connection timed out.'))}},9000);
-    activeSocket.addEventListener('open',()=>{if(socket!==activeSocket)return;settled=true;clearTimeout(timeout);emit('status',{text:'CONNECTED — SOLO / PARTY READY'});resolve()},{once:true});
+    activeSocket.addEventListener('open',()=>{if(socket!==activeSocket)return;settled=true;clearTimeout(timeout);if(!recovery)emit('status',{text:'CONNECTED — SOLO / PARTY READY'});resolve()},{once:true});
     activeSocket.addEventListener('error',()=>{if(socket!==activeSocket)return;if(!settled){settled=true;clearTimeout(timeout);reject(new Error('Could not reach the relay. Check the URL and hosting status.'))}else emit('error',{message:'Connection error.'})});
-    activeSocket.addEventListener('close',()=>{if(socket!==activeSocket)return;roomCode=null;players={};emit('players',{players:{}});emit('status',{text:'DISCONNECTED — SOLO MODE'});if(pendingRoom){pendingRoom.reject(new Error('Connection closed.'));pendingRoom=null}});
+    activeSocket.addEventListener('close',()=>{if(socket!==activeSocket)return;roomCode=null;players={};if(resumeCode&&resumeToken){retry();emit('status',{text:'RECONNECTING TO PARTY'})}else emit('status',{text:'DISCONNECTED — SOLO MODE'});emit('players',{players:{}});if(pendingRoom){pendingRoom.reject(new Error('Connection closed.'));pendingRoom=null}});
     activeSocket.addEventListener('message',ev=>{if(socket!==activeSocket)return;let m;try{m=JSON.parse(ev.data)}catch{return}
      if(m.type==='hello'){clientId=m.id;return}
-     if(m.type==='room_joined'){roomCode=m.code;hostId=m.host;revision=0;players=m.players||{};emit('room',{code:roomCode});emit('players',{players:remoteOnly()});emit('status',{text:'IN PRIVATE PARTY',code:roomCode});if(pendingRoom){pendingRoom.resolve(roomCode);pendingRoom=null}return}
+     if(m.type==='resume_failed'){stopRetry();resumeCode=resumeToken=null;hostPaused=false;emit('status',{text:'PARTY RECOVERY UNAVAILABLE — SOLO MODE'});return}
+     if(m.type==='host_paused'){hostPaused=true;emit('status',{text:'HOST RECONNECTING — PARTY PAUSED',code:roomCode});return}
+     if(m.type==='host_resumed'){hostPaused=false;emit('status',{text:'HOST RECONNECTED',code:roomCode});return}
+     if(m.type==='room_ended'){stopRetry();roomCode=resumeCode=resumeToken=null;hostPaused=false;players={};emit('players',{players:{}});emit('status',{text:'PARTY ENDED — SOLO MODE'});return}
+     if(m.type==='room_joined'){stopRetry();resumeCode=m.code;resumeToken=m.resumeToken||null;roomCode=m.code;hostId=m.host;revision=0;players=m.players||{};emit('room',{code:roomCode,resumed:!!m.resumed});emit('players',{players:remoteOnly()});emit('status',{text:'IN PRIVATE PARTY',code:roomCode});if(pendingRoom){pendingRoom.resolve(roomCode);pendingRoom=null}return}
      if(m.type==='host_changed'){hostId=m.host;emit('host',{isHost:api.isHost});return}
      if(m.type==='world_snapshot'){if(m.revision>revision){revision=m.revision;emit('world',{world:m.world})}return}
      if(m.type==='round_result'){emit('round_result',{roundId:m.roundId,turn:m.turn,damage:m.damage,mana:m.mana,heal:m.heal});return}
@@ -52,7 +60,7 @@
   sendWorld(world){if(this.isHost)socket.send(JSON.stringify({type:'world_snapshot',world}))},
   sendIntent(action){if(this.inRoom)socket.send(JSON.stringify({type:'combat_intent',action}))},
   sendState(player){if(this.inRoom)socket.send(JSON.stringify({type:'player_state',player}))},
-  leave(){if(this.connected&&roomCode)socket.send(JSON.stringify({type:'leave_room'}));roomCode=null;players={};emit('players',{players:{}});emit('status',{text:'CONNECTED — SOLO MODE'})}
+  leave(){stopRetry();resumeCode=resumeToken=null;hostPaused=false;if(this.connected&&roomCode)socket.send(JSON.stringify({type:'leave_room'}));roomCode=null;players={};emit('players',{players:{}});emit('status',{text:'CONNECTED — SOLO MODE'})}
  };
  window.DCKNet=api;
 })();
