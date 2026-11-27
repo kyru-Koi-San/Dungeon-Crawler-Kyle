@@ -40,7 +40,8 @@
      if(m.type==='trade_end'){emit('trade_end',{id:m.id,ok:m.ok===true,received:m.received});return}
      if(m.type==='drop_request'){if(api.isHost)emit('drop_request',{id:m.id,nonce:m.nonce,item:m.item,qty:m.qty,player:m.player});return}
      if(m.type==='drop_result'){emit('drop_result',{nonce:m.nonce,ok:m.ok===true});return}
-     if(m.type==='loot_bundle'){emit('loot_bundle',{items:m.items});return}
+     if(m.type==='loot_stored'){emit('loot_stored',{delivery:m.delivery});return}
+     if(m.type==='loot_bundle'){emit('loot_bundle',{delivery:m.delivery,items:m.items});return}
      if(m.type==='reward'){emit('reward',{gold:m.gold,xp:m.xp,item:m.item,guardian:m.guardian});return}
      if(m.type==='combat_intent'){if(api.isHost)emit('combat_intent',{id:m.id,action:m.action,player:m.player});return}
      if(m.type==='room_update'){players=m.players||{};emit('players',{players:remoteOnly()});return}
@@ -60,7 +61,8 @@
   trade(type,data){if(this.inRoom&&['trade_open','trade_offer','trade_accept','trade_cancel'].includes(type))socket.send(JSON.stringify({type,...data}))},
   sendDrop(drop){if(this.inRoom&&!this.isHost)socket.send(JSON.stringify({type:'drop_request',...drop}))},
   sendDropResult(target,nonce,ok){if(this.isHost)socket.send(JSON.stringify({type:'drop_result',target,nonce,ok}))},
-  sendLoot(target,items){if(this.isHost)socket.send(JSON.stringify({type:'loot_bundle',target,items}))},
+  sendLoot(target,items,delivery){if(this.isHost)socket.send(JSON.stringify({type:'loot_bundle',target,items,delivery}))},
+  ackLoot(delivery){if(this.inRoom)socket.send(JSON.stringify({type:'loot_ack',delivery}))},
   sendReward(target,gold,xp,item,guardian){if(this.isHost)socket.send(JSON.stringify({type:'reward',target,gold,xp,item,guardian}))},
   sendWorld(world){if(this.isHost)socket.send(JSON.stringify({type:'world_snapshot',world}))},
   sendIntent(action){if(this.inRoom)socket.send(JSON.stringify({type:'combat_intent',action}))},
