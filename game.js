@@ -850,9 +850,10 @@ function hatchGrub(parent){
  return spawned>0;
 }
 function cityMarket(){
- const price=state.floor*5;
- showModal('<small>'+safeAttr(names[state.floor-1])+'</small><h2>City exchange</h2><p>Sealed meth cargo · '+price+' gold per parcel</p><p>In backpack ×'+quantity('meth-cargo')+'</p><button class="widebtn" id="sellCargo" '+(!quantity('meth-cargo')?'disabled':'')+'>Trade one parcel</button><button class="widebtn" id="leaveMarket">Leave exchange</button>');
- $('#sellCargo').onclick=()=>{const cargo=state.inventory.find(i=>i.id==='meth-cargo'&&i.qty>0);if(!cargo)return;cargo.qty--;state.gold+=price;persistCampaign();render();cityMarket()};
+ const stock=(state.tradeInventory||[]).filter(i=>i.qty>0);
+ const value=i=>i.id==='meth-cargo'?state.floor*5:Math.max(1,3+(i.rank||1)*4);
+ showModal('<small>'+safeAttr(names[state.floor-1])+'</small><h2>City exchange</h2><p>Gold: '+state.gold+' · Items marked For sale</p>'+stock.map((i,n)=>'<button class="widebtn" data-sell="'+n+'">'+safeAttr(i.name)+' ×'+i.qty+' · '+value(i)+' gold each</button>').join('')+(stock.length?'':'<p>Move items to For sale in your backpack.</p>')+'<button class="widebtn" id="leaveMarket">Leave exchange</button>');
+ $$('[data-sell]').forEach(b=>b.onclick=()=>{const i=stock[Number(b.dataset.sell)];if(!i||i.qty<1)return;i.qty--;state.gold+=value(i);persistCampaign();render();cityMarket()});
  $('#leaveMarket').onclick=closeModal;
 }
 function spawnBoss(x,y){let brood=state.floor%9===6,phantom=state.floor%9===0,hp=brood?155+state.floor*22:phantom?145+state.floor*24:130+state.floor*20;let b={type:'enemy',name:brood?'The Brood Matriarch':phantom?'The Hollow Regent':'The Ossuary Warden',sprite:brood?'spider-boss':phantom?'wraith':'bone-champion',x,y,hp,max:hp,atk:14+state.floor*2,xp:100+state.floor*10,icon:'♛',cool:0,alive:true,boss:true};if(state.floor===3)Object.assign(b,{name:'Pip, Keeper of the Cage',sprite:'goblin',small:true,hp:48,max:48,atk:5});
@@ -1139,7 +1140,7 @@ function showComparison(item){
 
 function inspectItem(item,label,action){
   if(!item||awardShowing)return;
-  const screen=$('#inspectScreen');
+  const screen=$('#inspectScreen');document.getElementById('inventoryActions')?.remove();
   const display=$('#inspectArt');display.replaceChildren();
   if(item.art!==undefined){
     const c=document.createElement('canvas');c.width=c.height=32;
@@ -1159,12 +1160,27 @@ function inspectItem(item,label,action){
   confirm.onclick=()=>{dismiss();action?.()};
   pauseInspectionClock();if(!screen.open)screen.showModal();
 }
+function moveStack(from,to,item,qty){
+  if(!from.includes(item)||qty<1||qty>item.qty)return false;
+  const existing=to.find(i=>i.id===item.id);
+  if(existing)existing.qty+=qty;else to.push({...item,qty});
+  item.qty-=qty;if(item.qty===0)from.splice(from.indexOf(item),1);return true;
+}
 function inspectOwned(item,duplicate=false){
   if(!item)return;
   const equipped=item.slot&&state.equipment?.[item.slot]===item.id;
   const usable=item.effect||item.slot||['torch','tonic','shard','biscuit','food'].includes(item.id)||item.id.startsWith('box-');
   inspectItem(item,item.slot?(equipped?'Unequip':'Equip'):item.id.startsWith('box-')?'Open':'Use',
     usable&&!(duplicate&&equipped)?()=>useItem(item.id):null);
+  if(!$('#inspectScreen').open)return;
+  const available=item.qty-(equipped?1:0);
+  const controls=document.createElement('div');controls.id='inventoryActions';
+  if(available>0&&state.inventory.includes(item)){
+    const add=(label,fn)=>{const b=document.createElement('button');b.className='widebtn';b.textContent=label;b.onclick=()=>{$('#inspectBack').click();fn()};controls.appendChild(b)};
+    add('Move '+available+' to For sale',()=>{moveStack(state.inventory,state.tradeInventory??=[],item,available);persistCampaign();render();backpack()});
+    if(!state.hall&&state.chapter==='mine'&&!window.DCKNet?.inRoom)add('Drop '+available+' in a bag',()=>{const dropped=[];if(!moveStack(state.inventory,dropped,item,available))return;entities.push({type:'loot',name:'Dropped backpack',x:state.x,y:state.y,alive:true,droppedBag:true,contents:dropped});persistCampaign();render();backpack()});
+  }
+  $('#inspectAction').after(controls);
 }
 function unlock(n,tier=null){if(!state.achievements.includes(n)){state.achievements.push(n);if(tier)(state.achievementPrizes??={})[n]=tier;achievementBanner(n,tier);feed('Achievement unlocked: <b>'+n+'</b>.');}}
 const rewardCatalog=[
@@ -1562,7 +1578,7 @@ if(sceneryArt.complete&&sceneryArt.naturalWidth)for(const p of state.scenery||[]
  ctx.drawImage(sceneryArt,p.art*32,0,32,32,p.x*TILE,p.y*TILE,TILE,TILE);
  if(p.art>=6&&!state.investigated?.includes(p.y*W+p.x)){ctx.fillStyle='#9bd7ce';ctx.fillRect(p.x*TILE+15,p.y*TILE+3,3,3)}
 }
-for(let e of entities){if(!seen[e.y]?.[e.x])continue;if(e.type==='loot'&&e.alive){ctx.fillStyle='#e4c16a';ctx.fillRect(e.x*TILE+12,e.y*TILE+12,9,9);ctx.fillStyle='#fff0b3';ctx.fillRect(e.x*TILE+14,e.y*TILE+10,5,3)}else if(e.type==='enemy'&&e.alive)drawEnemy(e);else if(e.type==='enemy'&&!e.alive&&!e.looted)drawRemains(e)}for(const q of state.sanctuaries||[state.safe].filter(Boolean))drawGuildEntrance(q);if(state.npc&&seen[state.npc.y]?.[state.npc.x]){const n=state.npc,t=Math.min(1,Math.max(0,(performance.now()-(n.walkAt??-1000))/320)),px=(n.fromX??n.x)*(1-t)+n.x*t,py=(n.fromY??n.y)*(1-t)+n.y*t;
+for(let e of entities){if(!seen[e.y]?.[e.x])continue;if(e.type==='loot'&&e.alive){ctx.fillStyle=e.droppedBag?'#875b38':'#e4c16a';ctx.fillRect(e.x*TILE+11,e.y*TILE+12,11,10);ctx.fillStyle=e.droppedBag?'#d2ad75':'#fff0b3';ctx.fillRect(e.x*TILE+14,e.y*TILE+10,5,3)}else if(e.type==='enemy'&&e.alive)drawEnemy(e);else if(e.type==='enemy'&&!e.alive&&!e.looted)drawRemains(e)}for(const q of state.sanctuaries||[state.safe].filter(Boolean))drawGuildEntrance(q);if(state.npc&&seen[state.npc.y]?.[state.npc.x]){const n=state.npc,t=Math.min(1,Math.max(0,(performance.now()-(n.walkAt??-1000))/320)),px=(n.fromX??n.x)*(1-t)+n.x*t,py=(n.fromY??n.y)*(1-t)+n.y*t;
  spriteDraw('hero-'+(['side','back'].includes(n.facing)?n.facing:'front'),px*TILE+16,py*TILE+25-Math.sin(t*Math.PI)*2,30,44);ctx.fillStyle='#7ce4df';ctx.font='10px monospace';ctx.fillText(state.floor===1?'ROPE KEEPER':state.floor<=4?'SOUND SALVAGE':'NIGHT SHIFT',state.npc.x*TILE-8,state.npc.y*TILE-24)}if(state.wildAnimal&&seen[state.wildAnimal.y]?.[state.wildAnimal.x])drawAnimal(state.wildAnimal.species,state.wildAnimal.x,state.wildAnimal.y,false);drawHero(visualX,visualY);for(const [id,p] of Object.entries(netPlayers)){if(p.floor!==state.floor||p.hall)continue;const px=p.x*TILE+16,py=p.y*TILE+25;ctx.save();ctx.globalAlpha=.82;ctx.strokeStyle='#65c9d5';ctx.lineWidth=2;ctx.beginPath();ctx.arc(px,py-18,15,0,Math.PI*2);ctx.stroke();ctx.drawImage(crawlerPose('down',0,p.character||{},p.gear||{}),px-12,py-30,24,32);ctx.fillStyle='#a7e6ee';ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText((p.name||'ALLY').slice(0,10),px,py-51);ctx.restore();}
 for(let p of particles){let x=p.x*TILE+16,y=p.y*TILE+16;if(p.kind==='pulse'){ctx.strokeStyle='#60c9e2';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,15+p.t*100,0,Math.PI*2);ctx.stroke()}if(p.kind==='magic'||p.kind==='hit'||p.kind==='hurt'){ctx.fillStyle=p.kind==='magic'?'#77d9ee':'#f0a18b';ctx.font='bold 15px monospace';ctx.fillText(p.text||'',x,y-p.t*24)}if(p.kind==='death'||p.kind==='dodge'){ctx.fillStyle=p.kind==='death'?'#d6d8d4':'#9fdbe2';ctx.globalAlpha=Math.max(0,1-p.t*2);ctx.fillRect(x-7,y-7,14,14);ctx.globalAlpha=1}}
 ctx.restore();let glow=ctx.createRadialGradient(canvas.width/2,canvas.height/2,40,canvas.width/2,canvas.height/2,canvas.width*(state.torchTurns>0?.68:.43));glow.addColorStop(0,'rgba(255,177,83,.08)');glow.addColorStop(.5,'rgba(0,0,0,0)');glow.addColorStop(1,'rgba(2,5,12,.78)');ctx.fillStyle=glow;ctx.fillRect(0,0,canvas.width,canvas.height);if(performance.now()-hurtAt<220){ctx.fillStyle='rgba(180,20,25,.15)';ctx.fillRect(0,0,canvas.width,canvas.height)}}
@@ -1770,9 +1786,10 @@ const POCKET_SIZE=12;
 function backpack(){
   if(personalMenusLocked()){lockHint();return}
   if(state.dead||bossFight||activeLoot||remoteLoot||state.chapter==='create')return;
-  const count=item=>item.qty-(state.equipment?.[item.slot]===item.id?1:0);
+  const count=item=>item.qty-(bagSection!=='trade'&&state.equipment?.[item.slot]===item.id?1:0);
   const boxes=bagSection==='boxes';
-  const items=state.inventory.filter(item=>count(item)>0&&item.id.startsWith('box-')===boxes);
+  const trading=bagSection==='trade';
+  const items=trading?(state.tradeInventory||[]).filter(i=>i.qty>0):state.inventory.filter(item=>count(item)>0&&item.id.startsWith('box-')===boxes);
   const pages=Math.max(1,Math.ceil(items.length/POCKET_SIZE));
   bagPage=Math.min(bagPage,pages-1);
   const entries=items.slice(bagPage*POCKET_SIZE,(bagPage+1)*POCKET_SIZE);
@@ -1780,7 +1797,7 @@ function backpack(){
   const picture=item=>'<img class="pack-icon" alt="" src="item-art.svg#'+itemArt(item)+'">';
   const slots=entries.map((item,i)=>'<button class="bag-slot rank-'+Math.min(5,item.rank||1)+'" data-slot="'+i+'" title="'+safeAttr(item.name)+'">'+picture(item)+'<span>'+safeAttr(item.name)+'</span><small>×'+count(item)+'</small></button>');
   while(slots.length<POCKET_SIZE)slots.push('<div class="bag-slot empty" aria-hidden="true"></div>');
-  const sections=['general','equipped','boxes','skills'].map(id=>'<button data-bag-section="'+id+'" aria-pressed="'+(bagSection===id)+'">'+(id==='boxes'?'Loot boxes':id)+'</button>').join('');
+  const sections=['general','equipped','boxes','trade','skills'].map(id=>'<button data-bag-section="'+id+'" aria-pressed="'+(bagSection===id)+'">'+(id==='boxes'?'Loot boxes':id==='trade'?'For sale':id)+'</button>').join('');
   const statLine='<div class="bag-stats">'+(conditionText()?'<span>'+conditionText()+'</span>':'')+'<span>HP '+state.hp+'/'+state.maxHp+'</span><span>MP '+state.mp+'/'+state.maxMp+'</span><span>Level '+state.level+'</span><span>Power '+state.power+'</span><span>Armor '+state.armor+'</span><span>Gold '+state.gold+'</span><span>XP '+state.xp+'/'+state.nextXp+'</span><span>Spell bonus '+(state.spellBonus||0)+'</span>'+(state.pet?'<span>'+safeAttr(state.pet.name||animalNames[state.pet.species])+(state.pet.crawler?' · Crawler Lv '+state.pet.level:' · Pet')+'</span>':'')+(state.teaPower?'<span>Tea +'+state.teaPower+' power this floor</span>':'')+'</div>';
   let body;
   if(bagSection==='skills')body=skillsPanel()+(canMend()?'<button class="widebtn" id="bagMend">Mend · 8 MP</button>':'');
@@ -1820,12 +1837,13 @@ function backpack(){
       feed('You train your '+button.dataset.up+'.');persistCampaign();render();backpack();
     }});
   }
-  if(bagSection!=='general'&&!boxes)return;
+  if(bagSection!=='general'&&!boxes&&!trading)return;
   if(!boxes)$('#bagHot').onclick=chooseHot;
   $('#bagPrev').onclick=()=>{bagPage--;backpack()};
   $('#bagNext').onclick=()=>{bagPage++;backpack()};
   $$('[data-slot]').forEach(button=>button.onclick=()=>{
     const item=entries[Number(button.dataset.slot)];
+    if(trading){inspectItem(item,'Return to backpack',()=>{moveStack(state.tradeInventory,state.inventory,item,item.qty);persistCampaign();render();backpack()});return}
     inspectOwned(item,true);
   });
 }
@@ -1848,7 +1866,7 @@ function startLoot(containers,owner){
   const rows=[];
   for(const {source,name,index} of containers){
     source.contents??=index<0?[{id:'box-Bronze',qty:1}]:[{id:'gold',qty:5+Math.floor(Math.random()*10)},{id:Math.random()<.5?'tonic':'torch',qty:1}];
-    for(const item of source.contents)rows.push({...item,index,name,key:String(rows.length)});
+    for(const item of source.contents)rows.push({...item,itemName:item.name,index,name,key:String(rows.length)});
   }
   if(!rows.length)return;
   activeLoot={owner,name:'Nearby loot',rows};
@@ -1859,7 +1877,7 @@ function drawLoot(session,canTake){
   const rows=session.rows.map(row=>{
     let heading=lastIndex===row.index?'':'<h3>'+safeAttr(row.name||session.name)+'</h3>';
     lastIndex=row.index;
-    return heading+'<button class="loot-row" data-take="'+safeAttr(row.key??row.id)+'" '+(canTake?'':'disabled')+'><b>'+lootIcons[row.id]+'</b><span>'+lootNames[row.id]+'</span><span>×'+Number(row.qty)+'</span></button>';
+    return heading+'<button class="loot-row" data-take="'+safeAttr(row.key??row.id)+'" '+(canTake?'':'disabled')+'><b>'+safeAttr(row.icon||lootIcons[row.id]||'✦')+'</b><span>'+safeAttr(lootNames[row.id]||row.itemName||row.id)+'</span><span>×'+Number(row.qty)+'</span></button>';
   }).join('');
   showModal('<small>GAME PAUSED</small><h2>Nearby loot</h2><p>'+(canTake?'Choose items from bodies and chests within three tiles.':'A party member is searching nearby containers.')+'</p><div class="loot-pocket">'+rows+'</div>'+(canTake?'<div class="bag-nav"><button id="takeAll">Take all</button><button id="leaveLoot">Leave</button></div>':''));
   if(!canTake)return;
@@ -1868,7 +1886,7 @@ function drawLoot(session,canTake){
     const row=session.rows.find(r=>String(r.key??r.id)===b.dataset.take);
     if(!row)return;
     const desc={gold:'Currency accepted by sanctuary merchants.',tonic:'Drink to recover health.',torch:'Lights nearby dungeon tiles.',shard:'Restores mana.','box-Bronze':'Open from your backpack for a random reward.'};
-    inspectItem({id:row.id,name:lootNames[row.id]||row.id,desc:supplies[row.id]?.desc||desc[row.id]},'Take ×'+row.qty,()=>take(b.dataset.take));
+    inspectItem({id:row.id,name:lootNames[row.id]||row.itemName||row.id,desc:row.desc||supplies[row.id]?.desc||desc[row.id]},'Take ×'+row.qty,()=>take(b.dataset.take));
   });
   $('#takeAll').onclick=()=>take('all');$('#leaveLoot').onclick=closeModal;
 }
@@ -1891,8 +1909,8 @@ function transferLoot(key){
     const source=row.index<0?state.sanctuaries[-1-row.index]:entities[row.index];
     const i=source.contents.findIndex(item=>item.id===row.id);
     if(i<0)continue;
-    source.contents.splice(i,1);rows.splice(rows.indexOf(row),1);
-    bundle[row.id]=(bundle[row.id]||0)+row.qty;
+    const piece=source.contents[i];source.contents.splice(i,1);rows.splice(rows.indexOf(row),1);
+    if(source.droppedBag&&!owner){const existing=state.inventory.find(i=>i.id===piece.id);if(existing)existing.qty+=piece.qty;else state.inventory.push({...piece});persistCampaign()}else bundle[row.id]=(bundle[row.id]||0)+row.qty;
     if(!source.contents.length){
       if(row.index<0)source.cache=true;else{source.looted=true;if(source.type==='loot')source.alive=false}
       if(!owner){unlock('Scavenger');state.loots=(state.loots||0)+1;if(state.loots===3)ridiculous('Personal Space Is for the Living');if(state.loots===15)ridiculous('Estate Sale Enthusiast','Silver')}
