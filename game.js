@@ -857,8 +857,26 @@ function triggerHazard(x,y){
 }
 function paintHazard(x,y,px,py){const h=hazardAt(x,y),type=hazardTypes[state.floor-1];if(!h||!type)return;const active=hazardActive(h);ctx.save();ctx.globalAlpha=active?.85:.35;ctx.strokeStyle=type[1];ctx.lineWidth=2;ctx.strokeRect(px+3,py+3,26,26);ctx.fillStyle=type[1];ctx.font='bold 15px monospace';ctx.textAlign='center';ctx.fillText(active?'!':'·',px+16,py+21);ctx.restore()}
 function generate(){state.relay=null;state.patrolFloor=0;state.rivalFloor=0;state.rivals=[];state.hazardFloor=0;state.hazards={};state.grubHatches=0;state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;const depth=Math.min(FINAL_FLOOR,state.floor)-1;W=118-depth*4;H=80-depth*2;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
-// carve connected rooms and corridors
-let rooms=[];for(let i=0;i<54-depth*2;i++){let rw=4+Math.floor(r()*6),rh=3+Math.floor(r()*5),rx=1+Math.floor(r()*((state.floor%3===0?W-12:W)-rw-2)),ry=1+Math.floor(r()*(H-rh-2));let room={x:rx,y:ry,w:rw,h:rh,cx:Math.floor(rx+rw/2),cy:Math.floor(ry+rh/2)};for(let y=ry;y<ry+rh;y++)for(let x=rx;x<rx+rw;x++)tiles[y][x]=1;if(rooms.length){let p=rooms[rooms.length-1];let x=room.cx,y=room.cy;while(x!==p.cx){tiles[y][x]=1;x+=Math.sign(p.cx-x)}while(y!==p.cy){tiles[y][x]=1;y+=Math.sign(p.cy-y)}}rooms.push(room)}
+// Theme-specific room geometry; keep the legacy generator available for old party campaigns.
+const layoutProfiles=[
+ ['vault',6,5,4,3,0,'rect'],['drain',12,4,5,2,0,'rect'],['rail',5,11,3,5,0,'rect'],['signal',7,7,4,4,1,'cross'],['archive',13,7,4,3,0,'rect'],['relay',9,9,3,3,1,'octagon'],['lock',11,5,4,3,0,'rect'],['bridge',5,12,3,4,0,'rect'],['mirror',9,9,3,3,1,'diamond'],['boiler',10,8,3,3,1,'octagon'],['station',14,4,4,3,0,'rect'],['court',10,10,3,3,1,'cross'],['salt',8,8,4,4,0,'diamond'],['watch',6,10,3,3,0,'cross'],['tribunal',12,8,3,3,1,'octagon'],['channel',5,12,3,3,0,'rect'],['crypt',7,6,3,3,0,'cross'],['bell',12,12,2,2,1,'diamond']
+];
+const [layout,bw,bh,vw,vh,wide,shape]=layoutProfiles[depth];state.layoutTheme=layout;state.layoutVersion=2;
+const limit=state.floor%3===0?W-12:W;
+let rooms=[];
+function carve(x,y){if(x>0&&x<limit-1&&y>0&&y<H-1)tiles[y][x]=1}
+for(let i=0;i<54-depth*2;i++){
+ let rw=bw+Math.floor(r()*vw),rh=bh+Math.floor(r()*vh),rx=1+Math.floor(r()*(limit-rw-2)),ry=1+Math.floor(r()*(H-rh-2));
+ let room={x:rx,y:ry,w:rw,h:rh,cx:Math.floor(rx+rw/2),cy:Math.floor(ry+rh/2)};
+ for(let y=ry;y<ry+rh;y++)for(let x=rx;x<rx+rw;x++){
+ const dx=Math.abs((x-room.cx)/(rw/2)),dy=Math.abs((y-room.cy)/(rh/2));
+ if(shape==='diamond'&&dx+dy>1.16||shape==='cross'&&dx>.42&&dy>.42||shape==='octagon'&&dx+dy>1.48)continue;carve(x,y)}
+ if(rooms.length){const p=rooms[rooms.length-1];let x=room.cx,y=room.cy;
+ const horizontal=()=>{while(x!==p.cx){carve(x,y);if(wide)carve(x,y+1);x+=Math.sign(p.cx-x)}};
+ const vertical=()=>{while(y!==p.cy){carve(x,y);if(wide)carve(x+1,y);y+=Math.sign(p.cy-y)}};
+ if(depth%2){vertical();horizontal()}else{horizontal();vertical()}carve(x,y)}
+ rooms.push(room)
+}
 // walls around corridors
 for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++)if(tiles[y][x]===0){for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(tiles[y+dy]?.[x+dx]===1){tiles[y][x]=2;break}}
 state.x=rooms[0].cx;state.y=rooms[0].cy;state.rooms=rooms.length;let safe=rooms[0];state.safe={x:safe.cx,y:safe.cy};state.sanctuaries=[{...state.safe,rested:false}];for(let room of rooms.slice(2,-1)){if(state.sanctuaries.length>=6)break;if(r()<.28&&state.sanctuaries.every(q=>Math.hypot(q.x-room.cx,q.y-room.cy)>8))state.sanctuaries.push({x:room.cx,y:room.cy,rested:false})}buildSanctuaries();chooseLanding();let npc=rooms[1];state.npc={x:npc.cx,y:npc.cy,met:false};state.rested=false;
