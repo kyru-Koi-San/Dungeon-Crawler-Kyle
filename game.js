@@ -1008,12 +1008,14 @@ const floorMobs=[
  [['Crypt lamplighter','skeleton'],['Beacon shade','wraith']],
  [['Bellbound knight','bone-champion'],['Last chorister','shaman']]
 ];
+function progressionXp(level){return Math.round(100+38*(level-1)+7*(level-1)**2)}
+function guardianBalance(floor){const rank=Math.max(1,Math.floor(floor/3));return {hp:Math.round(70+rank*55+rank*rank*9),atk:13+rank*7,armor:rank*2,xp:180+rank*110}}
 function floorEnemy(floor,index,x,y){
  const roster=floorMobs[Math.min(floor,18)-1];
  const entry=roster[floor===1?[0,0,1,0,2][index%5]:index%roster.length];
  const [name,sprite]=entry,heavy=['bone-champion','pack-llama','goblin'].includes(sprite);
  const hp=floor===1?(heavy?13:7)+2:Math.round((18+floor*5+(heavy?12:0))*(1+Math.max(0,floor-4)*.065));
- return {type:'enemy',name,sprite,x,y,hp,max:hp,atk:floor===1?(heavy?3:2):Math.ceil(4+floor*2.4+(heavy?3:0)),armor:floor===1?0:Math.floor(floor*.65)+(heavy?2:0),xp:5+floor*3+(heavy?4:0),small:floor<=3,cool:0,alive:true,boss:false,rosterVersion:2,
+ return {type:'enemy',name,sprite,x,y,hp,max:hp,atk:floor===1?(heavy?3:2):Math.ceil(4+floor*2.4+(heavy?3:0)),armor:floor===1?0:Math.floor(floor*.65)+(heavy?2:0),xp:5+floor*4+Math.floor(floor*floor*.18)+(heavy?4:0),small:floor<=3,cool:0,alive:true,boss:false,rosterVersion:2,
  ...(sprite==='pack-llama'?{contents:[{id:'meth-cargo',qty:1},{id:'gold',qty:5}]}:{})};
 }
 function spawnEnemy(x,y,r=Math.random){
@@ -1069,7 +1071,7 @@ function hatchGrub(parent){
    const [x,y]=queue[i];
    if(tile(x,y)===1&&!solid(x,y)&&!sanctuaryAt(x,y)&&!(x===state.x&&y===state.y)&&!occupied.has(y*W+x)){
      const larva=floorEnemy(2,0,x,y);
-     Object.assign(larva,{name:'Grub hatchling',hp:5,max:5,budded:true,hatchling:true,den:{x,y}});
+     Object.assign(larva,{name:'Grub hatchling',hp:5,max:5,xp:2,budded:true,hatchling:true,den:{x,y}});
      entities.push(larva);occupied.add(y*W+x);remaining--;spawned++;
    }
    for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
@@ -1090,7 +1092,7 @@ function cityMarket(){
 }
 function spawnBoss(x,y){let brood=state.floor%9===6,phantom=state.floor%9===0,hp=brood?155+state.floor*22:phantom?145+state.floor*24:130+state.floor*20;let b={type:'enemy',name:brood?'The Brood Matriarch':phantom?'The Hollow Regent':'The Ossuary Warden',sprite:brood?'spider-boss':phantom?'wraith':'bone-champion',x,y,hp,max:hp,atk:14+state.floor*2,xp:100+state.floor*10,icon:'♛',cool:0,alive:true,boss:true};if(state.floor===3)Object.assign(b,{name:'Pip, Keeper of the Cage',sprite:'goblin',small:true,hp:48,max:48,atk:5});
 if(state.floor===12)Object.assign(b,{name:'The Cinder Inquisitor',sprite:'shaman'});if(state.floor===15)Object.assign(b,{name:'The Iron Magistrate',sprite:'bone-champion'});if(state.floor===FINAL_FLOOR)b.name='The Last Bellkeeper';
-entities.push(b);state.boss=entities.length-1;$('#bossbar').classList.add('hidden');$('#bossName').textContent=b.name;}
+const balance=guardianBalance(state.floor);Object.assign(b,{hp:balance.hp,max:balance.hp,atk:balance.atk,armor:balance.armor,xp:balance.xp,balanceVersion:1});entities.push(b);state.boss=entities.length-1;$('#bossbar').classList.add('hidden');$('#bossName').textContent=b.name;}
 function tile(x,y){return tiles[y]?.[x]??0}function solid(x,y){return !!state.scenery?.some(p=>p.art<3&&p.x===x&&p.y===y)||(tile(x,y)!==1&&tile(x,y)!==3)||!!(bossFight&&state.arena?.gates?.some(g=>g.x===x&&g.y===y))}
 function reveal(){if(state.hall)return;let rad=state.torchTurns>0?7:5;for(let y=Math.max(0,state.y-rad);y<=Math.min(H-1,state.y+rad);y++)for(let x=Math.max(0,state.x-rad);x<=Math.min(W-1,state.x+rad);x++)if(Math.hypot(x-state.x,y-state.y)<=rad)seen[y][x]=true}
 function feed(s){let d=new Date(),tm=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});state.feed.unshift({tm,s});state.feed=state.feed.slice(0,30);renderFeed()}
@@ -1315,10 +1317,10 @@ async function animateTurn(action){
 
 function bossScreen(){encounterScreen()}
 function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(techniques[action]&&action!=='mend'){if(!prepared().includes(action)||state.mp<techniques[action].cost)return;state.mp-=techniques[action].cost;d=strike;guard=action==='brace'||action==='bastion'||!!techniques[action].guard}if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(35)}if(d>0){const magical=!!techniques[action]&&(['magic','mana'].includes(techniques[action].scale)||['bell','tide','catalyst','racial'].includes(action));const armor=magical?Math.floor((e.armor||0)/3):e.armor||0;d=Math.max(1,d-armor);if(intent==='DEFENSIVE STANCE'&&!magical)d=Math.max(1,Math.floor(d*.5));if(magical&&['skeleton','bone-champion'].includes(e.sprite))d=Math.ceil(d*1.25);if(magical&&e.sprite==='wraith')d=Math.max(1,Math.floor(d*.75));}if(techniques[action]?.heal)state.hp=Math.min(state.maxHp,state.hp+Math.floor(Math.min(e.hp,d)*techniques[action].heal));d+=(b.assist||0)+resolvePartyTargets(b);b.assist=0;const companion=readyPet();let petLog='';if(companion&&e.hp>d){const {p,stats}=companion;const damage=stats.power;d+=damage;petLog=(p.name||animalNames[p.species]||'Companion')+' strikes for '+damage+'. ';}const assist=crawlerAssist(b,e,d);d+=assist.bonus;petLog+=assist.log;e.hp-=d;if(e.boss&&e.hp>0&&e.hp<=e.max*.5&&!b.spokenHalf){b.spokenHalf=true;b.speech=guardianDialogue[state.floor]?.[1]||'You will regret that.'}else if(b.turn>1)b.speech=null;if(e.hp<=0){partyRoundDamage(b,e,true);e.alive=false;broadcastKill(e);e.deathAt=performance.now();state.kills++;petVictory();crawlerAllyVictory();if(!e.boss){
-state.xp+=e.xp;state.gold+=5+Math.floor(Math.random()*12);if(e.localBoss){state.gold+=50+state.floor*15;awardBox(state.floor>=8?'Gold':'Silver');feed('Hidden local boss defeated. Premium loot awarded.')}const next=encounterAllies(b)[0];if(next){b.group=b.group.filter(i=>entities[i]!==next);b.e=next;b.partyActions={};b.turn++;b.log=e.name+' falls. '+next.name+' steps forward!';checkLevel();persistCampaign();bossScreen();render();return}bossFight=null;
+state.xp+=e.xp;state.gold+=5+Math.floor(Math.random()*12)+Math.floor(state.floor/2);if(e.localBoss){state.gold+=50+state.floor*15;awardBox(state.floor>=8?'Gold':'Silver');feed('Hidden local boss defeated. Premium loot awarded.')}const next=encounterAllies(b)[0];if(next){b.group=b.group.filter(i=>entities[i]!==next);b.e=next;b.partyActions={};b.turn++;b.log=e.name+' falls. '+next.name+' steps forward!';checkLevel();persistCampaign();bossScreen();render();return}bossFight=null;
 const milestones={10:['Unlicensed Exterminator','Silver'],30:['The Neighborhood Is Quiet Now','Gold'],100:['Population Control Department','Celestial']};
 if(milestones[state.kills])ridiculous(...milestones[state.kills]);
-if(Math.random()<.08)awardBox('Bronze');
+if(!e.hatchling&&Math.random()<.08+state.floor*.003)awardBox(state.floor>=12?'Gold':state.floor>=6?'Silver':'Bronze');
 if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true});
 closeModal();if(state.kills===1){unlock('First blood');ridiculous('Local Pest Control')}checkLevel();feed(e.name+' falls. Search its belongings with Loot.');persistCampaign();render();return
 }recordGuardian(state.floor,e.name,b.turn,b.guards||0);state.xp+=e.xp+100;state.gold+=250+state.floor*50;if(window.DCKNet?.isHost)for(let [id,p] of Object.entries(netPlayers))if(p.floor===state.floor&&Math.hypot(p.x-e.x,p.y-e.y)<=8)window.DCKNet.sendReward(id,50,e.xp||100,'tonic',{floor:state.floor,name:e.name});if(state.achievements.includes('Management Has Been Terminated'))awardBox('Gold');else ridiculous('Management Has Been Terminated','Gold');awardBox(state.floor>=9?'Celestial':'Gold');checkLevel();$('#bossbar').classList.add('hidden');bossFight=null;showModal('<h2>GUARDIAN DEFEATED</h2><p>Two premium loot boxes and bonus gold awarded. Loot the remains in the dungeon.</p><button class="widebtn" id="bossDone">CONTINUE</button>');if(state.floor===3&&state.foundKeeper){state.minersFree=true;caption('Iven','Hear that? Three bells. The cage is moving. My crew is going home.',true)}$('#bossDone').onclick=closeModal;save();render();return}let hit=Math.max(1,Math.floor((e.atk*(intent==='AIMED SHOT'?1.5:intent==='DEVASTATING STRIKE'?1.7:intent==='ENRAGED ATTACK'?1.25:1)-state.armor)*(guard?.25:1)));partyRoundDamage(b,e);if(intent==='BUDDING'&&hatchGrub(e)){b.log='The grub splits. A hatchling wriggles onto the floor beside it.';b.turn++;persistCampaign();sendPartyWorld();bossScreen();render();return}
@@ -1363,7 +1365,7 @@ if(Math.hypot(e.x-state.x,e.y-state.y)<1.4){if(!partyGuest()&&!modalOpen()){enem
 const chasing=!(e.lured>0)&&Math.hypot(e.x-state.x,e.y-state.y)<(state.floor===1?7:9+Math.floor(state.floor/5))+(state.season?.contract==='live'?5:0);
 const target=chasing?state:e.den;if(!target)continue;
 let dx=Math.sign(target.x-e.x),dy=Math.sign(target.y-e.y);let opts=Math.random()<.5?[[dx,0],[0,dy]]:[[0,dy],[dx,0]];for(let [ax,ay] of opts)if((ax||ay)&&!(step&&e.x+ax===step.nx&&e.y+ay===step.ny)&&!solid(e.x+ax,e.y+ay)&&!sanctuaryAt(e.x+ax,e.y+ay)&&!enemyOccupancy.has((e.y+ay)*W+e.x+ax)){release(e);e.x+=ax;e.y+=ay;occupy(e);break}}}enemyOccupancy=null}
-function checkLevel(){while(state.xp>=state.nextXp){state.xp-=state.nextXp;state.level++;state.nextXp=Math.floor(state.nextXp*1.35);state.maxHp+=12;restoreHealth(state.maxHp);if(state.floor>=4){state.maxMp+=4;state.mp=state.maxMp}state.power+=2;state.skillPoints++;feed('<b>LEVEL UP!</b> You reached level '+state.level+'. Stats increased.');notify('LEVEL UP — LEVEL '+state.level);unlock('Getting stronger');beep(660,.2,'sine')}}
+function checkLevel(){while(state.xp>=state.nextXp){state.xp-=state.nextXp;state.level++;state.nextXp=progressionXp(state.level);state.maxHp+=12;restoreHealth(state.maxHp);if(state.floor>=4){state.maxMp+=4;state.mp=state.maxMp}state.power+=2;state.skillPoints++;feed('<b>LEVEL UP!</b> You reached level '+state.level+'. Stats increased.');notify('LEVEL UP — LEVEL '+state.level);unlock('Getting stronger');beep(660,.2,'sine')}}
 const achievementNotes={
   'Guild inductee':'Finished Rowan’s induction and earned access to the crawler menus.',
   'Not alone':'Found another crawler and spoke to them in the dungeon.',
@@ -1702,7 +1704,7 @@ if(state.chapter==='mine')entities.forEach((e,i)=>{
   const fresh= floorEnemy(state.floor,i,e.x,e.y),ratio=e.hp/e.max;
   const elite=e.chief?1.8:1,max=Math.ceil(fresh.max*elite);Object.assign(e,{max,hp:Math.max(1,Math.round(max*ratio)),atk:Math.ceil(fresh.atk*(e.chief?1.2:1)),armor:fresh.armor+(e.chief?2:0),rosterVersion:2});
 });
-state.dead=!!(state.dead||state.collapsed||state.hp<=0);
+if(!state.progressionVersion){state.nextXp=progressionXp(state.level);state.progressionVersion=1}state.dead=!!(state.dead||state.collapsed||state.hp<=0);
 const guardian=entities[o.encounter?.e];
 if(!state.dead&&guardian?.type==='enemy'&&guardian.alive)bossFight={...o.encounter,e:guardian};
 return true}}catch(e){}return false}
