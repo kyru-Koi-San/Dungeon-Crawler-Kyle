@@ -1344,16 +1344,17 @@ function sanctuaryAt(x,y){return (state.sanctuaries||[state.safe].filter(Boolean
   }
 }
 let enemyOccupancy=null;
-let enemyAccumulator=0,enemySimulationFloor=0;
+let enemyAccumulator=0,enemySimulationFloor=0,enemyScanOffset=0;
 function advanceEnemySimulation(dt){if(enemySimulationFloor!==state.floor){enemyAccumulator=0;enemySimulationFloor=state.floor}if(state.hall||state.dead||bossFight||modalOpen()){enemyAccumulator=0;return}enemyAccumulator+=dt;const interval=entities.length>=350?.125:.075;if(enemyAccumulator>=interval){const elapsed=Math.min(.2,enemyAccumulator);enemyAccumulator=0;enemyTick(elapsed)}}
 function enemyTick(dt){if(state.hall||state.dead||bossFight||partyGuest()||state.chapter!=='mine')return;let guardian=entities.find(e=>e.boss&&e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=3);if(guardian&&!sanctuaryAt(state.x,state.y)&&(!state.arena||inArena(state.x,state.y))){beginBoss(guardian);return}moveScout(dt);if(sanctuaryAt(state.x,state.y))return;tickRivals(dt);if(modalOpen())return;state.retreatGrace=Math.max(0,(state.retreatGrace||0)-dt);enemyOccupancy=new Map();for(const e of entities)if(e.alive){const k=e.y*W+e.x;enemyOccupancy.set(k,(enemyOccupancy.get(k)||0)+1)}
 const release=e=>{const k=e.y*W+e.x,n=enemyOccupancy.get(k)||0;if(n<=1)enemyOccupancy.delete(k);else enemyOccupancy.set(k,n-1)};const occupy=e=>{const k=e.y*W+e.x;enemyOccupancy.set(k,(enemyOccupancy.get(k)||0)+1)};
-for(let e of entities){if(!e.alive||e.type!=='enemy'||e.boss)continue;e.cool-=dt;
+let pursuitBudget=entities.length>=350?12:32;const count=entities.length;const start=enemyScanOffset%Math.max(1,count);enemyScanOffset=(start+37)%Math.max(1,count);
+for(let j=0;j<count;j++){const e=entities[(start+j)%count];if(!e.alive||e.type!=='enemy'||e.boss)continue;e.cool-=dt;
 if(e.lured>0)e.lured-=dt;
 if(e.avoid>0){e.avoid-=dt;continue}
 if(e.pursuit>0){
   e.pursuit-=dt;e.pursuitDelay-=dt;
-  if(e.pursuitDelay<=0&&Math.hypot(e.x-state.x,e.y-state.y)>=1.4){release(e);pursueCrawler(e);occupy(e);e.pursuitDelay=.48}
+  if(e.pursuitDelay<=0&&Math.hypot(e.x-state.x,e.y-state.y)>=1.4&&pursuitBudget>0){pursuitBudget--;release(e);pursueCrawler(e);occupy(e);e.pursuitDelay=.48}
   if(state.retreatGrace||Math.hypot(e.x-state.x,e.y-state.y)>=1.4)continue;
 }
 if(state.retreatGrace&&Math.hypot(e.x-state.x,e.y-state.y)<1.4)continue;
