@@ -72,3 +72,18 @@ test('surface to guild induction and backpack',async({page})=>{
  await expect.poll(async()=> (await saved()).guildTrained).toBe(true);
  expect(errors).toEqual([]);
 });
+
+test('offline reload retains the created crawler',async({page,context})=>{
+ await page.goto('http://127.0.0.1:8000/');
+ await page.locator('[name=crawlerName]').fill('Offline Crawler');
+ await page.getByRole('button',{name:'Begin on the surface'}).click();
+ await page.evaluate(async()=>{await navigator.serviceWorker.ready});
+ await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller),{timeout:15000}).toBe(true);
+ await context.setOffline(true);
+ try{
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.locator('#game')).toBeVisible();
+  await expect(page.locator('#creator')).toHaveCount(0);
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('dck-final-save-v1')).state.character.name)).toBe('Offline Crawler');
+ }finally{await context.setOffline(false)}
+});
