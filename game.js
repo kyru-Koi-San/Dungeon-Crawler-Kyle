@@ -30,7 +30,7 @@ function dialogueFrame(speaker,line,profile,choices,tag='CONVERSATION'){
  const target=$('#conversationLine'),skip=$('#conversationSkip');let i=0;
  const finish=()=>{clearInterval(dialogueTimer);dialogueTimer=null;target.textContent=line;skip.hidden=true};
  skip.onclick=finish;if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else dialogueTimer=setInterval(()=>{if(!target.isConnected){clearInterval(dialogueTimer);dialogueTimer=null;return}i+=3;target.textContent=line.slice(0,i);if(i>=line.length)finish()},22);
- $('[data-conversation]').forEach(b=>b.onclick=()=>{clearInterval(dialogueTimer);dialogueTimer=null;choices[Number(b.dataset.conversation)].run()});
+ $('[data-conversation]').forEach(b=>b.onclick=()=>{clearInterval(dialogueTimer);dialogueTimer=null;const choice=choices[Number(b.dataset.conversation)];if(!choice||choice.disabled)return;choice.run()});
 }
 function caption(speaker,line,story=false){
   if(!story && performance.now()<captionUntil)return;
@@ -327,13 +327,13 @@ function renderCrawlerAllies(body){
 function rivalEncounter(n){
  if(!n||n.gone||partyGuest())return;
  const p=n.profile,hostile=p.temper==='hostile'||(p.temper==='deceptive'&&n.trust<0);
- n.met=true;
+ n.met=true;persistCampaign();
  dialogueFrame(p.name,hostile?'Hand over your supplies. I am not asking twice.':p.temper==='deceptive'?'I know a shortcut. Trust me.':n.trust?'Still alive? Good.':'Easy. I am just trying to survive.',p,[
  {label:'Ask about the floor',run:()=>{if(hostile){startRivalFight(n);return}if(!n.sharedTip){n.sharedTip=true;n.trust++}persistCampaign();dialogueFrame(p.name,relayFloors[state.floor-1][1],p,[{label:'Return to conversation',run:()=>rivalEncounter(n)},{label:'Leave',run:closeModal}])}},
  {label:'Offer 15 gold',disabled:state.gold<15,run:()=>{if(state.gold<15)return;state.gold-=15;n.trust+=2;if(p.temper==='deceptive'&&!n.betrayed){n.betrayed=true;n.trust=-2;startRivalFight(n);return}if(p.temper==='hostile')p.temper='wary';else if(n.trust>=2){p.temper='friendly';if(!n.rewarded){n.rewarded=true;giveItem('tonic',1);notify('Crawler shares a health tonic.')}}closeModal();persistCampaign();render()}},
  {label:'Invite into your party',disabled:hostile||p.temper!=='friendly'||n.trust<2||recruitedCrawlers().length>=2,run:()=>{if(recruitRival(n)){closeModal();notify(p.name+' joined your party.');persistCampaign();sendPartyWorld();render()}}},
  {label:hostile?'Defend yourself':'Challenge crawler',run:()=>{if(!hostile)allyReaction('challenge');startRivalFight(n)}},
- {label:'Walk away',run:()=>{n.cooldown=20;closeModal();persistCampaign()}}],'CRAWLER ENCOUNTER · LEVEL '+p.level);
+ {label:'Walk away',run:()=>{n.cooldown=20;closeModal();persistCampaign();sendPartyWorld()}}],'CRAWLER ENCOUNTER · LEVEL '+p.level);
 }
 function startRivalFight(n){
  if(n.gone||bossFight||partyGuest())return;
