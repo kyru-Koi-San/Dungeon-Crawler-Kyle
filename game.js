@@ -2176,7 +2176,7 @@ function startLoot(containers,owner){
     for(const item of source.contents)rows.push({...item,itemName:item.name,index,name,key:String(rows.length)});
   }
   if(!rows.length)return;
-  activeLoot={owner,name:'Nearby loot',rows};
+  activeLoot={owner,name:'Nearby loot',rows,sessionId:Math.random().toString(36).slice(2,10)};
   persistCampaign();drawLoot(activeLoot,!owner);sendPartyWorld();
 }
 function drawLoot(session,canTake){
@@ -2188,7 +2188,7 @@ function drawLoot(session,canTake){
   }).join('');
   showModal('<small>GAME PAUSED</small><h2>Nearby loot</h2><p>'+(canTake?'Choose items from bodies and chests within three tiles.':'A party member is searching nearby containers.')+'</p><div class="loot-pocket">'+rows+'</div>'+(canTake?'<div class="bag-nav"><button id="takeAll">Take all</button><button id="leaveLoot">Leave</button></div>':''));
   if(!canTake)return;
-  const take=id=>partyGuest()?window.DCKNet.sendIntent('take_'+id):transferLoot(id);
+  const take=id=>partyGuest()?window.DCKNet.sendIntent('take_'+(session.sessionId?session.sessionId+'_':'')+id):transferLoot(id);
   $$('[data-take]').forEach(b=>b.onclick=()=>{
     const row=session.rows.find(r=>String(r.key??r.id)===b.dataset.take);
     if(!row)return;
@@ -2201,11 +2201,23 @@ function finishLoot(){
   activeLoot=null;remoteLoot=null;lootSignature='';last=0;
   $('#modal').classList.add('hidden');persistCampaign();sendPartyWorld();render();
 }
+function recoverRankedGear(id,qty){
+ const match=/^(.+)-([1-5])$/.exec(id);if(!match)return false;
+ const base=rewardCatalog.find(i=>i.id===match[1]);if(!base)return false;
+ const rank=Number(match[2]),mods=Object.fromEntries(Object.entries(base.mods||{}).map(([key,n])=>[key,n>0?n+rank-1:n]));
+ const labels={power:'power',armor:'armor',spellBonus:'spell damage'};
+ const desc=base.effect==='buff'?'Gain '+(2+rank)+' power until you leave this floor. Replaces any active tea.':base.effect==='boon'?'Spend 5 mana to learn a permanent +'+rank+' spell damage.':Object.entries(mods).map(([key,n])=>(n>0?'+':'')+n+' '+labels[key]).join(' · ');
+ const existing=state.inventory.find(i=>i.id===id);if(existing){Object.assign(existing,{...base,id,rank,mods,desc,qty:existing.qty+qty})}else state.inventory.push({...base,id,rank,mods,desc,qty});
+ return true;
+}
 function receiveLoot(bundle){
+  if(!bundle||typeof bundle!=='object'||Array.isArray(bundle))return;
   for(const [id,qty] of Object.entries(bundle)){
+    if(!Number.isSafeInteger(qty)||qty<1||qty>100000)continue;
+    if(recoverRankedGear(id,qty))continue;
     if(id==='gold')state.gold+=qty;
     else if(id==='box-Bronze'){for(let i=0;i<qty;i++)awardBox('Bronze')}
-    else giveItem(id,qty);
+    else if(supplies[id]||/^box-(Bronze|Silver|Gold|Legendary|Celestial|Pet)$/.test(id)||id==='shard')giveItem(id,qty);
   }
 }
 function transferLoot(key){
@@ -2214,10 +2226,11 @@ function transferLoot(key){
   for(const row of rows.slice()){
     if(key!=='all'&&key!==row.key)continue;
     const source=row.index<0?state.sanctuaries[-1-row.index]:entities[row.index];
+    if(!source||!Array.isArray(source.contents))continue;
     const i=source.contents.findIndex(item=>item.id===row.id);
     if(i<0)continue;
     const piece=source.contents[i];source.contents.splice(i,1);rows.splice(rows.indexOf(row),1);
-    if(source.droppedBag&&!owner){const existing=state.inventory.find(i=>i.id===piece.id);if(existing)existing.qty+=piece.qty;else state.inventory.push({...piece});persistCampaign()}else bundle[row.id]=(bundle[row.id]||0)+row.qty;
+    if(source.droppedBag&&!owner){const existing=state.inventory.find(i=>i.id===piece.id);if(existing)existing.qty+=piece.qty;else state.inventory.push({...piece})}else bundle[row.id]=(bundle[row.id]||0)+piece.qty;
     if(!source.contents.length){
       if(row.index<0)source.cache=true;else{source.looted=true;if(source.type==='loot')source.alive=false}
       if(!owner){unlock('Scavenger');state.loots=(state.loots||0)+1;if(state.loots===3)ridiculous('Personal Space Is for the Living');if(state.loots===15)ridiculous('Estate Sale Enthusiast','Silver')}
@@ -2227,7 +2240,7 @@ function transferLoot(key){
     if(owner)window.DCKNet.sendLoot(owner,bundle);else receiveLoot(bundle);
     persistCampaign();
   }
-  if(!rows.length){finishLoot();return}
+  persistCampaign();if(!rows.length){finishLoot();return}
   drawLoot(activeLoot,!owner);sendPartyWorld();
 }
 function syncLoot(session){
@@ -2250,7 +2263,7 @@ function applyPartyWorld(w){if(!partyGuest()||!w||!Number.isInteger(w.floor)||w.
  }if(w.crew)season().crew=w.crew;if(Array.isArray(w.scenery))state.scenery=w.scenery;if(Array.isArray(w.chests))(state.sanctuaries||[]).forEach((q,i)=>q.cache=!!w.chests[i]);for(let v of w.enemies||[]){if(!Number.isInteger(v.i)||v.i<0||v.i>=100000)continue;let e=entities[v.i];if(v.type==='loot'&&(!e||e.type!=='loot')){e={type:'loot',name:v.name||'Cache',droppedBag:!!v.droppedBag};while(entities.length<v.i)entities.push({type:'loot',alive:false,looted:true,x:0,y:0});entities[v.i]=e}if(v.type==='enemy'&&!v.hatchling&&(!e||e.type!=='enemy')){e={type:'enemy',name:v.name||'Enemy',sprite:v.sprite||'skeleton',boss:!!v.boss,chief:v.chief,localBoss:!!v.localBoss,max:v.max||1};while(entities.length<v.i)entities.push({type:'loot',alive:false,looted:true,x:0,y:0});entities[v.i]=e}if(v.hatchling&&state.floor===2&&Number.isInteger(v.i)&&v.i>=0&&v.i<100000&&!e?.hatchling){e={...floorEnemy(2,0,v.x,v.y),hatchling:true,budded:true,name:'Grub hatchling',max:5};while(entities.length<v.i)entities.push({type:'loot',alive:false,looted:true,x:0,y:0});entities[v.i]=e}if(!e||!Number.isInteger(v.x)||!Number.isInteger(v.y)||v.x<0||v.x>=W||v.y<0||v.y>=H)continue;e.x=v.x;e.y=v.y;if(Number.isFinite(v.max)&&v.max>0)e.max=v.max;if(Number.isFinite(v.hp))e.hp=Math.max(0,Math.min(e.max||9999,v.hp));e.alive=!!v.alive;e.looted=!!v.looted}if(Number.isFinite(w.collapse))state.collapseLeft=Math.max(0,w.collapse);render()}
 function partyIntent(d){if(!window.DCKNet?.isHost||d.player?.floor!==state.floor)return;
 if(activeLoot){if(activeLoot.owner===d.id){
-if(d.action==='loot_close')finishLoot();else if(d.action.startsWith('take_'))transferLoot(d.action.slice(5))
+if(d.action==='loot_close')finishLoot();else if(d.action.startsWith('take_')){const prefix='take_'+activeLoot.sessionId+'_';if(activeLoot.sessionId?d.action.startsWith(prefix):true)transferLoot(d.action.slice(activeLoot.sessionId?prefix.length:5))}
 }return}
 if(d.action.startsWith('take_')||d.action==='loot_close')return;
 let now=performance.now();if(now-(remoteCooldown.get(d.id)||-1000)<450)return;remoteCooldown.set(d.id,now);let p=d.player;if(d.action!=='loot'&&sanctuaryAt(p.x,p.y))return;if(!['loot','attack'].includes(d.action))return;let range=2.15;if(bossFight){let e=bossFight.e;if(animatingTurn||!['attack','spell'].includes(d.action)||Math.hypot(e.x-p.x,e.y-p.y)>range)return;bossFight.assist=Math.min(60,(bossFight.assist||0)+8+Math.min(20,p.level||1));bossFight.log='An ally joins the assault. Bonus damage ready: '+bossFight.assist;bossScreen();sendPartyWorld();return}if(d.action==='loot'){const sources=nearbyContainers(p);if(sources.length&&!modalOpen())startLoot(sources,d.id);return}let targets=entities.filter(e=>e.type==='enemy'&&e.alive&&!e.boss&&Math.hypot(e.x-p.x,e.y-p.y)<=range).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));if(d.action==='attack')targets=targets.slice(0,1);for(let e of targets){let damage=8+Math.min(100,p.level||1)*2;e.hp-=damage;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+damage});if(e.hp<=0){e.alive=false;broadcastKill(e);e.deathAt=now;window.DCKNet.sendReward(d.id,8,e.xp||0,null)}}sendPartyWorld()}
