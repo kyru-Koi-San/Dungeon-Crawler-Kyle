@@ -13,7 +13,9 @@ let joystickAxis=null;let visualX=null,visualY=null,visualFloor=0,joyX=0,joyY=0,
 const spriteNames=['pack-llama','flood-grub','mire-leprechaun','hero-front','hero-side','hero-back','hero-slash','hero-strike','sewer-rat','skeleton','goblin','spider','wraith','archer','shaman','spider-boss','bone-champion'];
 for(const name of spriteNames){const img=new Image();img.src=name+'.png';img.onload=()=>render();sprites[name]=img;}
 const skinTones=['#f1cdb0','#dfaf87','#bc8b63','#a06c4b','#794f38','#50352c'];
-const ancestries=['Human','Elf','Dwarf'];
+const ancestries=['Human','Elf','Dwarf','Cat','Dog','Mutant Crab','Wizard','Zombie'];
+const racePerks={Human:{power:2,maxHp:8},Elf:{maxMp:15,spellBonus:3},Dwarf:{armor:3,maxHp:12},Cat:{power:5},Dog:{maxHp:20,power:2},'Mutant Crab':{armor:6},Wizard:{maxMp:25,spellBonus:5},Zombie:{maxHp:35}};
+const perkText=r=>Object.entries(racePerks[r]||{}).map(([k,v])=>'+'+v+' '+({maxHp:'max HP',maxMp:'max MP',spellBonus:'spell damage'}[k]||k)).join(' · ');
 const genders=['Woman','Man','Nonbinary'];
 const clothingColors=['#667565','#414454','#37485a','#a64b49','#d3b68a','#eeeeee','#25252c','#78568c','#397f89'];
 const shirtStyles=['T-shirt','Long sleeve','Tank top','None'],pantsStyles=['Trousers','Shorts','Underwear','Pixelated nude'],shoeStyles=['Boots','Sneakers','Barefoot'];
@@ -39,10 +41,10 @@ function showCreator(){if(state.chapter!=='create'&&personalMenusLocked()){lockH
   const choices=(list,value)=>list.map((name,i)=>'<option value="'+i+'" '+(i===value?'selected':'')+'>'+name+'</option>').join('');
   const outfitChoices=(name,list,value)=>'<label>'+name+'<select name="'+name.toLowerCase().replace(' ','')+'">'+choices(list,value)+'</select></label>';
   const colorChoices=(name,value)=>outfitChoices(name,['Olive','Slate','Blue','Red','Tan','White','Black','Purple','Teal'],Math.max(0,clothingColors.indexOf(value)));
-  showModal('<h2>Your crawler</h2><form id="creator"><label>Crawler name<input name="crawlerName" maxlength="24" placeholder="Crawler" autocomplete="off"></label><canvas id="look" width="192" height="84" aria-label="Front, side, and back hairstyle preview"></canvas><label>Race<select name="race" '+(state.floor<4?'disabled':'')+'>'+choices(state.floor<4?['Human']:ancestries,ancestries.indexOf(current.race))+'</select></label><label>Skin tone<select name="skin">'+choices(['Porcelain','Sand','Amber','Copper','Umber','Deep brown'],current.skin)+'</select></label><label>Gender<select name="gender" aria-label="Gender">'+choices(genders,genders.indexOf(current.gender))+'</select></label><label>Hairstyle<select name="hair" aria-label="Hairstyle">'+choices(hairStyles,Math.max(0,hairStyles.indexOf(current.hair)))+'</select></label>'+outfitChoices('Shirt',shirtStyles,Math.max(0,shirtStyles.indexOf(current.shirt)))+colorChoices('Shirt color',current.shirtColor)+outfitChoices('Pants',pantsStyles,Math.max(0,pantsStyles.indexOf(current.pants)))+colorChoices('Pants color',current.pantsColor||clothingColors[1])+outfitChoices('Shoes',shoeStyles,Math.max(0,shoeStyles.indexOf(current.shoes)))+colorChoices('Shoe color',current.shoeColor||clothingColors[6])+'<button class="widebtn">'+(state.chapter==='create'?'Begin on the surface':'Save character')+'</button></form><button class="widebtn" data-campaign-menu>Campaign saves</button>');
+  showModal('<h2>Your crawler</h2><form id="creator"><label>Crawler name<input name="crawlerName" maxlength="24" placeholder="Crawler" autocomplete="off"></label><canvas id="look" width="192" height="84" aria-label="Front, side, and back hairstyle preview"></canvas><label>Race<select name="race" '+('disabled')+'>'+choices(ancestries,Math.max(0,ancestries.indexOf(current.race)))+'</select></label><label>Skin tone<select name="skin">'+choices(['Porcelain','Sand','Amber','Copper','Umber','Deep brown'],current.skin)+'</select></label><label>Gender<select name="gender" aria-label="Gender">'+choices(genders,genders.indexOf(current.gender))+'</select></label><label>Hairstyle<select name="hair" aria-label="Hairstyle">'+choices(hairStyles,Math.max(0,hairStyles.indexOf(current.hair)))+'</select></label>'+outfitChoices('Shirt',shirtStyles,Math.max(0,shirtStyles.indexOf(current.shirt)))+colorChoices('Shirt color',current.shirtColor)+outfitChoices('Pants',pantsStyles,Math.max(0,pantsStyles.indexOf(current.pants)))+colorChoices('Pants color',current.pantsColor||clothingColors[1])+outfitChoices('Shoes',shoeStyles,Math.max(0,shoeStyles.indexOf(current.shoes)))+colorChoices('Shoe color',current.shoeColor||clothingColors[6])+'<button class="widebtn">'+(state.chapter==='create'?'Begin on the surface':'Save character')+'</button></form><button class="widebtn" data-campaign-menu>Campaign saves</button>');
   const form=$('#creator');
   form.elements.crawlerName.value=current.name||'';
-  const selection=()=>({name:form.elements.crawlerName.value.trim().slice(0,24)||'Crawler',race:state.floor<4?'Human':ancestries[form.elements.race.value],skin:Number(form.elements.skin.value),gender:genders[form.elements.gender.value],hair:hairStyles[form.elements.hair.value],shirt:shirtStyles[form.elements.shirt.value],shirtColor:clothingColors[form.elements.shirtcolor.value],pants:pantsStyles[form.elements.pants.value],pantsColor:clothingColors[form.elements.pantscolor.value],shoes:shoeStyles[form.elements.shoes.value],shoeColor:clothingColors[form.elements.shoecolor.value]});
+  const selection=()=>({name:form.elements.crawlerName.value.trim().slice(0,24)||'Crawler',race:state.identityLocked?state.character.race:state.floor<4?'Human':current.race,skin:Number(form.elements.skin.value),gender:genders[form.elements.gender.value],hair:hairStyles[form.elements.hair.value],shirt:shirtStyles[form.elements.shirt.value],shirtColor:clothingColors[form.elements.shirtcolor.value],pants:pantsStyles[form.elements.pants.value],pantsColor:clothingColors[form.elements.pantscolor.value],shoes:shoeStyles[form.elements.shoes.value],shoeColor:clothingColors[form.elements.shoecolor.value]});
   function preview(){
     const g=$('#look').getContext('2d');
     g.clearRect(0,0,192,84);g.imageSmoothingEnabled=false;
@@ -394,6 +396,7 @@ function enterHall(q){
   persistCampaign();render();
 }
 function leaveHall(){
+  if(state.floor>=4&&!state.identityLocked){guildIdentity();return}
   if(personalMenusLocked()){
     state.hall.x=6;state.hall.y=7;clearMovement();visualX=6;visualY=7;notify('Finish induction with Rowan before leaving.');return;
   }
@@ -429,8 +432,17 @@ function guildReview(){
   }
   $('#guildBack').onclick=guildMaster;
 }
+function guildIdentity(){
+ if(state.identityLocked||state.floor<4)return;
+ const races=ancestries,classes=['Vanguard','Arcanist','Reaver'];
+ showModal('<small>FLOOR 4 · GUILD OF ASCENSION</small><h2>Choose your new identity</h2><p>Rowan: Your race determines your innate gifts. Your class determines your combat techniques and skill tree. Both are permanent for this campaign.</p><label>Race<select id="ascRace">'+races.map(r=>'<option>'+r+'</option>').join('')+'</select></label><canvas id="ascPreview" width="96" height="128" aria-label="Race preview"></canvas><p id="ascPerks"></p><label>Class<select id="ascClass">'+classes.map(c=>'<option>'+c+'</option>').join('')+'</select></label><p id="ascClassInfo"></p><button class="widebtn" id="ascConfirm">Review selection</button>');
+ const preview=()=>{const r=$('#ascRace').value,c=$('#ascClass').value,g=$('#ascPreview').getContext('2d');g.clearRect(0,0,96,128);g.imageSmoothingEnabled=false;g.drawImage(crawlerPose('down',0,{...state.character,race:r}),0,0,96,128);$('#ascPerks').textContent=perkText(r);$('#ascClassInfo').textContent=skillPaths[c].bonus+' · '+skillPaths[c].nodes.map(n=>n[0]).join(', ')};
+ $('#ascRace').value=races.includes(state.character?.race)?state.character.race:'Human';$('#ascClass').value=classes.includes(state.specialization)?state.specialization:'Vanguard';$('#ascRace').onchange=preview;$('#ascClass').onchange=preview;preview();
+ $('#ascConfirm').onclick=()=>{const r=$('#ascRace').value,c=$('#ascClass').value;showModal('<h2>Confirm permanent identity</h2><p>'+r+' · '+c+'</p><p>'+perkText(r)+' · '+skillPaths[c].bonus+'</p><button class="widebtn" id="ascLock">Confirm for this campaign</button><button class="widebtn" id="ascBack">Change selection</button>');$('#ascBack').onclick=guildIdentity;$('#ascLock').onclick=()=>{if(state.identityLocked)return;state.character={...state.character,race:r};for(const [k,v] of Object.entries(racePerks[r])){state[k]=(state[k]||0)+v;if(k==='maxHp')state.hp+=v;if(k==='maxMp')state.mp+=v}if(state.specialization!==c){if(state.specialization)removeClass();state.specialization=c;if(c==='Vanguard'){state.maxHp+=15;state.hp+=15;state.armor+=2}else if(c==='Arcanist'){state.maxMp+=20;state.mp+=20}else state.power+=4}state.identityLocked=true;state.guildTrained=true;state.hp=Math.min(state.hp,state.maxHp);state.mp=Math.min(state.mp,state.maxMp);persistCampaign();closeModal();render();caption('Guild Master Rowan','Your identity is sealed. Make it count.',true);persistCampaign()}};
+}
 function guildMaster(){
   if(!state.hall)return;
+  if(state.floor>=4&&!state.identityLocked){guildIdentity();return}
   if(personalMenusLocked()){hallTutorial();return}
   showModal('<small>SEATTLE CRAWLERS’ GUILD</small><h2>Guild Master Rowan</h2><p>'+['Take a seat by the hearth. What shall we go over?','I put the kettle on. Tell me what you saw down there.','Boots by the stove, crawler. There’s news on the shortwave.'][Math.floor(Math.random()*3)]+'</p><button class="widebtn" id="guildNotes">Review defeated guardians</button><button class="widebtn" id="guildBasics">Revisit the tutorial</button><button class="widebtn" id="guildCounter">Guild services</button><button class="widebtn" id="guildAir">Audience terminal</button><button class="widebtn" id="guildManual">Field manual</button>'+(state.floor%6===0?'<button class="widebtn" id="cityExchange">City exchange</button>':''));
   $('#guildAir').onclick=onAir;$('#guildManual').onclick=fieldManual;
@@ -1255,8 +1267,9 @@ const reports={
 };
 if(state.floor===2&&state.relay)reports[2][1]='Nell here. Tess is sick. Find us near '+state.relay.camp.x+', '+state.relay.camp.y+'. Two bells mean high water.';
 if(state.floor===3&&['saved','lost'].includes(state.season?.crew))reports[3][1]=season().crew==='saved'?'Both salvage crew members made it. Nell left you a call sign for the lift on 4.':'Nell came up alone. The second bunk is still made.';
-if(state.floor===4)reports[4][1]+=' Race and class selection are now open. Use Character and Skills.';
+if(state.floor===4)reports[4][1]+=' Rowan is waiting at the guild to register your new identity.';
 if(reports[state.floor])caption(...reports[state.floor],true);
+if(state.floor===4&&!state.identityLocked){const q=state.sanctuaries?.[0];if(q)enterHall(q);guildIdentity()}
 save()}
 function openDeath(){showModal(`<h2>THE DUNGEON CLAIMS YOU</h2><p>You reached floor ${state.floor}, defeated ${state.kills} enemies, and reached level ${state.level}.</p><p>Your run can continue, but the dungeon will take a toll.</p><button class="widebtn" id="reviveBtn">REVIVE AT ENTRANCE</button><button class="widebtn danger" id="resetBtn">START A NEW RUN</button>`);$('#reviveBtn').onclick=()=>{if(state.collapsed){campaignMenu();return}state.dead=false;state.wounds={};state.hp=Math.min(state.maxHp,Math.max(30,Math.floor(state.maxHp*.5)));state.x=state.safe?.x??state.x;state.y=state.safe?.y??state.y;feed('You claw your way back from the brink.');render();save();closeModal()};$('#resetBtn').onclick=campaignMenu}
 let switchingCampaign=false;
@@ -1444,7 +1457,7 @@ if(pants==='Pixelated nude'){for(let j=0;j<3;j++)for(let i=0;i<5;i++)rect(7+i*2,
 if(look.weapon){const x=back?5:18;rect(x,16,2,9,'#835b38');if(look.weapon==='hammer'){rect(x-3,12,8,5,'#8d9097');rect(x-3,12,7,1,'#d3d6db')}else{rect(x,9,2,9,'#d8e6e5');rect(x-2,17,6,1,'#ba9362')}}
 if(look.charm){rect(11,12,3,2,'#dec789');rect(11,14,3,4,look.charm==='glass'?'#78e5f2':look.charm==='iron'?'#9696a9':'#e0aa41')}
 if(character?.race==='Elf'&&!back){rect(side?13:7,8,2,2,skinTones[character.skin]);rect(side?12:6,7,1,2,skinTones[character.skin])}
-if(character?.race==='Dwarf'){rect(5,14,4,3,'#b18954');rect(15,14,4,3,'#b18954');rect(10,15,4,3,'#cea668')}
+if(character?.race==='Cat'||character?.race==='Dog'){rect(7,1,3,5,skin);rect(15,1,3,5,skin);rect(17,21,3,7,skin)}if(character?.race==='Mutant Crab'){rect(3,15,5,5,'#b7654c');rect(17,15,5,5,'#b7654c');rect(4,13,2,3,'#e5a17b');rect(19,13,2,3,'#e5a17b')}if(character?.race==='Wizard'){rect(5,3,14,2,'#735a99');rect(10,0,5,4,'#735a99')}if(character?.race==='Zombie'){rect(9,5,7,5,'#859c78');rect(10,6,1,1,'#e3e6ac');rect(14,6,1,1,'#e3e6ac')}if(character?.race==='Dwarf'){rect(5,14,4,3,'#b18954');rect(15,14,4,3,'#b18954');rect(10,15,4,3,'#cea668')}
 walkArt.set(key,c);return c}
 function smoothPhase(p,a,b){
   const t=Math.max(0,Math.min(1,(p-a)/(b-a)));
@@ -1637,7 +1650,7 @@ state.spellBonus=(state.spellBonus||0)-(ranks.Channeling||0)*5;
 state.hp=Math.min(state.hp,state.maxHp);state.mp=Math.min(state.mp,state.maxMp);
 state.skillPoints+=Object.values(ranks).reduce((sum,n)=>sum+n,0);state.branches={};state.specialization=null;
 }
-function chooseClass(n){if(personalMenusLocked()){lockHint();return}if(state.floor<4||state.specialization===n||!['Vanguard','Arcanist','Reaver'].includes(n))return;
+function chooseClass(n){if(state.identityLocked){notify('Your class is permanent for this campaign.');return}if(personalMenusLocked()){lockHint();return}if(state.floor<4||state.specialization===n||!['Vanguard','Arcanist','Reaver'].includes(n))return;
 const missingHp=state.maxHp-state.hp,missingMp=state.maxMp-state.mp;if(state.specialization)removeClass();state.specialization=n;if(n==='Vanguard'){state.maxHp+=15;state.hp+=15;state.armor+=2}else if(n==='Arcanist'){state.maxMp+=20;state.mp+=20}else state.power+=4;state.hp=Math.max(1,state.maxHp-missingHp);state.mp=Math.max(0,state.maxMp-missingMp);save();render();openTab('skills')}function openTab(t){if(personalMenusLocked()){lockHint();return}if(t==='companions'){companionMenu();return}if(t==='skills'){bagSection='skills';backpack();return}if(t==='inventory'){backpack();return}tab=t;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));let c=$('#tabContent');if(t==='journal'){c.innerHTML='<div class="panel-title">DUNGEON FEED <span class="muted">LIVE</span></div><div id="feed" class="feed"></div>';renderFeed()}else if(t==='map'){c.innerHTML='<div class="panel-title">CARTOGRAPHER’S MAP</div><p class="feed-line">The map reveals itself as you explore. Red marks living threats; white marks fallen enemies; gold marks your position and the exit.</p><div class="feed-line">Explored tiles: '+seen.flat().filter(Boolean).length+' / '+(W*H)+'</div>'+button('mapNotes','Open field manual');$('#mapNotes').onclick=fieldManual}else if(t==='inventory'){c.innerHTML='<div class="panel-title">CRAWLER INVENTORY</div><div class="equipment-strip">⚔ Weapon • ⬟ Armor</div><div class="item-list inventory-grid">'+state.inventory.map(i=>`<div class="item-row"><span class="ico">${i.icon}</span><div><b>${i.name} ×${i.qty}</b><small>${i.desc}</small></div>${(['tonic','torch','shard'].includes(i.id)||i.id.startsWith('box-')||i.slot)?`<button class="smallbtn" data-use="${i.id}">${i.slot?(state.equipment?.[i.slot]===i.id?'EQUIPPED':'EQUIP'):i.id.startsWith('box-')?'OPEN':'USE'}</button>`:''}</div>`).join('')+'</div>'}else if(t==='party'){c.innerHTML='<div class="panel-title">PRIVATE CRAWLER PARTY</div><p>Connect to a hosted Dungeon Crawler relay to create an invite-only room. This alpha synchronizes party presence and positions; combat and dungeon state are not yet authoritative/shared.</p><div class="item-list"><label>SERVER WSS URL<input id="netEndpoint" class="modal-input" placeholder="wss://your-relay-host.example" value="'+safeAttr(localStorage.getItem('dck-net-url')||'')+'"></label><label>CRAWLER NAME<input id="netName" class="modal-input" maxlength="16" value="'+safeAttr(localStorage.getItem('dck-net-name')||'Crawler')+'"></label><div class="item-row"><button class="smallbtn" id="netCreate">CREATE PRIVATE ROOM</button><button class="smallbtn" id="netJoin">JOIN WITH CODE</button><button class="smallbtn" id="netLeave">LEAVE</button></div><div class="item-row"><span class="ico">♙</span><div><b id="netStatus">'+(window.DCKNet?.connected?'CONNECTED':'SOLO MODE')+'</b><small id="netRoom">'+(window.DCKNet?.roomCode?'ROOM '+window.DCKNet.roomCode:'No active room')+'</small></div><span class="achievement">ALPHA</span></div><div id="netRoster" class="feed-line">Remote crawlers: '+Object.keys(netPlayers).length+'</div></div><p>Use a secure WSS address for public hosting. Room codes are private invite codes, not user accounts or strong authentication.</p>'}}
 function modalOpen(){return !$('#modal').classList.contains('hidden')}
 function strideDuration(){return runPointer!==null||keys.shift?RUN_MS:WALK_MS}
@@ -1731,7 +1744,7 @@ function bindMovementControls(){
 function showModal(html){clearMovement();step=null;$('#modalBody').innerHTML=html;$('#modal').classList.remove('hidden')}function closeModal(){
 if(activeLoot){if(!activeLoot.owner)finishLoot();return}
 if(remoteLoot){if(remoteLoot.owner===window.DCKNet.playerId)window.DCKNet.sendIntent('loot_close');return}
-if(state.chapter==='create')return;if(bossFight&&!state.dead)return;$('#modal').classList.add('hidden')}
+if(state.chapter==='create')return;if(state.floor>=4&&state.hall&&!state.identityLocked&&!state.dead){guildIdentity();return}if(bossFight&&!state.dead)return;$('#modal').classList.add('hidden')}
 let fieldZoom=2;
 function sizePlayfield(){
   if(window.matchMedia('(max-width:1100px)').matches){
@@ -1802,7 +1815,7 @@ function skillsPanel(){
   html+=limb('Foundations','All crawlers',node('Weapon mastery','+2 power',cost('data-up="power"'))+node('Iron constitution','+15 maximum health · +1 armor',cost('data-up="armor"')));
   for(const [name,path] of Object.entries(skillPaths)){
     const active=state.specialization===name,locked=state.floor<4;
-    let nodes=node(name,path.bonus,active?'':locked?'':'<button class="smallbtn" data-class="'+name+'">Choose class</button>');
+    let nodes=node(name,path.bonus,active?'':locked||state.identityLocked?'':'<button class="smallbtn" data-class="'+name+'">Choose class</button>');
     for(const [i,[skill,effect]] of path.nodes.entries()){
       const rank=active?(state.branches?.[skill]||0):0,requires=i&&(!active||(state.branches?.[path.nodes[0][0]]||0)<2);
       nodes+=node(skill+' · '+rank+'/3',effect+' per rank'+(requires?' · Requires '+path.nodes[0][0]+' 2/3':''),rank===3?'':cost('data-branch="'+skill+'"',!active||locked||requires));
