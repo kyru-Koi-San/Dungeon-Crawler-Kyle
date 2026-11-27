@@ -47,8 +47,8 @@ wss.on('connection',(ws,req)=>{
    send(target.ws,{type:'loot_bundle',items});return;
   }
   if(m.type==='reward'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const target=room.players.get(m.target);if(target)send(target.ws,{type:'reward',guardian:m.guardian?{floor:clampInt(m.guardian.floor,1,999),name:String(m.guardian.name||'Guardian').slice(0,60)}:null,gold:clampInt(m.gold,0,100),xp:clampInt(m.xp,0,500),item:['tonic','torch','shard'].includes(m.item)?m.item:null});return;}
-  if(m.type==='round_result'){const room=rooms.get(client.room);if(!room||room.host!==id||!/^[a-f0-9]{32}$/.test(m.roundId||'')||!Number.isInteger(m.turn)||m.turn<1||m.turn>99999)return;const target=room.players.get(m.target);if(target)send(target.ws,{type:'round_result',roundId:m.roundId,turn:m.turn,damage:clampInt(m.damage,0,9999),mana:clampInt(m.mana,0,4)});return;}
-  if(m.type==='combat_intent'){const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p||!['attack','spell','loot','loot_close','take_gold','take_torch','take_tonic','take_all'].includes(m.action)&&!/^take_(?:[a-z0-9]{1,8}_)?(?:all|[0-9]{1,4})$/.test(m.action)&&!/^round_[a-f0-9]{32}_[0-9]{1,5}_(strike|guard|focus)$/.test(m.action))return;const host=room.players.get(room.host);if(host)send(host.ws,{type:'combat_intent',id,action:m.action,player:p.state});return;}
+  if(m.type==='round_result'){const room=rooms.get(client.room);if(!room||room.host!==id||!/^[a-f0-9]{32}$/.test(m.roundId||'')||!Number.isInteger(m.turn)||m.turn<1||m.turn>99999)return;const target=room.players.get(m.target);if(target)send(target.ws,{type:'round_result',roundId:m.roundId,turn:m.turn,damage:clampInt(m.damage,0,9999),mana:clampInt(m.mana,-20,4),heal:clampInt(m.heal,0,140)});return;}
+  if(m.type==='combat_intent'){const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p||!['attack','spell','loot','loot_close','take_gold','take_torch','take_tonic','take_all'].includes(m.action)&&!/^take_(?:[a-z0-9]{1,8}_)?(?:all|[0-9]{1,4})$/.test(m.action)&&!/^round_[a-f0-9]{32}_[0-9]{1,5}_(strike|guard|focus|cast[0-2])$/.test(m.action))return;const host=room.players.get(room.host);if(host)send(host.ws,{type:'combat_intent',id,action:m.action,player:p.state});return;}
   if(m.type==='player_state'){
    const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p)return;
    const s=m.player||{};const floor=clampInt(s.floor,1,999),x=clampInt(s.x,0,117),y=clampInt(s.y,0,79);
@@ -60,7 +60,7 @@ wss.on('connection',(ws,req)=>{
    const gender=['Woman','Man','Nonbinary'].includes(s.character?.gender)?s.character.gender:'Nonbinary';
    const character={hair,gender,skin:clampInt(s.character?.skin??2,0,5),race:['Human','Elf','Dwarf','Cat','Dog','Mutant Crab','Wizard','Zombie'].includes(s.character?.race)?s.character.race:'Human'};
    const hall=s.hall?{index:clampInt(s.hall.index,0,5),x:clampInt(s.hall.x,1,11),y:clampInt(s.hall.y,2,8)}:null;
-   p.state={hall,gear,character,name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999)};
+   p.state={hall,gear,character,name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999),mp:clampInt(s.mp,0,9999),power:clampInt(s.power,1,200),armor:clampInt(s.armor,0,100),spellBonus:clampInt(s.spellBonus,0,100),spells:Array.isArray(s.spells)?s.spells.filter(v=>typeof v==='string'&&/^[a-z]{1,24}$/.test(v)).slice(0,3):[]};
    broadcast(room,{type:'player_state',id,player:p.state},id);return;
   }
   send(ws,{type:'error',message:'Unsupported message.'});
