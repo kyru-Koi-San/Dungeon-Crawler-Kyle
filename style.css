@@ -218,3 +218,5 @@ body:has(#modal:not(.hidden)){overflow:hidden}.modal,.modal-card{overscroll-beha
 .command-fan .duel-command{min-height:44px}
 @media(max-width:480px){.duel h2{font-size:clamp(19px,5vw,26px)}.duel .command-fan{gap:5px;padding:5px}.command-fan .duel-command{font-size:14px;gap:4px;padding:6px 8px}.conversation-head{padding:8px;gap:10px}.conversation-head canvas{width:54px;height:72px}}
 @media(prefers-reduced-motion:reduce){.duel-stage .fighter,.duel-stage .fighter img,.duel-stage .impact{animation:none!important}}
+
+.resolved-hit{position:absolute;top:28%;z-index:8;pointer-events:none;font:bold 20px monospace;color:#ffe3a9;text-shadow:2px 2px #151019;animation:resolvedHit .85s ease-out both}.resolved-hit.enemy-hit{left:72%}.resolved-hit.hero-hit{left:18%;color:#ff9c90}@keyframes resolvedHit{0%{transform:translateY(8px);opacity:1}65%{opacity:1}100%{transform:translateY(-18px);opacity:0}}@media(prefers-reduced-motion:reduce){.resolved-hit{animation:none}}
