@@ -1098,7 +1098,7 @@ async function animateTurn(action){
 }
 
 function bossScreen(){encounterScreen()}
-function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(techniques[action]&&action!=='mend'){if(!prepared().includes(action)||state.mp<techniques[action].cost)return;state.mp-=techniques[action].cost;d=strike;guard=action==='brace'||action==='bastion'||!!techniques[action].guard}if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(35)}if(techniques[action]?.heal)state.hp=Math.min(state.maxHp,state.hp+Math.floor(Math.min(e.hp,d)*techniques[action].heal));d+=b.assist||0;b.assist=0;const companion=readyPet();let petLog='';if(companion&&e.hp>d){const {p,stats}=companion;const damage=stats.power;d+=damage;petLog=(p.name||animalNames[p.species]||'Companion')+' strikes for '+damage+'. ';}e.hp-=d;if(e.hp<=0){e.alive=false;broadcastKill(e);e.deathAt=performance.now();state.kills++;petVictory();if(!e.boss){
+function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(techniques[action]&&action!=='mend'){if(!prepared().includes(action)||state.mp<techniques[action].cost)return;state.mp-=techniques[action].cost;d=strike;guard=action==='brace'||action==='bastion'||!!techniques[action].guard}if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(35)}if(techniques[action]?.heal)state.hp=Math.min(state.maxHp,state.hp+Math.floor(Math.min(e.hp,d)*techniques[action].heal));d+=b.assist||0;b.assist=0;const companion=readyPet();let petLog='';if(companion&&e.hp>d){const {p,stats}=companion;const damage=stats.power;d+=damage;petLog=(p.name||animalNames[p.species]||'Companion')+' strikes for '+damage+'. ';}e.hp-=d;if(e.hp<=0){partyRoundDamage(b,e,true);e.alive=false;broadcastKill(e);e.deathAt=performance.now();state.kills++;petVictory();if(!e.boss){
 state.xp+=e.xp;state.gold+=5+Math.floor(Math.random()*12);if(e.localBoss){state.gold+=50+state.floor*15;awardBox(state.floor>=8?'Gold':'Silver');feed('Hidden local boss defeated. Premium loot awarded.')}const next=encounterAllies(b)[0];if(next){b.group=b.group.filter(i=>entities[i]!==next);b.e=next;b.partyActions={};b.turn++;b.log=e.name+' falls. '+next.name+' steps forward!';checkLevel();persistCampaign();bossScreen();render();return}bossFight=null;
 const milestones={10:['Unlicensed Exterminator','Silver'],30:['The Neighborhood Is Quiet Now','Gold'],100:['Population Control Department','Celestial']};
 if(milestones[state.kills])ridiculous(...milestones[state.kills]);
@@ -2348,30 +2348,34 @@ function endTrade(d){
  if(partyTrade?.id===d.id){partyTrade=null;closeModal()}notify(d.ok?'Trade completed.':'Trade cancelled.');render();
 }
 function acceptPartyAction(d){
- const b=bossFight,p=d.player,m=/^round_([a-f0-9]{32})_([0-9]{1,5})_(strike|guard|focus)$/.exec(d.action);
+ const b=bossFight,p=d.player,m=/^round_([a-f0-9]{32})_([0-9]{1,5})_(strike|guard|focus|cast[0-2])$/.exec(d.action);
  if(!b||!m||animatingTurn||m[1]!==b.roundId||Number(m[2])!==b.turn||p.hall||p.hp<=0||Math.hypot(p.x-b.e.x,p.y-b.e.y)>3)return;
  b.partyActions??={};if(b.partyActions[d.id])return;
- b.partyActions[d.id]=m[3];
+ const slot=/^cast([0-2])$/.exec(m[3]),spell=slot&&p.spells?.[Number(slot[1])],ability=spell&&Object.hasOwn(techniques,spell)?techniques[spell]:null;
+ if(slot&&(!ability||p.mp<ability.cost||state.floor<ability.floor))return;
+ b.partyActions[d.id]=m[3];b.partySpellCosts??={};b.partySpellDetails??={};
+ if(ability){b.partySpellCosts[d.id]=ability.cost;const power=Math.max(1,Math.min(200,p.power||1)),magic=Math.max(0,Math.min(100,p.spellBonus||0)),armor=Math.max(0,Math.min(100,p.armor||0));let damage=spell==='mend'?0:ability.scale==='magic'||['catalyst','tide','bell'].includes(spell)?20+2*magic:ability.scale==='armor'||spell==='bastion'?power+armor+6:power*2+6;damage=Math.min(400,damage);b.assist=(b.assist||0)+damage;b.partySpellDetails[d.id]={spell,guard:!!ability.guard||['brace','bastion'].includes(spell),heal:spell==='mend'?25:Math.floor(damage*(ability.heal||0))};}
  if(m[3]==='strike')b.assist=(b.assist||0)+8+Math.min(20,p.level||1);
  if(m[3]==='focus')b.assist=(b.assist||0)+4+Math.floor(Math.min(20,p.level||1)/2);
  b.log='Ally action locked: '+Object.keys(b.partyActions).length+' ready.';
  persistCampaign();bossScreen();sendPartyWorld();
  if(b.hostChoice&&!pendingRoundGuests(b).length){const action=b.hostChoice;b.hostChoice=null;animateTurn(action)}
 }
-function partyRoundDamage(b,e){
+function partyRoundDamage(b,e,won=false){
  if(!window.DCKNet?.isHost)return;
  for(const [id,choice] of Object.entries(b.partyActions||{})){
  const p=netPlayers[id];if(!p||p.hp<=0||p.floor!==state.floor||p.hall||Math.hypot(p.x-e.x,p.y-e.y)>3)continue;
- const damage=Math.max(1,Math.floor(e.atk*(choice==='guard'?.2:.65)));
- window.DCKNet.sendRoundResult(id,b.roundId,b.turn,damage,choice==='focus'?4:0);
+ const spell=b.partySpellDetails?.[id],cost=b.partySpellCosts?.[id]||0;
+ const damage=won?0:Math.max(1,Math.floor(e.atk*((choice==='guard'||spell?.guard)?0.2:0.65)));
+ window.DCKNet.sendRoundResult(id,b.roundId,b.turn,damage,choice==='focus'?4:-cost,spell?.heal||0);
  }
- b.partyActions={};
+ b.partyActions={};b.partySpellCosts={};b.partySpellDetails={};
 }
 function receivePartyRound(d){
  const key=d.roundId+'/'+d.turn;state.partyRoundReceipts??=[];
  if(state.partyRoundReceipts.includes(key)||state.dead)return;
  state.partyRoundReceipts.push(key);if(state.partyRoundReceipts.length>200)state.partyRoundReceipts.shift();
- state.hp=Math.max(0,state.hp-d.damage);state.mp=Math.min(state.maxMp,state.mp+d.mana);
+ state.hp=Math.max(0,Math.min(state.maxHp,state.hp+(d.heal||0))-d.damage);state.mp=Math.max(0,Math.min(state.maxMp,state.mp+d.mana));
  if(state.hp===0){state.dead=true;openDeath()}else notify('Party turn resolved: −'+d.damage+' HP'+(d.mana?' · +'+d.mana+' MP':''));
  persistCampaign();render();
 }
@@ -2379,8 +2383,8 @@ function partyActionControls(h){
  const t=partyEncounter,e=entities[t?.index];if(!t?.roundId||!e||state.dead||state.hall||Math.hypot(state.x-e.x,state.y-e.y)>3)return;
  const row=document.createElement('div');row.className='field-stat';
  const choice=t.actions?.[window.DCKNet.playerId];
- if(choice)row.textContent='Action locked: '+choice;
- else for(const a of ['strike','guard','focus']){const b=document.createElement('button');b.className='smallbtn';b.textContent=a==='focus'?'Focus + MP':a;b.disabled=!!t.busy;b.onclick=()=>{window.DCKNet.sendIntent('round_'+t.roundId+'_'+t.turn+'_'+a);for(const child of row.querySelectorAll('button'))child.disabled=true};row.appendChild(b)}
+ if(choice)row.textContent='Action locked: '+(/^cast[0-2]$/.test(choice)?moveName(prepared()[Number(choice.slice(-1))]||'bell'):choice);
+ else for(const a of ['strike','guard','focus',...prepared().map((_,i)=>'cast'+i)]){const b=document.createElement('button');b.className='smallbtn';const spell=/^cast[0-2]$/.test(a)?prepared()[Number(a.slice(-1))]:null;b.textContent=spell?moveName(spell)+' · '+techniques[spell].cost+' MP':a==='focus'?'Focus + MP':a;b.disabled=!!t.busy||!!(spell&&state.mp<techniques[spell].cost);b.onclick=()=>{window.DCKNet.sendIntent('round_'+t.roundId+'_'+t.turn+'_'+a);for(const child of row.querySelectorAll('button'))child.disabled=true};row.appendChild(b)}
  h.appendChild(row);
 }
 function updatePartyRoster(){const el=$('#netRoster');if(el){el.textContent='Party members connected: '+(window.DCKNet?.inRoom?Object.keys(netPlayers).length+1:0)+' / 4';if(window.DCKNet?.inRoom){const b=document.createElement('button');b.className='smallbtn';b.textContent='Player trade';b.onclick=tradeMenu;el.appendChild(b)}}}
@@ -2400,7 +2404,7 @@ if(step){
   visualX=step.x+(step.nx-step.x)*progress;
   visualY=step.y+(step.ny-step.y)*progress;
 }
-}}if(!partyGuest())enemyTick(dt);worldClock+=dt;if(worldClock>.5){worldClock=0;sendPartyWorld()}attackCooldown=Math.max(0,attackCooldown-dt);particles.forEach(p=>p.t+=dt);particles=particles.filter(p=>p.t<.65);if(Math.random()<dt*.025)persistCampaign();netSyncClock+=dt;if(netSyncClock>.18&&window.DCKNet?.inRoom){netSyncClock=0;window.DCKNet.sendState({hall:state.hall?{index:state.hall.index,x:state.hall.x,y:state.hall.y}:null,gear:gearLook(),character:state.character,floor:state.floor,x:state.x,y:state.y,level:state.level,hp:state.hp,maxHp:state.maxHp,name:localStorage.getItem('dck-net-name')||'Crawler'});}}if(!state.dead&&Math.floor(ts/200)!==Math.floor((ts-dt*1000)/200))render();else draw();requestAnimationFrame(tick)}
+}}if(!partyGuest())enemyTick(dt);worldClock+=dt;if(worldClock>.5){worldClock=0;sendPartyWorld()}attackCooldown=Math.max(0,attackCooldown-dt);particles.forEach(p=>p.t+=dt);particles=particles.filter(p=>p.t<.65);if(Math.random()<dt*.025)persistCampaign();netSyncClock+=dt;if(netSyncClock>.18&&window.DCKNet?.inRoom){netSyncClock=0;window.DCKNet.sendState({hall:state.hall?{index:state.hall.index,x:state.hall.x,y:state.hall.y}:null,gear:gearLook(),character:state.character,floor:state.floor,x:state.x,y:state.y,level:state.level,hp:state.hp,maxHp:state.maxHp,mp:state.mp,power:state.power,armor:state.armor,spellBonus:state.spellBonus||0,spells:prepared(),name:localStorage.getItem('dck-net-name')||'Crawler'});}}if(!state.dead&&Math.floor(ts/200)!==Math.floor((ts-dt*1000)/200))render();else draw();requestAnimationFrame(tick)}
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 if(!load()){startStory()}else{if(!state.sanctuaries?.length&&state.safe)state.sanctuaries=[state.safe];if(state.hall&&!state.sanctuaries?.[state.hall.index]?.door)state.hall=null;
   if(!state.hall&&!state.dead){const q=sanctuaryAt(state.x,state.y);if(q?.door)enterHall(q)}
