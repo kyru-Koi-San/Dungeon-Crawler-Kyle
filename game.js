@@ -1062,14 +1062,14 @@ function populatePatrols(upgrading=false){
 function hatchGrub(parent){
  if(state.floor!==2||parent.alive||parent.corpseHatched)return false;
  parent.corpseHatched=true;
- let remaining=Math.min(3,500-entities.filter(e=>e.alive&&e.sprite==='flood-grub').length),spawned=0;
- const occupied=new Set(entities.filter(e=>e.alive).map(e=>e.y*W+e.x));
+ let living=0;for(const e of entities)if(e.alive&&e.sprite==='flood-grub')living++;let remaining=Math.min(3,500-living),spawned=0;if(remaining<=0)return false;
+ const occupied=new Set();for(const e of entities)if(e.alive)occupied.add(e.y*W+e.x);
  const queue=[[parent.x,parent.y]],visited=new Set([parent.y*W+parent.x]);
  for(let i=0;i<queue.length&&remaining>0&&i<200;i++){
    const [x,y]=queue[i];
    if(tile(x,y)===1&&!solid(x,y)&&!sanctuaryAt(x,y)&&!(x===state.x&&y===state.y)&&!occupied.has(y*W+x)){
      const larva=floorEnemy(2,0,x,y);
-     Object.assign(larva,{name:'Grub hatchling',hp:5,max:5,budded:true,hatchling:true});
+     Object.assign(larva,{name:'Grub hatchling',hp:5,max:5,budded:true,hatchling:true,den:{x,y}});
      entities.push(larva);occupied.add(y*W+x);remaining--;spawned++;
    }
    for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
@@ -1358,7 +1358,7 @@ if(e.pursuit>0){
 }
 if(state.retreatGrace&&Math.hypot(e.x-state.x,e.y-state.y)<1.4)continue;
 if(Math.hypot(e.x-state.x,e.y-state.y)<1.4){if(!partyGuest()&&!modalOpen()){enemyOccupancy=null;beginBoss(e);return}if(e.cool<=0){e.attackAt=performance.now();
- {if(e.sprite==='mire-leprechaun'&&Math.random()<.4){mistCloud(e);(state.wounds??={}).sick=true}takeDamage(e.atk,e)}e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<dt*(state.floor===1?.72:1+Math.min(state.floor,12)*.035)){
+ {if(e.sprite==='mire-leprechaun'&&Math.random()<.4){mistCloud(e);(state.wounds??={}).sick=true}takeDamage(e.atk,e)}e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<1-Math.exp(-dt*(state.floor===1?.72:1+Math.min(state.floor,12)*.035))){
 const chasing=!(e.lured>0)&&Math.hypot(e.x-state.x,e.y-state.y)<(state.floor===1?7:9+Math.floor(state.floor/5))+(state.season?.contract==='live'?5:0);
 const target=chasing?state:e.den;if(!target)continue;
 let dx=Math.sign(target.x-e.x),dy=Math.sign(target.y-e.y);let opts=Math.random()<.5?[[dx,0],[0,dy]]:[[0,dy],[dx,0]];for(let [ax,ay] of opts)if((ax||ay)&&!(step&&e.x+ax===step.nx&&e.y+ay===step.ny)&&!solid(e.x+ax,e.y+ay)&&!sanctuaryAt(e.x+ax,e.y+ay)&&!enemyOccupancy.has((e.y+ay)*W+e.x+ax)){release(e);e.x+=ax;e.y+=ay;occupy(e);break}}}enemyOccupancy=null}
