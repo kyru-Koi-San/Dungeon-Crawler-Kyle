@@ -134,8 +134,18 @@ function tradeMessage(room,id,m){
 }
 function cleanName(s){return String(s||'Crawler').replace(/[^\w -]/g,'').slice(0,16)||'Crawler'}
 function clampInt(v,min,max){v=Number(v);return Number.isFinite(v)?Math.max(min,Math.min(max,Math.floor(v))):min}
+// Retry durable deliveries even when a guest remains connected but its local save failed.
+function retryDeliveries(){
+ for(const room of rooms.values()){
+  const budgets=new Map();
+  const deliver=(id,data)=>{const ws=room.players.get(id)?.ws;if(ws?.readyState!==WebSocket.OPEN||ws.bufferedAmount>262144)return;const remaining=budgets.get(id)??32;if(remaining<=0)return;budgets.set(id,remaining-1);send(ws,data)};
+  for(const entry of room.roundResults?.values()||[])if(!entry.acked)deliver(entry.target,entry.result);
+  for(const [delivery,entry] of room.lootDeliveries||[])if(!entry.acked)deliver(entry.target,{type:'loot_bundle',delivery,items:entry.items});
+ }
+}
+const deliveryRetry=setInterval(retryDeliveries,5000);deliveryRetry.unref();
 const checkpoint=setInterval(()=>{if(dirty)persistNow()},1000);checkpoint.unref();
 const heartbeat=setInterval(()=>{for(const room of rooms.values()){for(const [id,p] of room.players)if(!p.ws&&p.expires<=Date.now()){room.players.delete(id);if(room.host===id){broadcast(room,{type:'room_ended',reason:'Host recovery expired'});for(const q of room.players.values()){const c=clients.get(q.ws);if(c)c.room=null}rooms.delete(room.code);break}}if(!room.players.size)rooms.delete(room.code)}for(const [id,r] of tradeReceipts)if(r.expires<=Date.now())tradeReceipts.delete(id);dirty=true;persistNow();for(const ws of wss.clients){if(ws.isAlive===false){ws.terminate();continue}ws.isAlive=false;ws.ping()}},30000);
-wss.on('close',()=>{clearInterval(heartbeat);clearInterval(checkpoint)});
+wss.on('close',()=>{clearInterval(heartbeat);clearInterval(checkpoint);clearInterval(deliveryRetry)});
 for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>{persistNow();process.exit(storageError?1:0)});
 server.listen(PORT,'0.0.0.0',()=>console.log(`DCK relay listening on ${PORT}`));
