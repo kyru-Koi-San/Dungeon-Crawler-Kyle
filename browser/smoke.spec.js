@@ -43,3 +43,32 @@ test('native touch joystick moves and resets after release',async({page})=>{
  });
  await expect.poll(()=>knob.evaluate(el=>el.style.transform)).toBe('');
 });
+
+test('surface to guild induction and backpack',async({page})=>{
+ test.setTimeout(60000);
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:8000/');
+ await page.getByRole('button',{name:'Begin on the surface'}).click();
+ const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('dck-final-save-v1')).state);
+ await page.keyboard.down('ArrowDown');
+ try{await expect.poll(async()=> (await saved()).chapter,{timeout:20000}).toBe('mine')}finally{await page.keyboard.up('ArrowDown')}
+ await expect.poll(async()=>!!(await saved()).hall).toBe(true);
+ for(let i=0;i<6;i++){
+  const h=(await saved()).hall;if(h.y<=4)break;
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(async()=> (await saved()).hall.y).toBe(h.y-1);
+ }
+ await page.keyboard.press('e');
+ for(let i=0;i<4;i++)await page.locator('#guildNext').click();
+ await expect.poll(async()=> (await saved()).guildTrained).toBe(true);
+ await page.locator('#packBtn').click();
+ await expect(page.locator('[data-bag-section="general"]')).toBeVisible();
+ await page.locator('[data-bag-section="boxes"]').click();
+ await expect(page.locator('[data-bag-section="boxes"]')).toHaveAttribute('aria-pressed','true');
+ await page.locator('[data-bag-section="trade"]').click();
+ await expect(page.locator('[data-bag-section="trade"]')).toHaveAttribute('aria-pressed','true');
+ await page.locator('#modalClose').click();
+ await page.reload();
+ await expect.poll(async()=> (await saved()).guildTrained).toBe(true);
+ expect(errors).toEqual([]);
+});
