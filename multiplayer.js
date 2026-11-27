@@ -23,7 +23,7 @@
      if(m.type==='room_joined'){roomCode=m.code;hostId=m.host;revision=0;players=m.players||{};emit('room',{code:roomCode});emit('players',{players:remoteOnly()});emit('status',{text:'IN PRIVATE PARTY',code:roomCode});if(pendingRoom){pendingRoom.resolve(roomCode);pendingRoom=null}return}
      if(m.type==='host_changed'){hostId=m.host;emit('host',{isHost:api.isHost});return}
      if(m.type==='world_snapshot'){if(m.revision>revision){revision=m.revision;emit('world',{world:m.world})}return}
-     if(m.type==='round_result'){emit('round_result',{roundId:m.roundId,turn:m.turn,damage:m.damage,mana:m.mana});return}
+     if(m.type==='round_result'){emit('round_result',{roundId:m.roundId,turn:m.turn,damage:m.damage,mana:m.mana,heal:m.heal});return}
      if(m.type==='trade_state'){emit('trade_state',{trade:m.trade});return}
      if(m.type==='trade_end'){emit('trade_end',{id:m.id,ok:m.ok===true,received:m.received});return}
      if(m.type==='drop_request'){if(api.isHost)emit('drop_request',{id:m.id,nonce:m.nonce,item:m.item,qty:m.qty,player:m.player});return}
@@ -41,7 +41,7 @@
   createRoom(){return this._roomAction({type:'create_room',name:playerName})},
   joinRoom(code){code=(code||'').trim().toUpperCase();if(!/^[A-Z0-9]{6}$/.test(code))return Promise.reject(new Error('Enter a valid 6-character room code.'));return this._roomAction({type:'join_room',code,name:playerName})},
   _roomAction(message){if(!this.connected)return Promise.reject(new Error('Connect to the relay first.'));if(pendingRoom)return Promise.reject(new Error('A room request is already pending.'));return new Promise((resolve,reject)=>{pendingRoom={resolve,reject};socket.send(JSON.stringify(message));setTimeout(()=>{if(pendingRoom){pendingRoom.reject(new Error('Room request timed out.'));pendingRoom=null}},7000)})},
-  sendRoundResult(target,roundId,turn,damage,mana){if(this.isHost)socket.send(JSON.stringify({type:'round_result',target,roundId,turn,damage,mana}))},
+  sendRoundResult(target,roundId,turn,damage,mana,heal=0){if(this.isHost)socket.send(JSON.stringify({type:'round_result',target,roundId,turn,damage,mana,heal}))},
   trade(type,data){if(this.inRoom&&['trade_open','trade_offer','trade_accept','trade_cancel'].includes(type))socket.send(JSON.stringify({type,...data}))},
   sendDrop(drop){if(this.inRoom&&!this.isHost)socket.send(JSON.stringify({type:'drop_request',...drop}))},
   sendDropResult(target,nonce,ok){if(this.isHost)socket.send(JSON.stringify({type:'drop_result',target,nonce,ok}))},
