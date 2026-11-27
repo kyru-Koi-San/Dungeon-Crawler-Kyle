@@ -156,6 +156,28 @@ test('guardian battle controls, victory and corpse loot',async({page})=>{
  expect(restored.state.inventory.some(i=>i.id==='box-Gold'&&i.qty>0)).toBe(false);
  expect(restored.entities[0].looted).toBe(true);
  expect(restored.entities[0].alive).toBe(false);
+ // Return the sale stack, drop it physically, reload, and recover exactly once.
+ await page.locator('.bag-slot[data-slot]').filter({hasText:'Gold loot box'}).click();
+ await page.getByRole('button',{name:'Return to backpack',exact:true}).click();
+ await page.locator('[data-bag-section="boxes"]').click();
+ await page.locator('.bag-slot[data-slot]').filter({hasText:'Gold loot box'}).click();
+ await page.getByRole('button',{name:/Drop .* in a bag/}).click();
+ const readWorld=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('dck-final-save-v1')));
+ const dropped=await readWorld();
+ const bag=dropped.entities.find(e=>e.droppedBag&&e.alive);
+ const qty=transfer.tradeInventory.find(i=>i.id==='box-Gold').qty;
+ expect(bag.contents.find(i=>i.id==='box-Gold').qty).toBe(qty);
+ expect(dropped.state.inventory.some(i=>i.id==='box-Gold')).toBe(false);
+ await page.reload();
+ await page.locator('[data-action="loot"]').click();
+ await expect(page.locator('#takeAll')).toBeVisible();
+ await page.locator('#takeAll').click();
+ const recovered=await readWorld();
+ expect(recovered.state.inventory.filter(i=>i.id==='box-Gold').reduce((n,i)=>n+i.qty,0)).toBe(qty);
+ expect(recovered.entities.some(e=>e.droppedBag&&e.alive)).toBe(false);
+ expect(recovered.state.loots).toBe(dropped.state.loots);
+ expect(recovered.state.achievements).toEqual(dropped.state.achievements);
+
 
 
  expect(errors).toEqual([]);
