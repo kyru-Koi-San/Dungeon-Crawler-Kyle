@@ -8,15 +8,17 @@ const rooms=new Map(),clients=new Map(),tradeReceipts=new Map();
 const RECEIPT_TTL=7*24*60*60*1000;
 const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function code(){let s='';for(let i=0;i<6;i++)s+=alphabet[crypto.randomInt(alphabet.length)];return s}
-function send(ws,data){if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(data))}
-function publicPlayers(room){const out={};for(const [id,p] of room.players)out[id]=p.state;return out}
+function send(ws,data){if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(data))}
+function publicPlayers(room){const out={};for(const [id,p] of room.players)if(p.ws?.readyState===WebSocket.OPEN)out[id]=p.state;return out}
 function broadcast(room,data,except){for(const [id,p] of room.players){if(id!==except)send(p.ws,data)}}
+const RESUME_TTL=120000;
+function suspend(ws){const c=clients.get(ws),room=rooms.get(c?.room),p=room?.players.get(c?.id);if(!p||p.ws!==ws)return;for(const t of room.trades?.values()||[])if(t.a===c.id||t.b===c.id)cancelTrade(room,t);p.ws=null;p.expires=Date.now()+RESUME_TTL;broadcast(room,{type:'player_left',id:c.id});broadcast(room,{type:'room_update',players:publicPlayers(room)});if(room.host===c.id)broadcast(room,{type:'host_paused'});}
 function leave(ws){const c=clients.get(ws);if(!c||!c.room)return;const room=rooms.get(c.room);if(room){for(const t of room.trades?.values()||[])if(t.a===c.id||t.b===c.id)cancelTrade(room,t);room.players.delete(c.id);if(room.host===c.id){room.host=room.players.keys().next().value;broadcast(room,{type:'host_changed',host:room.host})}broadcast(room,{type:'player_left',id:c.id});broadcast(room,{type:'room_update',players:publicPlayers(room)});if(!room.players.size)rooms.delete(room.code)}c.room=null}
 const server=http.createServer((req,res)=>{if(req.url==='/health'){res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});return res.end(JSON.stringify({ok:true,service:'dck-private-relay',rooms:rooms.size,clients:clients.size}))}res.writeHead(200,{'content-type':'text/plain'});res.end('Dungeon Crawler Kyle private relay is running.\n')});
 const wss=new WebSocketServer({server,maxPayload:MAX_MESSAGE});
 wss.on('connection',(ws,req)=>{
  const allowedOrigin=process.env.ALLOWED_ORIGIN;if(allowedOrigin&&req.headers.origin!==allowedOrigin){ws.close(1008,'Origin not allowed');return}
- const id=crypto.randomUUID(),client={id,ws,room:null,name:'Crawler',windowStart:Date.now(),messages:0};clients.set(ws,client);ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true});send(ws,{type:'hello',id});
+ let id=crypto.randomUUID();const client={id,ws,room:null,name:'Crawler',windowStart:Date.now(),messages:0};clients.set(ws,client);ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true});send(ws,{type:'hello',id});
  ws.on('message',raw=>{
   if(raw.length>MAX_MESSAGE)return ws.close(1009,'Message too large');
   const now=Date.now();if(now-client.windowStart>1000){client.windowStart=now;client.messages=0}if(++client.messages>30)return ws.close(1008,'Rate limit');
@@ -24,11 +26,12 @@ wss.on('connection',(ws,req)=>{
   if(!m||typeof m!=='object'||Array.isArray(m))return;
   if(raw.length>8192&&m.type!=='world_snapshot')return ws.close(1009,'Message too large');
   if(m.type==='trade_recover'){const receipt=tradeReceipts.get(m.id);const token=String(m.token||'');if(receipt&&/^[a-f0-9]{32}$/.test(token)&&receipt.results.has(token)){send(ws,receipt.results.get(token));return}send(ws,{type:'trade_recovery_unknown',id:String(m.id||'').slice(0,36)});return}
+  if(m.type==='resume_room'){const room=rooms.get(String(m.code||''));const token=String(m.token||'');const found=room&&/^[a-f0-9]{64}$/.test(token)&&[...room.players].find(([key,p])=>p.token===token&&!p.ws&&p.expires>Date.now());if(!found)return send(ws,{type:'resume_failed'});leave(ws);id=client.id=found[0];const p=found[1];p.ws=ws;p.expires=0;client.room=room.code;client.name=p.name;send(ws,{type:'hello',id});send(ws,{type:'room_joined',code:room.code,host:room.host,players:publicPlayers(room),resumeToken:p.token,resumed:true});if(room.world)send(ws,{type:'world_snapshot',revision:room.revision,world:room.world});broadcast(room,{type:'room_update',players:publicPlayers(room)});if(room.host===id)broadcast(room,{type:'host_resumed'});return}
   if(m.type==='create_room'){
-   leave(ws);let roomCode;do{roomCode=code()}while(rooms.has(roomCode));const room={code:roomCode,host:id,players:new Map(),world:null,revision:0};rooms.set(roomCode,room);client.room=roomCode;client.name=cleanName(m.name);room.players.set(id,{ws,name:client.name,state:{name:client.name,floor:1,x:15,y:9,level:1,hp:100,maxHp:100}});send(ws,{type:'room_joined',code:roomCode,players:publicPlayers(room),host:room.host});return;
+   leave(ws);let roomCode;do{roomCode=code()}while(rooms.has(roomCode));const room={code:roomCode,host:id,players:new Map(),world:null,revision:0};rooms.set(roomCode,room);client.room=roomCode;client.name=cleanName(m.name);room.players.set(id,{ws,token:crypto.randomBytes(32).toString('hex'),name:client.name,state:{name:client.name,floor:1,x:15,y:9,level:1,hp:100,maxHp:100}});send(ws,{type:'room_joined',code:roomCode,players:publicPlayers(room),host:room.host,resumeToken:room.players.get(id).token});return;
   }
   if(m.type==='join_room'){
-   leave(ws);const room=rooms.get(String(m.code||'').toUpperCase());if(!room)return send(ws,{type:'error',message:'Room not found. Check the invite code.'});if(room.players.size>=MAX_PLAYERS)return send(ws,{type:'error',message:'That party is full.'});client.room=room.code;client.name=cleanName(m.name);room.players.set(id,{ws,name:client.name,state:{name:client.name,floor:1,x:15,y:9,level:1,hp:100,maxHp:100}});send(ws,{type:'room_joined',code:room.code,players:publicPlayers(room),host:room.host});if(room.world)send(ws,{type:'world_snapshot',revision:room.revision,world:room.world});broadcast(room,{type:'room_update',players:publicPlayers(room)},id);broadcast(room,{type:'player_state',id,player:room.players.get(id).state},id);return;
+   leave(ws);const room=rooms.get(String(m.code||'').toUpperCase());if(!room)return send(ws,{type:'error',message:'Room not found. Check the invite code.'});if(room.players.size>=MAX_PLAYERS)return send(ws,{type:'error',message:'That party is full.'});client.room=room.code;client.name=cleanName(m.name);room.players.set(id,{ws,token:crypto.randomBytes(32).toString('hex'),name:client.name,state:{name:client.name,floor:1,x:15,y:9,level:1,hp:100,maxHp:100}});send(ws,{type:'room_joined',code:room.code,players:publicPlayers(room),host:room.host,resumeToken:room.players.get(id).token});if(room.world)send(ws,{type:'world_snapshot',revision:room.revision,world:room.world});broadcast(room,{type:'room_update',players:publicPlayers(room)},id);broadcast(room,{type:'player_state',id,player:room.players.get(id).state},id);return;
   }
   if(m.type==='leave_room'){leave(ws);return}
   if(['trade_open','trade_offer','trade_accept','trade_cancel'].includes(m.type)){const room=rooms.get(client.room);if(room)tradeMessage(room,id,m);return}
@@ -69,7 +72,7 @@ wss.on('connection',(ws,req)=>{
   }
   send(ws,{type:'error',message:'Unsupported message.'});
  });
- ws.on('close',()=>{leave(ws);clients.delete(ws)});ws.on('error',()=>{leave(ws);clients.delete(ws)});
+ ws.on('close',()=>{suspend(ws);clients.delete(ws)});ws.on('error',()=>{ws.terminate()});
 });
 function recordTradeResult(room,t,ok){const results=new Map();for(const who of [t.a,t.b]){const token=t.tokens?.[who];const result={type:'trade_end',id:t.id,ok,received:ok?t.offers[who===t.a?t.b:t.a]:undefined};if(token)results.set(token,result);const p=room.players.get(who);if(p)send(p.ws,result)}tradeReceipts.set(t.id,{results,expires:Date.now()+RECEIPT_TTL})}
 function tradeView(room,t){
@@ -87,6 +90,6 @@ function tradeMessage(room,id,m){
 }
 function cleanName(s){return String(s||'Crawler').replace(/[^\w -]/g,'').slice(0,16)||'Crawler'}
 function clampInt(v,min,max){v=Number(v);return Number.isFinite(v)?Math.max(min,Math.min(max,Math.floor(v))):min}
-const heartbeat=setInterval(()=>{for(const [id,r] of tradeReceipts)if(r.expires<=Date.now())tradeReceipts.delete(id);for(const ws of wss.clients){if(ws.isAlive===false){ws.terminate();continue}ws.isAlive=false;ws.ping()}},30000);
+const heartbeat=setInterval(()=>{for(const room of rooms.values()){for(const [id,p] of room.players)if(!p.ws&&p.expires<=Date.now()){room.players.delete(id);if(room.host===id){broadcast(room,{type:'room_ended',reason:'Host recovery expired'});for(const q of room.players.values()){const c=clients.get(q.ws);if(c)c.room=null}rooms.delete(room.code);break}}if(!room.players.size)rooms.delete(room.code)}for(const [id,r] of tradeReceipts)if(r.expires<=Date.now())tradeReceipts.delete(id);for(const ws of wss.clients){if(ws.isAlive===false){ws.terminate();continue}ws.isAlive=false;ws.ping()}},30000);
 wss.on('close',()=>clearInterval(heartbeat));
 server.listen(PORT,'0.0.0.0',()=>console.log(`DCK relay listening on ${PORT}`));
