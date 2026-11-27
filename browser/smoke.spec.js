@@ -146,6 +146,17 @@ test('guardian battle controls, victory and corpse loot',async({page})=>{
  const transfer=await page.evaluate(()=>JSON.parse(localStorage.getItem('dck-final-save-v1')).state);
  expect(transfer.tradeInventory.find(i=>i.id==='box-Gold').qty).toBeGreaterThanOrEqual(2);
  expect(transfer.inventory.some(i=>i.id==='box-Gold'&&i.qty>0)).toBe(false);
+ // Verify sale inventory survives reload without duplicating guardian rewards.
+ await page.reload();
+ await page.locator('#packBtn').click();
+ await page.locator('[data-bag-section="trade"]').click();
+ await expect(page.locator('.bag-slot[data-slot]').filter({hasText:'Gold loot box'})).toBeVisible();
+ const restored=await page.evaluate(()=>JSON.parse(localStorage.getItem('dck-final-save-v1')));
+ expect(restored.state.tradeInventory.filter(i=>i.id==='box-Gold').reduce((n,i)=>n+i.qty,0)).toBe(transfer.tradeInventory.find(i=>i.id==='box-Gold').qty);
+ expect(restored.state.inventory.some(i=>i.id==='box-Gold'&&i.qty>0)).toBe(false);
+ expect(restored.entities[0].looted).toBe(true);
+ expect(restored.entities[0].alive).toBe(false);
+
 
  expect(errors).toEqual([]);
 });
