@@ -20,3 +20,26 @@ const {test,expect}=require('@playwright/test');
    await expect(page.locator('#creator')).toHaveCount(0);
    expect(errors).toEqual([]);
   });
+
+test('native touch joystick moves and resets after release',async({page})=>{
+ await page.goto('http://127.0.0.1:8000/');
+ await page.getByRole('button',{name:'Begin on the surface'}).click();
+ await expect(page.locator('#modal')).toBeHidden();
+ const joy=page.locator('#joystick'),knob=page.locator('#joyKnob');
+ await expect(joy).toBeVisible();
+ const before=await page.locator('#coords').innerText();
+ await joy.evaluate(el=>{
+  const b=el.getBoundingClientRect();
+  const touch={identifier:7,target:el,clientX:b.left+b.width/2,clientY:b.top+b.height*.85};
+  const event=new Event('touchstart',{bubbles:true,cancelable:true});
+  Object.defineProperties(event,{touches:{value:[touch]},changedTouches:{value:[touch]}});
+  el.dispatchEvent(event);
+ });
+ await expect(page.locator('#coords')).not.toHaveText(before,{timeout:5000});
+ await joy.evaluate(el=>{
+  const event=new Event('touchend',{bubbles:true,cancelable:true});
+  Object.defineProperties(event,{touches:{value:[]},changedTouches:{value:[{identifier:7,target:el}]}});
+  el.dispatchEvent(event);
+ });
+ await expect.poll(()=>knob.evaluate(el=>el.style.transform)).toBe('');
+});
