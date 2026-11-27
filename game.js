@@ -2322,7 +2322,7 @@ function bind(){
   }
   document.addEventListener('click',e=>{if(e.target.closest('[data-campaign-menu]'))campaignMenu()});
 
-sizePlayfield();new ResizeObserver(sizePlayfield).observe($('.canvas-wrap'));
+sizePlayfield();let resizeFrame=0;new ResizeObserver(()=>{if(!resizeFrame)resizeFrame=requestAnimationFrame(()=>{resizeFrame=0;sizePlayfield()})}).observe($('.canvas-wrap'));
 bindMovementControls();
 const status=$('#mobileStatus');status.onclick=()=>{if(personalMenusLocked()){lockHint();return}clearMovement();document.body.classList.add('status-open')};
 $('#statusClose').onclick=()=>document.body.classList.remove('status-open');
