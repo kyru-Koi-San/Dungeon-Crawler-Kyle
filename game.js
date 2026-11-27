@@ -66,8 +66,35 @@ const hallStyles=[
  {name:'Elliott Bay Pilothouse',object:'Tide gauge',lore:'Three high-water marks cross the brass dial. The newest is labeled “after the stairs appeared.”',color:'#4a959a',wood:'#28494b',x:2,y:6},
  {name:'Volunteer Park Glasshouse',object:'Seed cabinet',lore:'Each envelope names a Seattle street. Someone is saving a little of the surface for spring.',color:'#a4bf74',wood:'#465641',x:4,y:4},
  {name:'SoDo Switch House',object:'Signal lever',lore:'One scratched lever still points toward King Street. The signal lamp blinks twice when you touch it.',color:'#daa155',wood:'#624938',x:8,y:6},
- {name:'Gas Works Observatory',object:'Star chart',lore:'The painted stars match the sky over Lake Union. A second constellation outlines the tunnels below.',color:'#9fa5df',wood:'#3c4159',x:3,y:5}
+ {name:'Gas Works Observatory',object:'Star chart',lore:'The painted stars match the sky over Lake Union. A second constellation outlines the tunnels below.',color:'#9fa5df',wood:'#3c4159',x:3,y:5},
+ {name:'Rainier Apothecary',object:'Dispensing table',lore:'Each drawer has a name and a last known floor. A fresh bottle waits under yours.',color:'#c49dba',wood:'#594757',x:8,y:4},
+ {name:'Ballard Print Room',object:'Map press',lore:'Routes hang beside the stove on drying lines. A penciled note reads: please correct our mistakes.',color:'#d6bc8e',wood:'#554937',x:3,y:6}
 ];
+function furnishHallArt(id,rect,line){
+ const brass='#ccab72',ink='#24343b';
+ for(const side of [0,1]){
+   const x=side?324:22;
+   if(id===0){ // Portholes, mooring line and chart table
+     for(let i=0;i<3;i++){rect(x+5+i*16,66,12,12,brass);rect(x+7+i*16,68,8,8,'#477887')}
+     for(let i=0;i<3;i++)line(x+4,95+i*3,x+54,103+i*3,'#ac8860');
+   }else if(id===1){ // Glass roof trusses and hanging flower baskets
+     for(let i=0;i<4;i++){line(x+i*16,65,x+18+i*12,83,'#738a7e');line(x+9+i*12,65,x+9+i*12,84,'#b6c5a2',1);
+       rect(x+5+i*12,84,10,5,'#a47153');rect(x+4+i*12,79,10,6,'#598657');rect(x+7+i*12,77,3,3,'#e4b3a4')}
+   }else if(id===2){ // Railway control bank with illuminated signal tracks
+     rect(x,66,65,37,ink);for(let i=0;i<5;i++){line(x+4,72+i*5,x+58,72+(4-i)*5,brass,1);rect(x+6+i*11,95,4,3,i%2?'#dc725e':'#91c88e')}
+   }else if(id===3){ // Celestial instrument and moon phase strip
+     for(let i=0;i<6;i++){rect(x+i*10,74,7,7,'#ddd3ad');rect(x+i*10,73,i,9,'#383d53')}
+     for(let i=0;i<13;i++)rect(x+(i*11)%60,86+(i*7)%15,2,2,'#b3b9d9');
+   }else if(id===4){ // Apothecary shelves with labeled bottles
+     for(let j=0;j<3;j++){rect(x,31+j*22,65,4,'#886440');for(let i=0;i<6;i++){
+       const a=x+4+i*10,b=20+j*22;rect(a+2,b-4,3,5,brass);rect(a,b,7,10,['#7ca39c','#cb925d','#987f9a'][(i+j)%3]);rect(a+1,b+4,5,3,'#ddd0aa')}}
+   }else{ // Letterpress type drawers and drying sheets
+     rect(x,18,63,74,'#594032');for(let j=0;j<5;j++)for(let i=0;i<6;i++){rect(x+2+i*10,21+j*13,8,11,'#967753');rect(x+4+i*10,23+j*13,4,2,ink)}
+     line(x,100,x+64,96,brass);for(let i=0;i<5;i++){rect(x+i*12,99,9,12,'#dbccaa');rect(x+2+i*12,102,5,1,ink)}
+   }
+ }
+}
+
 function hallTheme(h=state.hall){return (3*(state.floor-1)+h.index)%hallStyles.length}
 const hallScenes=new Map();
 function hallBackdrop(h){
@@ -101,16 +128,236 @@ function hallBackdrop(h){
   if(id===1){rect(x-13,y-21,26,21,'#916b44');for(let i=0;i<6;i++){rect(x-10+i%3*7,y-17+Math.floor(i/3)*7,5,5,'#d6bc7c')}rect(x-6,y-28,12,7,'#699768')}
   if(id===2){rect(x-12,y-6,24,6,'#887969');line(x,y-5,x+8,y-24,'#b2a79a',4);rect(x+4,y-26,10,5,'#cd6549')}
   if(id===3){line(x,y-12,x-9,y,'#bca079');line(x,y-12,x+9,y,'#bca079');line(x-9,y-14,x+10,y-25,'#bac1d9',7);rect(x+7,y-27,6,5,'#e4cf94')}
+  furnishHallArt(id,rect,line);
+  for(const [a,b] of hallFurniture[id])furnitureArt(id,a*32+16,b*32+23,rect,line);
+  if(id===4||id===5){rect(x-15,y-13,30,14,theme.wood);rect(x-17,y-15,34,4,theme.color);
+    if(id===4){for(let j=0;j<3;j++){rect(x-10+j*8,y-22,5,7,'#aac4b0');rect(x-9+j*8,y-24,3,3,'#b29872')}}
+    else{rect(x-8,y-29,17,13,'#475153');rect(x-1,y-33,3,22,'#aa976e');rect(x-9,y-34,18,3,'#b29872')}}
   const rand=rng(state.floor*331+h.index*9391);
   for(let i=0;i<9;i++){const x=117+i*20;rect(x,249,8,5,'#51473e');rect(x+1,250,2+Math.floor(rand()*5),2,rand()>.5?theme.color:'#cbb78f')}
   if(hallScenes.size>24)hallScenes.clear();
   hallScenes.set(roomKey,art);return art;
 }
 
+const hallFurniture=[
+ [[2,5],[9,6]],[[3,6],[8,5]],[[4,3],[9,4]],[[2,6],[9,3]],[[4,5],[9,6]],[[3,4],[8,6]]
+];
+function furnitureArt(id,x,y,rect,line){
+ const wood='#77604c',iron='#53616b',paper='#dccea5';
+ rect(x-13,y-1,26,4,'#272932');
+ if(id===0){rect(x-11,y-18,22,18,wood);for(let i=0;i<3;i++)rect(x-11,y-17+i*7,22,2,iron);line(x-8,y-18,x+6,y-15,paper)}
+ if(id===1){rect(x-8,y-10,16,11,'#a4654c');for(let i=0;i<6;i++){line(x,y-9,x-12+i*5,y-20-i%3*5,'#6ca174',3);rect(x-13+i*5,y-23-i%3*5,5,5,i%2?'#e4b1a1':'#acbb75')}}
+ if(id===2){rect(x-13,y-20,26,18,iron);rect(x-10,y-17,20,8,'#273237');for(let i=0;i<3;i++){rect(x-8+i*6,y-16,3,3,i%2?'#a1b97c':'#ef9b76');line(x-7+i*6,y-3,x-5+i*6,y-7,paper)}}
+ if(id===3){line(x,y-15,x-10,y+1,wood,3);line(x,y-15,x+9,y+1,wood,3);line(x-9,y-12,x+9,y-25,iron,7);rect(x+7,y-27,6,6,'#b2bddb')}
+ if(id===4){rect(x-12,y-15,24,15,'#859890');rect(x-11,y-13,22,5,'#ced4b5');rect(x-10,y-24,7,8,'#94b3bf');rect(x+2,y-21,6,5,'#c68973')}
+ if(id===5){rect(x-13,y-17,26,17,wood);for(let i=0;i<3;i++){rect(x-11,y-15+i*4,22,2,paper);rect(x-4,y-14+i*4,9,1,iron)}line(x+7,y-18,x+11,y-25,iron,3)}
+}
 const guildStations=[
  {x:6,y:3,label:'Talk',kind:'master'}, {x:2,y:3,label:'Rest',kind:'bed'},
  {x:10,y:3,label:'Locker',kind:'locker'}, {x:10,y:5,label:'Supplies',kind:'chest'}
 ];
+// Relay fixtures, field notes and the favors carried between floors.
+const relayFloors=[
+ ['Bell vault','Ring the brass bell to draw nearby patrols to the rope.','lure'],
+ ['Floodworks pump','Two bells signal high water. Start the pump to drain the blue crossings and open the crew’s evacuation route.','pump'],
+ ['Cage brake','Release the spare counterweight to hold the collapse clock for 45 extra seconds.','time'],
+ ['Signal lift','Transmit a call sign to reveal the stair coordinates. The salvage crew remembers favors.','stairs'],
+ ['Archive index','Read a former surveyor’s overlay to chart the passages around the archive.','map'],
+ ['Sky relay','Ground the lightning mast to recharge your mana.','mana'],
+ ['Lock gates','Open the spill gates to scatter the lock tenders from the wheel.','scatter'],
+ ['Drawbridge winch','Lower the service bridge to extend the evacuation window by a minute.','time'],
+ ['Mirror well','Aim the inspection mirror to locate the exit through its reflection.','stairs'],
+ ['Kiln vent','Vent the furnace to weaken the guards gathered around it.','weaken'],
+ ['Platform chime','Ring the departure chime to pull nearby platform patrols toward it.','lure'],
+ ['Cinder cistern','Release the clean reserve to treat your party leader’s wounds.','heal'],
+ ['Brine sluice','Wash the salt crust from a buried neighborhood map.','map'],
+ ['Beacon lens','Focus the beam to drive nearby watchers back.','scatter'],
+ ['Tribunal seal','Stamp an emergency stay to add 75 seconds to the clock.','time'],
+ ['Silt turbine','Divert the current to drain strength from nearby sentries.','weaken'],
+ ['Crypt lantern','Light the row of burial lamps to restore your mana.','mana'],
+ ['Last bell','Sound the evacuation signal to mark the stairs and draw the last patrol away.','final']
+];
+function season(){return state.season??={highlights:[],notes:[],crew:'unknown',fans:0}}
+function highlight(line,fans){
+ const s=season();s.highlights.unshift({floor:state.floor,line});s.highlights.length=Math.min(8,s.highlights.length);
+ s.fans+=fans;feed('<b>On air</b> · '+line);
+}
+function initialiseRelay(){
+ if(state.chapter!=='mine'||state.relay?.floor===state.floor)return;
+ const origin=state.hall?{x:state.hall.returnX,y:state.hall.returnY}:state;
+ const queue=[origin],visited=new Set([origin.y*W+origin.x]),spots=[];
+ for(let i=0;i<queue.length;i++){
+   const p=queue[i];
+   if(Math.abs(p.x-origin.x)+Math.abs(p.y-origin.y)>4&&!inArena(p.x,p.y)&&
+      !state.scenery?.some(s=>s.x===p.x&&s.y===p.y)&&!entities.some(e=>e.x===p.x&&e.y===p.y))spots.push(p);
+   for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+     const x=p.x+dx,y=p.y+dy,k=y*W+x;
+     if(visited.has(k)||tile(x,y)!==1||solid(x,y)||sanctuaryAt(x,y)||state.sanctuaries?.some(q=>q.door?.x===x&&q.door.y===y))continue;
+     visited.add(k);queue.push({x,y});
+   }
+ }
+ if(!spots.length)return;
+ const pick=f=>spots[Math.min(spots.length-1,Math.floor(spots.length*f))];
+ const post=pick(state.floor===2?.28:.35),camp=pick(.045);
+ state.relay={floor:state.floor,x:post.x,y:post.y,camp,water:[],used:false};
+ if(state.floor===2)state.relay.berth=spots.find(p=>p!==camp&&Math.hypot(p.x-camp.x,p.y-camp.y)<=2)||camp;
+ if(state.npc){Object.assign(state.npc,camp,{home:{...camp},talkIndex:-1})}
+ if(state.floor!==2)return;
+ // A clear ring leaves a walkable detour around each submerged crossing.
+ for(const p of spots){
+   if(state.relay.water.length>=24)break;
+   if(Math.hypot(p.x-post.x,p.y-post.y)<2||Math.hypot(p.x-camp.x,p.y-camp.y)<3||
+      state.relay.water.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<4))continue;
+   if([-1,0,1].every(dx=>[-1,0,1].every(dy=>!solid(p.x+dx,p.y+dy)&&tile(p.x+dx,p.y+dy)===1&&!sanctuaryAt(p.x+dx,p.y+dy))))state.relay.water.push(p);
+ }
+}
+function highWater(){return state.floor===2&&state.relay?.floor===2&&!state.relay.used&&Math.floor((900-state.collapseLeft)/22)%2===1}
+function submerged(x,y){return highWater()&&state.relay.water.some(p=>p.x===x&&p.y===y)}
+function near(p,range=1.7){return p&&Math.hypot(state.x-p.x,state.y-p.y)<=range}
+function relayName(){return relayFloors[state.floor-1]?.[0]||'Relay'}
+function crewName(){return state.floor===1?'Iven, rope keeper':[2,3,4].includes(state.floor)?'Nell · Sound Salvage':'Joss · Night Shift'}
+function agentTalk(){
+ const n=state.npc,first=!n.met,s=season();
+ if(first){n.met=true;state.gold+=15;if(state.floor===1)state.foundKeeper=true;unlock('Not alone');feed('The crawler shares 15 gold.')}
+ const lines=state.floor===1?['The cage motor is on Floor 3. Look for the blue pipes.','Blue rope is mine. If you find a red length, leave it tied.','My brother used to count the bells between shifts. I still do.']:
+ state.floor===2&&s.crew==='saved'?['Tess made the boat. I owe you a lift.','Listen for our call sign under Capitol Hill.','The audience wants us to wave. I should probably use the clean bandage.']:
+ state.floor===2&&s.crew==='following'?['Tess is right behind you. Get her to the stairs.','We can still take the skiff if you get the pump running.','Keep her clear of the green mist.']:
+ state.floor===2?['Tess can walk if we treat the fever. She can’t swim the spillway.','Hear two bells? Water’s coming over the grates.','That green mist stopped the grubs splitting. Saw it with my own eyes.']:
+ [s.crew==='saved'?'Sound Salvage marked you as a friend. Take the dry path.':'Last team through here traded their lamp for a map.',relayFloors[state.floor-1][1],'We listen at the doors before we open them. You learn whose boots are whose.'];
+ const i=first?0:(Math.max(0,n.talkIndex||0)+1+Math.floor(Math.random()*(lines.length-1)))%lines.length;
+ n.talkIndex=i;n.wait=4;caption(crewName(),lines[i],true);
+ if(state.floor>=5&&!state.relay.used&&!state.relay.race){
+   const r=state.relay;
+   showModal('<small>NIGHT SHIFT</small><h2>Joss offers a race</h2><p>Reach the '+relayName()+' within 75 seconds of dungeon time. First crew there takes the 25-gold salvage purse.</p>'+button('raceYes','Take the race')+button('raceNo','Walk away'));
+   $('#raceYes').onclick=()=>{r.race='live';r.raceStart=state.collapseLeft;r.pinned=true;closeModal();persistCampaign();notify('Race started · cyan map pin')};$('#raceNo').onclick=closeModal;
+ }
+ if(state.floor===2&&['unknown','stranded'].includes(s.crew)){
+   s.crew='stranded';
+   showModal('<small>SOUND SALVAGE</small><h2>Tess has the mire fever</h2><p>Give her a tonic and escort her to the stairs, or start the Floodworks pump so Nell can get her out by boat.</p>'+button('crewTonic','Use a tonic and escort Tess',!quantity('tonic'))+
+   (state.pet?'<p>'+({dog:'Your dog sits beside Tess and refuses to budge.',cat:'Your cat tests a dry ledge and looks back at Nell.',rabbit:'Your rabbit finds a narrow dry passage beneath the overflow pipe.'}[state.pet.species]||'Your companion waits beside Nell.')+'</p>'+button('crewPet','Send your companion with Nell'):'')+button('crewWait','Leave the decision open'));
+   $('#crewTonic').onclick=()=>{if(!quantity('tonic')||s.crew!=='stranded')return;state.inventory.find(it=>it.id==='tonic'&&it.qty>0).qty--;s.crew='following';closeModal();caption('Tess','Lead on. I can keep up.',true);persistCampaign()};
+   if($('#crewPet'))$('#crewPet').onclick=()=>{s.crew='escort';closeModal();caption('Nell','Your scout can guide us. Get that pump running.',true);persistCampaign()};
+   $('#crewWait').onclick=closeModal;
+ }
+ persistCampaign();render();
+}
+function button(id,label,disabled=false){return '<button class="widebtn" id="'+id+'" '+(disabled?'disabled':'')+'>'+label+'</button>'}
+function orphanedPet(){return state.floor===2&&state.season?.crew==='escort'}
+function saveCrew(){
+ const s=season();if(s.crew==='saved')return;s.crew='saved';highlight('Sound Salvage brought both crew members out alive.',80);
+ s.medical=true;caption('Nell','Tess is clear. Use our call sign at the Capitol Hill lift.',true);
+}
+function moveScout(dt){
+ const n=state.npc;if(!n||modalOpen())return;
+ n.wait=(n.wait||0)-dt;if(n.wait>0)return;n.wait=1.1+Math.random()*2;
+ const home=n.home||{x:n.x,y:n.y};n.home=home;
+ const choices=[[1,0],[0,1],[-1,0],[0,-1]].map(([dx,dy])=>({x:n.x+dx,y:n.y+dy})).filter(p=>
+   tile(p.x,p.y)===1&&!solid(p.x,p.y)&&!submerged(p.x,p.y)&&!sanctuaryAt(p.x,p.y)&&
+   !state.sanctuaries?.some(q=>q.door?.x===p.x&&q.door.y===p.y)&&Math.hypot(p.x-home.x,p.y-home.y)<=4&&
+   !near(p,1)&&!entities.some(e=>e.alive&&e.x===p.x&&e.y===p.y));
+ if(choices.length){
+   const dest=choices[Math.floor(Math.random()*choices.length)];
+   n.fromX=n.x;n.fromY=n.y;n.facing=dest.x!==n.x?'side':dest.y<n.y?'back':'front';n.walkAt=performance.now();Object.assign(n,dest);
+ }
+ if(near(n,5)&&Math.random()<.18){
+   const lines=['Keep your lamp low.','That echo came from underneath us.',relayFloors[state.floor-1][1]];
+   const i=((n.bark??-1)+1+Math.floor(Math.random()*2))%lines.length;n.bark=i;caption(crewName(),lines[i]);
+ }
+}
+function mistCloud(e){
+ const grubs=entities.filter(g=>g.alive&&g.sprite==='flood-grub'&&Math.hypot(e.x-g.x,e.y-g.y)<=3&&!g.budded);
+ for(const g of grubs){g.budded=true;g.hp=Math.max(1,g.hp-3);particles.push({x:g.x,y:g.y,t:0,kind:'magic',text:'MIST'})}
+ if(grubs.length){const s=season();if(!s.mist){s.mist=true;highlight('Caught a grub nest in a leprechaun’s mist.',35)}notify('Mist sickens the grubs. Budding interrupted.')}
+}
+function useRelay(){
+ const r=state.relay,s=season(),[name,tip,effect]=relayFloors[state.floor-1];
+ showModal('<small>FLOOR '+state.floor+' · FIELD STATION</small><h2>'+name+'</h2><p>'+tip+'</p>'+button('relayUse',r.used?'Already activated':'Activate '+name,r.used)+button('relayNotes','Read field manual'));
+ $('#relayNotes').onclick=()=>fieldManual();$('#relayUse').onclick=()=>{
+ if(r.used)return;r.used=true;
+ if(r.race==='live'){
+   const won=r.raceStart-state.collapseLeft<=75;r.race=won?'won':'lost';
+   if(won)state.gold+=25;highlight(won?'Beat Night Shift to the station. Won the 25-gold purse.':'Joss reached the station first and collected the purse.',won?20:4);
+ }
+ const local=entities.filter(e=>e.alive&&e.type==='enemy'&&!e.boss&&Math.hypot(e.x-r.x,e.y-r.y)<15);
+ if(effect==='pump')saveCrew();
+ if(effect==='time')state.collapseLeft+={3:45,8:60,15:75}[state.floor];
+ if(effect==='heal'){state.wounds={};restoreHealth(35)}
+ if(effect==='mana')state.mp=state.maxMp;
+ if(effect==='map')for(let y=Math.max(0,r.y-13);y<Math.min(H,r.y+14);y++)for(let x=Math.max(0,r.x-13);x<Math.min(W,r.x+14);x++)seen[y][x]=true;
+ if(['stairs','final'].includes(effect)){let y=tiles.findIndex(row=>row.includes(3));if(y>=0){let x=tiles[y].indexOf(3);seen[y][x]=true;r.exit={x,y}}}
+ if(['lure','final'].includes(effect))for(const e of local){e.den={x:r.x,y:r.y};e.lured=18}
+ if(effect==='scatter')for(const e of local){e.avoid=20;e.pursuit=0}
+ if(effect==='weaken')for(const e of local)e.hp=Math.max(1,Math.ceil(e.hp*.6));
+ if(state.floor===4&&s.crew==='saved'){state.collapseLeft+=90;giveItem('tonic',1);highlight('Nell held the lift. Gained 90 seconds and a tonic.',25)}
+ highlight(name+' activated.',12);closeModal();notify(name+' online'+(r.exit?' · stairs '+r.exit.x+', '+r.exit.y:''));persistCampaign();render();sendPartyWorld();
+ };
+}
+function fieldManual(){
+ const s=season(),r=state.relay,entry=relayFloors[state.floor-1];if(!r||!entry)return;
+ if(!s.notes.includes(state.floor))s.notes.push(state.floor);
+ showModal('<small>SEATTLE RESCUE · HANDWRITTEN FIELD MANUAL</small><h2>Shift notes</h2>'+s.notes.map(f=>'<p><b>F'+f+' · '+relayFloors[f-1][0]+'</b><br>“'+relayFloors[f-1][1]+'” — '+['Mara','Nell','Iven'][f%3]+'</p>').join('')+
+ '<p>Pencil mark at X '+r.x+', Y '+r.y+'.</p>'+button('pinRelay',r.pinned?'Remove map pin':'Pin fixture to map'));
+ $('#pinRelay').onclick=()=>{r.pinned=!r.pinned;persistCampaign();closeModal();render()};persistCampaign();
+}
+function replayHighlights(){
+ const clips=season().highlights.slice(0,3).reverse();if(!clips.length)return;
+ const started=performance.now();
+ showModal('<small>GUILD SHORTWAVE · TEN-SECOND RECAP</small><h2>Tonight underground</h2><div id="recapClip" class="ai-box"></div>'+button('recapBack','Return to terminal'));
+ const frame=$('#recapClip');$('#recapBack').onclick=onAir;
+ function next(){if(!frame.isConnected||$('#modal').classList.contains('hidden'))return;
+   const elapsed=performance.now()-started;if(elapsed>=10000){onAir();return}
+   const h=clips[Math.floor(elapsed*clips.length/10000)];frame.textContent='Floor '+h.floor+' · '+h.line;setTimeout(next,250)}
+ next();
+}
+function onAir(){
+ const s=season(),contract=s.contract;
+ showModal('<small>GUILD SHORTWAVE · AUDIENCE FEED</small><h2>On air</h2><p>'+s.fans+' followers</p><h3>Last broadcast</h3>'+
+ (s.highlights.length?s.highlights.slice(0,3).map(h=>'<p>F'+h.floor+' · '+safeAttr(h.line)+'</p>').join(''):'<p>The recorder is waiting for your first field report.</p>')+
+ (s.highlights.length?button('playRecap','Play ten-second recap'):'')+(s.medical?button('fanGift','Claim fan-voted medical parcel'):'')+
+ '<h3>Open-channel sponsor</h3><p>Broadcast your position. Patrols can detect you from farther away until you defeat a roaming miniboss. Payment is a Gold loot box.</p>'+
+ button('liveDeal',contract==='live'?'Cancel broadcast':contract==='paid'?'Contract paid':'Accept broadcast contract',contract==='paid')+button('fieldBook','Read shift notes'));
+ if($('#playRecap'))$('#playRecap').onclick=replayHighlights;
+ $('#liveDeal').onclick=()=>{s.contract=contract==='live'?'off':'live';persistCampaign();onAir()};
+ if($('#fanGift'))$('#fanGift').onclick=()=>{if(!s.medical)return;s.medical=false;giveItem('tonic',2);persistCampaign();onAir()};
+ $('#fieldBook').onclick=()=>fieldManual();
+}
+function broadcastKill(e){
+ if(!e.chief)return;
+ const s=season();highlight(e.name+' defeated on camera.',24);
+ if(s.contract==='live'){s.contract='paid';awardBox('Gold');highlight('Open-channel sponsor paid a Gold loot box.',40)}
+}
+function expeditionStep(){
+ const r=state.relay;if(!r)return;
+ const s=season();
+ if(state.floor>=3&&state.pet&&!r.petClue&&near(r,6)){
+   r.petClue=true;
+   if(state.pet.species==='cat'&&entities.some(e=>e.alive&&near(e,6)))caption('Companion signal','Your cat flattens its ears. A patrol is close to the station.',true);
+   else if(state.pet.species==='dog')caption('Companion signal','Your dog picks up the scent of another crawler near the station.',true);
+   else caption('Companion signal','Your scout has found the field station. Look for the brass dial.',true);
+ }
+ if(state.floor===2&&near(r,7)&&state.pet&&!s.petWarned&&!orphanedPet()){
+   s.petWarned=true;caption('Companion signal',state.pet.species==='dog'?'Your dog noses the pump handle, then looks back toward the stranded crew.':state.pet.species==='cat'?'Your cat refuses the wet grate and picks a dry line toward the pump.':'Your rabbit thumps twice. The dry ledge leads to the pump.',true);
+ }
+}
+function drawRelay(){
+ const r=state.relay;if(!r||state.chapter!=='mine')return;
+ if(state.floor===2&&!r.used)for(const p of r.water||[]){
+   if(!seen[p.y]?.[p.x])continue;const x=p.x*32,y=p.y*32;
+   ctx.fillStyle=highWater()?'#2c7fa5b8':'#34566e88';ctx.fillRect(x,y+4,32,25);
+   ctx.fillStyle='#94cdd4';for(let i=0;i<3;i++)ctx.fillRect(x+3+(i*7)%13,y+9+i*6,9,1);
+ }
+ if(seen[r.y]?.[r.x]){
+ const x=r.x*32,y=r.y*32;ctx.fillStyle='#252d32';ctx.fillRect(x+3,y+16,26,14);ctx.fillStyle='#ae8461';ctx.fillRect(x+5,y+11,21,14);
+ ctx.fillStyle=r.used?'#93ba91':'#f4cb70';ctx.fillRect(x+7,y+13,8,6);ctx.fillStyle='#435055';ctx.fillRect(x+17,y+15,7,3);
+ ctx.fillStyle='#f8d984';ctx.font='bold 10px monospace';ctx.fillText(relayName(),x-6,y+7);
+ }
+ if(state.floor===2&&r.berth&&seen[r.berth.y]?.[r.berth.x]&&!['saved','following'].includes(state.season?.crew)){
+   const p=r.berth;spriteDraw('hero-side',p.x*32+16,p.y*32+25,24,31);
+   ctx.fillStyle='#ddc59a';ctx.font='9px monospace';ctx.fillText('TESS',p.x*32,p.y*32-4);
+ }
+ if(state.floor===2&&state.season?.crew==='following'&&r.trail&&!state.hall)spriteDraw('hero-back',r.trail.x*32+16,r.trail.y*32+24,25,36);
+}
+
 function guildStation(){const h=state.hall;if(!h)return;const t=hallStyles[hallTheme(h)];return [...guildStations,{x:t.x,y:t.y,kind:"discovery",label:t.object}].filter(s=>Math.hypot(s.x-h.x,s.y-h.y)<=1.6).sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0]}
 function personalMenusLocked(){return state.guildTrained!==true}
 function lockHint(){
@@ -119,6 +366,7 @@ function lockHint(){
   const q=doors[0];notify(q?'Guild induction: nearest sanctuary at X '+q.x+', Y '+q.y+' (green on map).':'Speak to Guild Master Rowan in a sanctuary.');
 }
 function hallWalkable(x,y){
+  if(hallFurniture[hallTheme()].some(([a,b])=>a===x&&b===y))return false;
   const t=hallStyles[hallTheme()];if(x===t.x&&y===t.y)return false;
   return (x===6&&y===8)||(x>=1&&x<=11&&y>=2&&y<=7&&!guildStations.some(s=>s.x===x&&s.y===y));
 }
@@ -179,7 +427,8 @@ function guildReview(){
 function guildMaster(){
   if(!state.hall)return;
   if(personalMenusLocked()){hallTutorial();return}
-  showModal('<small>SEATTLE CRAWLERS’ GUILD</small><h2>Guild Master Rowan</h2><p>Take a seat by the hearth. What shall we go over?</p><button class="widebtn" id="guildNotes">Review defeated guardians</button><button class="widebtn" id="guildBasics">Revisit the tutorial</button><button class="widebtn" id="guildCounter">Guild services</button>'+(state.floor%6===0?'<button class="widebtn" id="cityExchange">City exchange</button>':''));
+  showModal('<small>SEATTLE CRAWLERS’ GUILD</small><h2>Guild Master Rowan</h2><p>'+['Take a seat by the hearth. What shall we go over?','I put the kettle on. Tell me what you saw down there.','Boots by the stove, crawler. There’s news on the shortwave.'][Math.floor(Math.random()*3)]+'</p><button class="widebtn" id="guildNotes">Review defeated guardians</button><button class="widebtn" id="guildBasics">Revisit the tutorial</button><button class="widebtn" id="guildCounter">Guild services</button><button class="widebtn" id="guildAir">Audience terminal</button><button class="widebtn" id="guildManual">Field manual</button>'+(state.floor%6===0?'<button class="widebtn" id="cityExchange">City exchange</button>':''));
+  $('#guildAir').onclick=onAir;$('#guildManual').onclick=fieldManual;
   if($('#cityExchange'))$('#cityExchange').onclick=cityMarket;
   $('#guildNotes').onclick=guildReview;$('#guildBasics').onclick=()=>hallTutorial(0,true);$('#guildCounter').onclick=()=>sanctuaryMenu(state.sanctuaries[state.hall.index]);
 }
@@ -195,6 +444,8 @@ function hallInteract(){
       q.discoveryRead=true;
       if(id===0){for(let y=Math.max(0,q.y-7);y<Math.min(H,q.y+8);y++)for(let x=Math.max(0,q.x-7);x<Math.min(W,q.x+8);x++)if(Math.hypot(x-q.x,y-q.y)<=7)seen[y][x]=true;detail='You copy the surrounding passages onto your map.'}
       if(id===1){giveItem('food',1);detail='You take a trail ration from the cabinet.'}
+      if(id===4){giveItem('tonic',1);detail='A labeled tonic goes into your pack.'}
+      if(id===5){state.relay.pinned=true;detail='You pin the local field station to your map.'}
       if(id===2){giveItem('torch',1);detail='You find a spare torch under the switchboard.'}
       persistCampaign();
     }
@@ -351,6 +602,10 @@ const supplies={
   biscuit:{name:'Enchanted biscuit',icon:'✧',desc:'Feed this to your pet to register it as a crawler. It will gain levels and assist your strikes.'}
 };
 const hotItems=['torch','food','tonic'];
+function giveItem(id,qty){
+ const owned=state.inventory.find(it=>it.id===id);
+ if(owned)owned.qty+=qty;else state.inventory.push({id,...(supplies[id]||{name:id==='shard'?'Mana shard':id,icon:'✦'}),qty});
+}
 function quantity(id){return state.inventory.find(i=>i.id===id)?.qty||0}
 function chooseHot(){
   if(personalMenusLocked()){lockHint();return}
@@ -389,7 +644,7 @@ function meetAnimal(){
     state.wildAnimal=null;awardBox('Pet');persistCampaign();closeModal();render();caption(name,'A pet loot box is tucked into your backpack.',true)};
 }
 function petVictory(){
-  const pet=state.pet;if(!pet)return;
+  const pet=state.pet;if(!pet||orphanedPet())return;
   pet.wins++;if(pet.crawler)pet.level=1+Math.floor(pet.wins/4);
   if(pet.wins%5===0)awardBox('Pet');
 }
@@ -433,8 +688,9 @@ function drawAnimal(species,x,y,crawler,walking=false,g=ctx){
 function interactionTarget(){
   if(state.hall){const s=guildStation();return s&&{kind:'hall',label:s.kind==='master'?'Talk to Rowan':s.label}}
   if(state.chapter==='surface'&&Math.hypot(state.x-10,state.y-12)<=2)return {kind:'sign',label:'Read sign'};
+  if(state.relay&&near(state.relay))return {kind:'relay',label:relayName()};
   const n=state.npc;
-  if(n&&Math.hypot(n.x-state.x,n.y-state.y)<=1.7)return {kind:'npc',label:state.floor===1?'Talk to Iven':'Talk to crawler'};
+  if(n&&(near(n)||(state.floor===2&&!['saved','following'].includes(state.season?.crew)&&near(state.relay?.berth))))return {kind:'npc',label:state.floor===1?'Talk to Iven':'Talk to '+crewName().split(' · ')[0]};
   if(state.wildAnimal&&Math.hypot(state.x-state.wildAnimal.x,state.y-state.wildAnimal.y)<=1.65)return {kind:"animal",label:"Meet "+animalNames[state.wildAnimal.species]};
   const site=state.scenery?.find(p=>p.art>=3&&Math.hypot(p.x-state.x,p.y-state.y)<=1.6);
   if(site)return {kind:'site',label:site.art>=6?'Examine site':'Inspect hideout',site};
@@ -446,16 +702,14 @@ function interact(){
   if(state.dead||bossFight||modalOpen()||activeLoot||remoteLoot)return;
   const target=interactionTarget();
   if(!target){notify('Move beside a person, sign, or doorway.');return}
+  if(target.kind==='relay'){if(partyGuest())notify('The host operates field stations.');else useRelay();return}
   if(target.kind==='animal'){meetAnimal();return}
   if(target.kind==='combat'){attack();return}
   if(target.kind==='hall'){hallInteract();return}
   if(target.kind==='door'){enterHall(target.door);return}
   if(target.kind==='sign'){caption('Seattle rescue notice','Mine access is south, down the stone steps. Report to Guild Master Rowan before entering the tunnels.',true);return}
   if(target.kind==='site'){investigate(target.site);return}
-  const n=state.npc,first=!n.met;
-  if(first){n.met=true;state.gold+=15;if(state.floor===1)state.foundKeeper=true;unlock('Not alone')}
-  caption(state.floor===1?'Iven, rope keeper':'Wandering crawler',state.floor===1?'The cage motor is on Floor 3. Follow the blue pipes through the floodworks.':'Look for the brass crest above a guild door. The lamps stay lit even when the tunnels go dark.',true);
-  if(first)feed('The crawler shares 15 gold.');persistCampaign();render();
+  if(partyGuest()){caption(crewName(),relayFloors[state.floor-1][1],true);return}agentTalk();
 }
 
 function investigate(selected){if(state.hall){hallInteract();return}
@@ -487,7 +741,7 @@ function chooseLanding(){
   if(eligible.length)[state.x,state.y]=eligible[0];
 }
 
-function generate(){state.patrolFloor=0;state.grubHatches=0;state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;const depth=Math.min(FINAL_FLOOR,state.floor)-1;W=118-depth*4;H=80-depth*2;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
+function generate(){state.relay=null;state.patrolFloor=0;state.grubHatches=0;state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;const depth=Math.min(FINAL_FLOOR,state.floor)-1;W=118-depth*4;H=80-depth*2;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
 // carve connected rooms and corridors
 let rooms=[];for(let i=0;i<54-depth*2;i++){let rw=4+Math.floor(r()*6),rh=3+Math.floor(r()*5),rx=1+Math.floor(r()*((state.floor%3===0?W-12:W)-rw-2)),ry=1+Math.floor(r()*(H-rh-2));let room={x:rx,y:ry,w:rw,h:rh,cx:Math.floor(rx+rw/2),cy:Math.floor(ry+rh/2)};for(let y=ry;y<ry+rh;y++)for(let x=rx;x<rx+rw;x++)tiles[y][x]=1;if(rooms.length){let p=rooms[rooms.length-1];let x=room.cx,y=room.cy;while(x!==p.cx){tiles[y][x]=1;x+=Math.sign(p.cx-x)}while(y!==p.cy){tiles[y][x]=1;y+=Math.sign(p.cy-y)}}rooms.push(room)}
 // walls around corridors
@@ -496,7 +750,7 @@ state.x=rooms[0].cx;state.y=rooms[0].cy;state.rooms=rooms.length;let safe=rooms[
 if(state.floor===1)for(let i=0;i<26;i++){let room=rooms[1+Math.floor(r()*(rooms.length-1))],ex=room.cx+Math.floor(r()*3)-1,ey=room.cy+Math.floor(r()*3)-1;if(!sanctuaryAt(ex,ey)&&!solid(ex,ey)&&!entities.some(e=>e.x===ex&&e.y===ey)&&Math.abs(ex-state.x)+Math.abs(ey-state.y)>5)spawnEnemy(ex,ey,r)}
 let dist=Array.from({length:H},()=>Array(W).fill(-1)),queue=[[state.x,state.y]];dist[state.y][state.x]=0;for(let i=0;i<queue.length;i++){let [x,y]=queue[i];for(let [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){let a=x+dx,b=y+dy;if(tile(a,b)===1&&!sanctuaryAt(a,b)&&!state.sanctuaries.some(q=>q.door?.x===a&&q.door?.y===b)&&dist[b][a]<0){dist[b][a]=dist[y][x]+1;queue.push([a,b])}}}let end=rooms.slice(1).sort((a,b)=>dist[b.cy][b.cx]-dist[a.cy][a.cx])[0];const far=queue[queue.length-1];if(dist[end.cy][end.cx]<1||sanctuaryAt(end.cx,end.cy))end={...end,cx:far[0],cy:far[1]};tiles[end.cy][end.cx]=3;state.stairs=true;
 if(state.floor%3===0){let candidates=[];for(let y=2;y<H-9;y++)for(let x=2;x<W-11;x++){let w=8,h=6,clear=true;for(let j=y-1;j<=y+h;j++)for(let i=x-1;i<=x+w;i++)if(tile(i,j)===1||tile(i,j)===3)clear=false;if(!clear)continue;for(let [dx,dy] of [[0,-1],[0,1],[-1,0],[1,0]]){let gx=dx<0?x-1:dx>0?x+w:x+4,gy=dy<0?y-1:dy>0?y+h:y+3;if(tile(gx+dx,gy+dy)===1&&dist[gy+dy][gx+dx]>12)candidates.push({x,y,w,h,gx,gy,score:dist[gy+dy][gx+dx]})}}candidates.sort((a,b)=>b.score-a.score);let a=candidates[0];if(!a){let x=W-10,y=H-10,w=8,h=6,gx=x-1,gy=y+3;let nearest=queue.filter(([i,j])=>i<gx).sort((p,q)=>Math.abs(p[0]-gx)+Math.abs(p[1]-gy)-Math.abs(q[0]-gx)-Math.abs(q[1]-gy))[0];if(nearest){let [i,j]=nearest;while(j!==gy){tiles[j][i]=1;j+=Math.sign(gy-j)}while(i<gx){tiles[j][i]=1;i++}a={x,y,w,h,gx,gy}}}if(a){for(let j=a.y-1;j<=a.y+a.h;j++)for(let i=a.x-1;i<=a.x+a.w;i++)tiles[j][i]=i>=a.x&&i<a.x+a.w&&j>=a.y&&j<a.y+a.h?1:2;tiles[a.gy][a.gx]=1;state.arena={x:a.x,y:a.y,w:a.w,h:a.h,gates:[{x:a.gx,y:a.gy}]};spawnBoss(a.x+4,a.y+3)}else{let room=rooms.filter(q=>q!==end&&dist[q.cy][q.cx]>12).sort((a,b)=>b.w*b.h-a.w*a.h)[0]||rooms[1];state.arena={x:room.x,y:room.y,w:room.w,h:room.h,gates:[]};entities=entities.filter(e=>!(e.x>=room.x&&e.x<room.x+room.w&&e.y>=room.y&&e.y<room.y+room.h));spawnBoss(room.cx,room.cy)}}else state.arena=null;
-populatePatrols();furnishFloor();placeAnimal();feed('You descend into <b>'+names[(state.floor-1)%names.length]+'</b>.');ai(quips[Math.floor(r()*quips.length)]);reveal();render();}
+populatePatrols();furnishFloor();placeAnimal();initialiseRelay();feed('You descend into <b>'+names[(state.floor-1)%names.length]+'</b>.');ai(quips[Math.floor(r()*quips.length)]);reveal();render();}
 const floorMobs=[
  [['Drain rat','sewer-rat'],['Tunnel goblin','goblin'],['Pack llama','pack-llama']],
  [['Flood grub','flood-grub'],['Mire leprechaun','mire-leprechaun']],
@@ -592,7 +846,7 @@ function reveal(){if(state.hall)return;let rad=state.torchTurns>0?7:5;for(let y=
 function feed(s){let d=new Date(),tm=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});state.feed.unshift({tm,s});state.feed=state.feed.slice(0,30);renderFeed()}
 function ai(s){caption("Underfloor",s);$('#aiLine').textContent='“'+s+'”'}function notify(s){let t=$('#toast');t.textContent=s;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),1600)}
 function beep(f=180,d=.07,type='square'){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();let o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+d);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d)}catch(e){}}
-function move(dx,dy,start=performance.now()){if(pauseStarted!==null||bossFight||state.dead||step||modalOpen())return;state.facing=dx<0?'left':dx>0?'right':dy<0?'up':'down';const pos=state.hall||state;let nx=pos.x+dx,ny=pos.y+dy;if(state.hall&&nx===6&&ny===8&&personalMenusLocked()){leaveHall();return}if(state.hall?!hallWalkable(nx,ny):solid(nx,ny)||entities.some(e=>e.type==='enemy'&&e.alive&&e.x===nx&&e.y===ny))return;step={x:pos.x,y:pos.y,nx,ny,start,duration:strideDuration()};stepCount++;return;}function finishStep(nx,ny){
+function move(dx,dy,start=performance.now()){if(pauseStarted!==null||bossFight||state.dead||step||modalOpen())return;state.facing=dx<0?'left':dx>0?'right':dy<0?'up':'down';const pos=state.hall||state;let nx=pos.x+dx,ny=pos.y+dy;if(state.hall&&nx===6&&ny===8&&personalMenusLocked()){leaveHall();return}if(!state.hall&&submerged(nx,ny)){notify('High water · use the dry ledge or wait for low tide.');return}if(state.hall?!hallWalkable(nx,ny):solid(nx,ny)||entities.some(e=>e.type==='enemy'&&e.alive&&e.x===nx&&e.y===ny))return;step={x:pos.x,y:pos.y,nx,ny,start,duration:strideDuration()};stepCount++;return;}function finishStep(nx,ny){
 if(state.hall){if(ny===8&&personalMenusLocked()){leaveHall();return}setPetTile(state.hall);state.hall.x=nx;state.hall.y=ny;if(ny===8){leaveHall();return}persistCampaign();render();return}
 
 if(entities.some(e=>e.type==='enemy'&&e.alive&&e.x===nx&&e.y===ny))return;
@@ -601,7 +855,7 @@ setPetTile(state);state.x=nx;state.y=ny;
 if(ny>=12&&!state.heardRope){state.heardRope=true;caption('Mara','My brother tied blue cloth to the rope. If you find it, tell him the lamps are still lit.',true)}
 if(tile(nx,ny)===3)nextFloor();else persistCampaign();
 return}
-const shelter=state.sanctuaries?.find(q=>(q.door?.x===nx&&q.door.y===ny)||q.room&&q.door&&sanctuaryAt(nx,ny)===q||!q.room&&q.x===nx&&q.y===ny);if(shelter){enterHall(shelter);return}let wasSafe=sanctuaryAt(state.x,state.y);setPetTile(state);state.x=nx;state.y=ny;if(wasSafe&&!sanctuaryAt(nx,ny))notify('LEFT SAFE ROOM');if(!wasSafe&&sanctuaryAt(nx,ny)){notify('SAFE ROOM — ATTACKS DISABLED');ridiculous('Even Cowards Need a Break')}walkUntil=performance.now()+340;state.steps++;if(state.steps===50)ridiculous('Congratulations, You Have Legs');if(state.steps===1000)ridiculous('Certified Corridor Enthusiast','Legendary');if(state.steps===250)ridiculous('The Dungeon Is Not a Treadmill','Silver');if(Math.random()<.002)ridiculous('Suspiciously Competent Wandering');if(state.torchTurns>0)state.torchTurns--;reveal();if(tile(nx,ny)===3){nextFloor();return}if(Math.random()<.05)ai(quips[Math.floor(Math.random()*quips.length)]);render();}
+const shelter=state.sanctuaries?.find(q=>(q.door?.x===nx&&q.door.y===ny)||q.room&&q.door&&sanctuaryAt(nx,ny)===q||!q.room&&q.x===nx&&q.y===ny);if(shelter){enterHall(shelter);return}let wasSafe=sanctuaryAt(state.x,state.y);if(state.relay)state.relay.trail={x:state.x,y:state.y};setPetTile(state);state.x=nx;state.y=ny;expeditionStep();if(wasSafe&&!sanctuaryAt(nx,ny))notify('LEFT SAFE ROOM');if(!wasSafe&&sanctuaryAt(nx,ny)){notify('SAFE ROOM — ATTACKS DISABLED');ridiculous('Even Cowards Need a Break')}walkUntil=performance.now()+340;state.steps++;if(state.steps===50)ridiculous('Congratulations, You Have Legs');if(state.steps===1000)ridiculous('Certified Corridor Enthusiast','Legendary');if(state.steps===250)ridiculous('The Dungeon Is Not a Treadmill','Silver');if(Math.random()<.002)ridiculous('Suspiciously Competent Wandering');if(state.torchTurns>0)state.torchTurns--;reveal();if(tile(nx,ny)===3){nextFloor();return}if(Math.random()<.05)ai(quips[Math.floor(Math.random()*quips.length)]);render();}
 function nearby(){return entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=1.65).sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y))[0]}
 let bossFight=null;
 function beginBoss(e){if(bossFight||state.dead||modalOpen()||sanctuaryAt(state.x,state.y)||(e.boss&&state.arena&&!inArena(state.x,state.y)))return;bossFight={e,turn:1,log:e.boss?'The arena seals.':'The '+e.name.toLowerCase()+' advances.'};step=null;visualX=state.x;visualY=state.y;joyX=joyY=0;if(e.boss)ai('BOSS BATTLE! Please make your inevitable suffering entertaining.');bossScreen();persistCampaign()}
@@ -685,7 +939,7 @@ async function animateTurn(action){
     persistCampaign();render();return;
   }
   const stage=$('.duel-stage');
-  const strike=action==='attack'?state.power+(state.pet?.crawler?state.pet.level+1:0)+Math.floor(Math.random()*5):techniqueDamage(action);
+  const strike=action==='attack'?state.power+(state.pet?.crawler&&!orphanedPet()?state.pet.level+1:0)+Math.floor(Math.random()*5):techniqueDamage(action);
   const damage=strike+(action==='trap'?25+state.level*3:0)+(battle.assist||0);
   animatingTurn=true;
   const wait=ms=>battleFrames(ms,null,()=>bossFight===battle);
@@ -702,7 +956,7 @@ async function animateTurn(action){
 }
 
 function bossScreen(){encounterScreen()}
-function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(techniques[action]&&action!=='mend'){if(!prepared().includes(action)||state.mp<techniques[action].cost)return;state.mp-=techniques[action].cost;d=strike;guard=action==='brace'}if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(35)}d+=b.assist||0;b.assist=0;e.hp-=d;if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;petVictory();if(!e.boss){
+function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(techniques[action]&&action!=='mend'){if(!prepared().includes(action)||state.mp<techniques[action].cost)return;state.mp-=techniques[action].cost;d=strike;guard=action==='brace'}if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(35)}d+=b.assist||0;b.assist=0;e.hp-=d;if(e.hp<=0){e.alive=false;broadcastKill(e);e.deathAt=performance.now();state.kills++;petVictory();if(!e.boss){
 state.xp+=e.xp;state.gold+=5+Math.floor(Math.random()*12);bossFight=null;
 const milestones={10:['Unlicensed Exterminator','Silver'],30:['The Neighborhood Is Quiet Now','Gold'],100:['Population Control Department','Celestial']};
 if(milestones[state.kills])ridiculous(...milestones[state.kills]);
@@ -710,9 +964,10 @@ if(Math.random()<.08)awardBox('Bronze');
 if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true});
 closeModal();if(state.kills===1){unlock('First blood');ridiculous('Local Pest Control')}checkLevel();feed(e.name+' falls. Search its belongings with Loot.');persistCampaign();render();return
 }recordGuardian(state.floor,e.name,b.turn,b.guards||0);state.xp+=e.xp+100;state.gold+=100;if(window.DCKNet?.isHost)for(let [id,p] of Object.entries(netPlayers))if(p.floor===state.floor&&Math.hypot(p.x-e.x,p.y-e.y)<=8)window.DCKNet.sendReward(id,50,e.xp||100,'tonic',{floor:state.floor,name:e.name});if(state.achievements.includes('Management Has Been Terminated'))awardBox('Gold');else ridiculous('Management Has Been Terminated','Gold');checkLevel();$('#bossbar').classList.add('hidden');bossFight=null;showModal('<h2>GUARDIAN DEFEATED</h2><p>Gold loot box awarded. Loot the remains in the dungeon.</p><button class="widebtn" id="bossDone">CONTINUE</button>');if(state.floor===3&&state.foundKeeper){state.minersFree=true;caption('Iven','Hear that? Three bells. The cage is moving. My crew is going home.',true)}$('#bossDone').onclick=closeModal;save();render();return}let hit=Math.max(1,Math.floor((e.atk*(intent==='AIMED SHOT'?1.5:intent==='DEVASTATING STRIKE'?1.7:intent==='ENRAGED ATTACK'?1.25:1)-state.armor)*(guard?.25:1)));if(intent==='BUDDING'&&hatchGrub(e)){b.log='The grub splits. A hatchling wriggles onto the floor beside it.';b.turn++;persistCampaign();sendPartyWorld();bossScreen();render();return}
+if(intent==='SICKENING MIST')mistCloud(e);
 if(intent==='SICKENING MIST'&&!guard)(state.wounds??={}).sick=true;
 if(intent==='MANA DRAIN'&&!guard){state.mp=Math.max(0,state.mp-8);hit+=4}if(intent==='ARMOR SHATTER'&&!guard)hit+=Math.min(12,state.armor);if(state.wounds?.poison||b.poison>0)hit+=2;if(state.wounds?.bleed&&!guard)hit+=1;state.hp=Math.max(0,state.hp-hit);registerHit(e,hit,guard,intent==='VENOM BITE');b.log=(d?'You dealt '+d+' damage. ':guard?'You brace for impact. ':action==='focus'?'You recover mana. ':'You recover health. ')+'The guardian deals '+hit+' damage.';b.turn++;if(state.hp<=0){state.dead=true;bossFight=null;save();openDeath();return}persistCampaign();bossScreen();render()}
-function attack(){if(state.chapter==='create'||state.chapter==='surface')return;if(state.dead||bossFight||sanctuaryAt(state.x,state.y))return;if(partyGuest()){if(!state.dead&&attackCooldown<=0){attackCooldown=.48;attackStarted=performance.now();window.DCKNet.sendIntent('attack')}return}let guardian=entities.find(e=>e.boss&&e.alive&&(!state.arena||inArena(state.x,state.y))&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);if(guardian){beginBoss(guardian);return}if(state.dead||attackCooldown>0)return;attackCooldown=.48;attackStarted=performance.now();let targets=entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);targets=targets.filter(e=>e.type==='enemy'&&!e.boss);if(!targets.length){beep(110,.06);return}targets.sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y));let e=targets[0];if(!window.DCKNet?.inRoom){beginBoss(e);return}let dmg=state.power+(state.pet?.crawler?state.pet.level+1:0)+Math.floor(Math.random()*5);e.hp-=dmg;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+dmg});beep(230,.08,'sawtooth');feed('You strike '+e.name+' for <b>'+dmg+'</b> damage.');if(e.hp<=0){e.alive=false;e.deathAt=performance.now();state.kills++;petVictory();if(state.kills===1)ridiculous('Local Pest Control');if(state.kills===10)ridiculous('Unlicensed Exterminator','Silver');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===30)ridiculous('The Neighborhood Is Quiet Now','Gold');if(Math.random()<.08)awardBox('Bronze');if(e.boss)ridiculous('Management Has Been Terminated','Gold');state.xp+=e.xp;state.gold+=Math.floor(5+Math.random()*12);feed('<b>'+e.name+'</b> falls. Remains left behind. +'+e.xp+' XP.');particles.push({x:e.x,y:e.y,t:0,kind:'death'});checkLevel();if(state.kills>=1)unlock('First blood');if(e.boss){state.gold+=100;state.xp+=100;unlock('Warden breaker');ai('The Warden is down. The audience is… cautiously impressed.');$('#bossbar').classList.add('hidden')}if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true})}render();}
+function attack(){if(state.chapter==='create'||state.chapter==='surface')return;if(state.dead||bossFight||sanctuaryAt(state.x,state.y))return;if(partyGuest()){if(!state.dead&&attackCooldown<=0){attackCooldown=.48;attackStarted=performance.now();window.DCKNet.sendIntent('attack')}return}let guardian=entities.find(e=>e.boss&&e.alive&&(!state.arena||inArena(state.x,state.y))&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);if(guardian){beginBoss(guardian);return}if(state.dead||attackCooldown>0)return;attackCooldown=.48;attackStarted=performance.now();let targets=entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=2.15);targets=targets.filter(e=>e.type==='enemy'&&!e.boss);if(!targets.length){beep(110,.06);return}targets.sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y));let e=targets[0];if(!window.DCKNet?.inRoom){beginBoss(e);return}let dmg=state.power+(state.pet?.crawler&&!orphanedPet()?state.pet.level+1:0)+Math.floor(Math.random()*5);e.hp-=dmg;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+dmg});beep(230,.08,'sawtooth');feed('You strike '+e.name+' for <b>'+dmg+'</b> damage.');if(e.hp<=0){e.alive=false;broadcastKill(e);e.deathAt=performance.now();state.kills++;petVictory();if(state.kills===1)ridiculous('Local Pest Control');if(state.kills===10)ridiculous('Unlicensed Exterminator','Silver');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===100)ridiculous('Population Control Department','Celestial');if(state.kills===30)ridiculous('The Neighborhood Is Quiet Now','Gold');if(Math.random()<.08)awardBox('Bronze');if(e.boss)ridiculous('Management Has Been Terminated','Gold');state.xp+=e.xp;state.gold+=Math.floor(5+Math.random()*12);feed('<b>'+e.name+'</b> falls. Remains left behind. +'+e.xp+' XP.');particles.push({x:e.x,y:e.y,t:0,kind:'death'});checkLevel();if(state.kills>=1)unlock('First blood');if(e.boss){state.gold+=100;state.xp+=100;unlock('Warden breaker');ai('The Warden is down. The audience is… cautiously impressed.');$('#bossbar').classList.add('hidden')}if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true})}render();}
 
 function takeDamage(n,e){if(state.dead)return;if(sanctuaryAt(state.x,state.y))return;hurtAt=performance.now();let d=Math.max(1,n-state.armor);state.hp=Math.max(0,state.hp-d);registerHit(e,d);particles.push({x:state.x,y:state.y,t:0,kind:'hurt',text:'-'+d});feed('<b>'+e.name+'</b> hits you for '+d+' damage.');beep(90,.12,'sawtooth');if(state.hp<=0){state.dead=true;feed('<b>You have fallen.</b> The dungeon claims another crawler.');unlock('Down but not out');notify('CRAWLER DOWN — TAP REVIVE');save();setTimeout(()=>openDeath(),600)}}
 function sanctuaryAt(x,y){return (state.sanctuaries||[state.safe].filter(Boolean)).find(q=>q.room?x>=q.room.x&&x<q.room.x+q.room.w&&y>=q.room.y&&y<q.room.y+q.room.h:Math.hypot(x-q.x,y-q.y)<=2)}function buildSanctuaries(){for(let q of state.sanctuaries){let candidates=[];for(let y=2;y<H-6;y++)for(let x=2;x<W-8;x++){let clear=true;for(let b=y-1;b<=y+4;b++)for(let a=x-1;a<=x+5;a++)if(tile(a,b)===1||tile(a,b)===3)clear=false;if(!clear)continue;for(let [dx,dy] of [[0,-2],[0,5],[-2,0],[6,0]]){let a=x+(dx===0?2:dx),b=y+(dy===0?1:dy);if(tile(a,b)===1)candidates.push({x,y,a,b,dx,dy})}}candidates.sort((a,b)=>Math.hypot(a.x-q.x,a.y-q.y)-Math.hypot(b.x-q.x,b.y-q.y));let c=candidates[0];if(!c)continue;let {x,y,a,b,dx,dy}=c;for(let j=y-1;j<=y+4;j++)for(let i=x-1;i<=x+5;i++)tiles[j][i]=(i>=x&&i<x+5&&j>=y&&j<y+4)?1:2;let door={x:dx<0?x-1:dx>0?x+5:x+2,y:dy<0?y-1:dy>0?y+4:y+1};tiles[door.y][door.x]=1;q.x=x+2;q.y=y+2;q.room={x,y,w:5,h:4};q.door=door;}state.sanctuaries=state.sanctuaries.filter(q=>q.room);if(state.sanctuaries.length)state.safe={x:state.sanctuaries[0].x,y:state.sanctuaries[0].y}}function pursueCrawler(enemy){
@@ -729,7 +984,8 @@ function sanctuaryAt(x,y){return (state.sanctuaries||[state.safe].filter(Boolean
     }
   }
 }
-function enemyTick(dt){if(state.hall||state.dead||bossFight||partyGuest())return;let guardian=entities.find(e=>e.boss&&e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=3);if(guardian&&!sanctuaryAt(state.x,state.y)&&(!state.arena||inArena(state.x,state.y))){beginBoss(guardian);return}if(state.npc&&!state.npc.met&&Math.random()<dt*.65){let n=state.npc,opts=[[1,0],[-1,0],[0,1],[0,-1]],a=opts[Math.floor(Math.random()*4)],x=n.x+a[0],y=n.y+a[1];if(!solid(x,y)&&tile(x,y)!==3&&!(x===state.x&&y===state.y)&&!entities.some(e=>e.alive&&e.x===x&&e.y===y)){n.x=x;n.y=y}}if(sanctuaryAt(state.x,state.y))return;state.retreatGrace=Math.max(0,(state.retreatGrace||0)-dt);for(let e of entities){if(!e.alive||e.type!=='enemy'||e.boss)continue;e.cool-=dt;
+function enemyTick(dt){if(state.hall||state.dead||bossFight||partyGuest()||state.chapter!=='mine')return;let guardian=entities.find(e=>e.boss&&e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=3);if(guardian&&!sanctuaryAt(state.x,state.y)&&(!state.arena||inArena(state.x,state.y))){beginBoss(guardian);return}moveScout(dt);if(sanctuaryAt(state.x,state.y))return;state.retreatGrace=Math.max(0,(state.retreatGrace||0)-dt);for(let e of entities){if(!e.alive||e.type!=='enemy'||e.boss)continue;e.cool-=dt;
+if(e.lured>0)e.lured-=dt;
 if(e.avoid>0){e.avoid-=dt;continue}
 if(e.pursuit>0){
   e.pursuit-=dt;e.pursuitDelay-=dt;
@@ -739,8 +995,8 @@ if(e.pursuit>0){
 if(state.retreatGrace&&Math.hypot(e.x-state.x,e.y-state.y)<1.4)continue;
 if(Math.hypot(e.x-state.x,e.y-state.y)<1.4){if(!window.DCKNet?.inRoom){beginBoss(e);return}if(e.cool<=0){e.attackAt=performance.now();
  if(e.sprite==='flood-grub'&&hatchGrub(e))notify('A grub hatchling emerges.');
- else{if(e.sprite==='mire-leprechaun'&&Math.random()<.4)(state.wounds??={}).sick=true;takeDamage(e.atk,e)}e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<dt*(state.floor===1?.72:1+Math.min(state.floor,12)*.035)){
-const chasing=Math.hypot(e.x-state.x,e.y-state.y)<(state.floor===1?7:9+Math.floor(state.floor/5));
+ else{if(e.sprite==='mire-leprechaun'&&Math.random()<.4){mistCloud(e);(state.wounds??={}).sick=true}takeDamage(e.atk,e)}e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<dt*(state.floor===1?.72:1+Math.min(state.floor,12)*.035)){
+const chasing=!(e.lured>0)&&Math.hypot(e.x-state.x,e.y-state.y)<(state.floor===1?7:9+Math.floor(state.floor/5))+(state.season?.contract==='live'?5:0);
 const target=chasing?state:e.den;if(!target)continue;
 let dx=Math.sign(target.x-e.x),dy=Math.sign(target.y-e.y);let opts=Math.random()<.5?[[dx,0],[0,dy]]:[[0,dy],[dx,0]];for(let [ax,ay] of opts)if((ax||ay)&&!(step&&e.x+ax===step.nx&&e.y+ay===step.ny)&&!solid(e.x+ax,e.y+ay)&&!sanctuaryAt(e.x+ax,e.y+ay)&&!entities.some(q=>q!==e&&q.alive&&q.x===e.x+ax&&q.y===e.y+ay)){e.x+=ax;e.y+=ay;break}}}}
 function checkLevel(){while(state.xp>=state.nextXp){state.xp-=state.nextXp;state.level++;state.nextXp=Math.floor(state.nextXp*1.35);state.maxHp+=12;restoreHealth(state.maxHp);if(state.floor>=4){state.maxMp+=4;state.mp=state.maxMp}state.power+=2;state.skillPoints++;feed('<b>LEVEL UP!</b> You reached level '+state.level+'. Stats increased.');notify('LEVEL UP — LEVEL '+state.level);unlock('Getting stronger');beep(660,.2,'sine')}}
@@ -948,6 +1204,7 @@ if(state.floor>=FINAL_FLOOR){
   showModal('<h2>Seattle hears the last bell</h2><p>You cleared all 18 floors. Above the rescue shaft, the street lamps come back on.</p><button class="widebtn" id="campaignDone">Return to the floor</button>');
   $('#campaignDone').onclick=closeModal;return;
 }
+if(state.floor===2){const s=season();if(s.crew==='following')saveCrew();else if(s.crew!=='saved'){s.crew='lost';highlight('Nell reached the cage alone. Tess missed the last boat.',8)}}
 ridiculous('Elevator Out of Service','Silver');state.floor++;if(state.floor===4&&state.maxMp===0){state.maxMp=35;state.mp=35}state.hp=Math.min(state.maxHp,state.hp+18);state.mp=Math.min(state.maxMp,state.mp+8);state.gold+=10;unlock('Deeper down');feed('You descend to floor '+state.floor+'. +10 gold, recovered vitality.');generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();
 const reports={
 2:['Iven’s radio','Elliott Bay is leaking through the west wall. Follow the blue pipes to the cage motor.'],
@@ -956,6 +1213,8 @@ const reports={
 5:['Mara','The Lake Union archive has the original wiring plans. Find where the signal leaves the city.'],
 6:['Rescue frequency','Queen Anne relay online. Seattle can hear us. Keep the channel open.']
 };
+if(state.floor===2&&state.relay)reports[2][1]='Nell here. Tess is sick. Find us near '+state.relay.camp.x+', '+state.relay.camp.y+'. Two bells mean high water.';
+if(state.floor===3&&['saved','lost'].includes(state.season?.crew))reports[3][1]=season().crew==='saved'?'Both salvage crew members made it. Nell left you a call sign for the lift on 4.':'Nell came up alone. The second bunk is still made.';
 if(state.floor===4)reports[4][1]+=' Race and class selection are now open. Use Character and Skills.';
 if(reports[state.floor])caption(...reports[state.floor],true);
 save()}
@@ -1006,7 +1265,7 @@ function companionMenu(){
   const description=pet.crawler?'Crawler · Level '+pet.level:'Pet · Travels with you';
   body.innerHTML='<div class="companion-profile"><canvas width="32" height="32" aria-label="Companion portrait"></canvas><div><h3>'+safeAttr(pet.name||species)+'</h3><p>'+safeAttr(species)+' · '+description+'</p></div></div>'+
     (pet.crawler?'<p>Strike assist +'+(pet.level+1)+' · '+(4-wins%4)+' victories to next level</p><progress aria-label="Progress to next level" value="'+(wins%4)+'" max="4"></progress>':'<p>An enchanted biscuit from a Pet loot box can transform this pet into a crawler.</p><button id="feedCompanion" '+(quantity('biscuit')?'':'disabled')+'>Feed enchanted biscuit ×'+quantity('biscuit')+'</button>')+
-    '<p>Victories '+wins+' · Next pet box in '+(5-wins%5)+'</p><form id="petNameForm"><label>Companion name<input name="petName" maxlength="24" placeholder="'+safeAttr(species)+'"></label><button>Save name</button></form>';
+    '<p>Victories '+wins+' · '+(orphanedPet()?'Escorting Sound Salvage':pet.species==='dog'?'Loyal · favors rescues':pet.species==='cat'?'Cautious · favors dry routes':'Alert · watches for hazards')+' · Next pet box in '+(5-wins%5)+'</p><form id="petNameForm"><label>Companion name<input name="petName" maxlength="24" placeholder="'+safeAttr(species)+'"></label><button>Save name</button></form>';
   drawAnimal(pet.species,0,0,pet.crawler,false,body.querySelector('canvas').getContext('2d'));
   const form=$('#petNameForm');form.elements.petName.value=pet.name||'';
   form.onsubmit=e=>{e.preventDefault();pet.name=form.elements.petName.value.trim().slice(0,24);persistCampaign();render();companionMenu()};
@@ -1199,7 +1458,7 @@ function playDuelStrike(stage,battle){
   },()=>bossFight===battle&&stage.isConnected);
 }
 function drawHero(x,y){
-  if(state.pet){const pet=petPosition(x,y);if(pet)drawAnimal(state.pet.species,pet.x,pet.y,state.pet.crawler,!!step)}
+  if(state.pet&&!orphanedPet()){const pet=petPosition(x,y);if(pet)drawAnimal(state.pet.species,pet.x,pet.y,state.pet.crawler,!!step)}
   const now=performance.now(),px=x*TILE+16,ground=y*TILE+27;
   const p=step?Math.min(1,Math.max(0,(now-step.start)/step.duration)):0;
   const phase=step?((stepCount-1+p)*.5)%1:0;
@@ -1273,12 +1532,14 @@ if(cameraX===null||Math.hypot(visualX-cameraX,visualY-cameraY)>2.5){cameraX=visu
 else{cameraX+=(visualX-cameraX)*blend;cameraY+=(visualY-cameraY)*blend}
 cameraTime=now;
 let camX=cameraX*TILE-canvas.width/(2*zoom)+TILE/2,camY=cameraY*TILE-canvas.height/(2*zoom)+TILE/2;ctx.imageSmoothingEnabled=false;ctx.save();ctx.scale(zoom,zoom);ctx.translate(-camX,-camY);for(let y=Math.max(0,Math.floor(camY/TILE)-2);y<Math.min(H,Math.ceil((camY+canvas.height/zoom)/TILE)+2);y++)for(let x=Math.max(0,Math.floor(camX/TILE)-2);x<Math.min(W,Math.ceil((camX+canvas.width/zoom)/TILE)+2);x++){if(!seen[y][x]){ctx.fillStyle='#030609';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}else drawTile(x,y,tiles[y][x])}
+drawRelay();
 if(sceneryArt.complete&&sceneryArt.naturalWidth)for(const p of state.scenery||[]){
  if(!seen[p.y]?.[p.x])continue;
  ctx.drawImage(sceneryArt,p.art*32,0,32,32,p.x*TILE,p.y*TILE,TILE,TILE);
  if(p.art>=6&&!state.investigated?.includes(p.y*W+p.x)){ctx.fillStyle='#9bd7ce';ctx.fillRect(p.x*TILE+15,p.y*TILE+3,3,3)}
 }
-for(let e of entities){if(!seen[e.y]?.[e.x])continue;if(e.type==='loot'&&e.alive){ctx.fillStyle='#e4c16a';ctx.fillRect(e.x*TILE+12,e.y*TILE+12,9,9);ctx.fillStyle='#fff0b3';ctx.fillRect(e.x*TILE+14,e.y*TILE+10,5,3)}else if(e.type==='enemy'&&e.alive)drawEnemy(e);else if(e.type==='enemy'&&!e.alive&&!e.looted)drawRemains(e)}for(const q of state.sanctuaries||[state.safe].filter(Boolean))drawGuildEntrance(q);if(state.npc&&seen[state.npc.y]?.[state.npc.x]){spriteDraw('hero-front',state.npc.x*TILE+16,state.npc.y*TILE+25,30,44);ctx.fillStyle='#7ce4df';ctx.font='10px monospace';ctx.fillText(state.floor===1?'ROPE KEEPER':'CRAWLER',state.npc.x*TILE-8,state.npc.y*TILE-24)}if(state.wildAnimal&&seen[state.wildAnimal.y]?.[state.wildAnimal.x])drawAnimal(state.wildAnimal.species,state.wildAnimal.x,state.wildAnimal.y,false);drawHero(visualX,visualY);for(const [id,p] of Object.entries(netPlayers)){if(p.floor!==state.floor||p.hall)continue;const px=p.x*TILE+16,py=p.y*TILE+25;ctx.save();ctx.globalAlpha=.82;ctx.strokeStyle='#65c9d5';ctx.lineWidth=2;ctx.beginPath();ctx.arc(px,py-18,15,0,Math.PI*2);ctx.stroke();ctx.drawImage(crawlerPose('down',0,p.character||{},p.gear||{}),px-12,py-30,24,32);ctx.fillStyle='#a7e6ee';ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText((p.name||'ALLY').slice(0,10),px,py-51);ctx.restore();}
+for(let e of entities){if(!seen[e.y]?.[e.x])continue;if(e.type==='loot'&&e.alive){ctx.fillStyle='#e4c16a';ctx.fillRect(e.x*TILE+12,e.y*TILE+12,9,9);ctx.fillStyle='#fff0b3';ctx.fillRect(e.x*TILE+14,e.y*TILE+10,5,3)}else if(e.type==='enemy'&&e.alive)drawEnemy(e);else if(e.type==='enemy'&&!e.alive&&!e.looted)drawRemains(e)}for(const q of state.sanctuaries||[state.safe].filter(Boolean))drawGuildEntrance(q);if(state.npc&&seen[state.npc.y]?.[state.npc.x]){const n=state.npc,t=Math.min(1,Math.max(0,(performance.now()-(n.walkAt??-1000))/320)),px=(n.fromX??n.x)*(1-t)+n.x*t,py=(n.fromY??n.y)*(1-t)+n.y*t;
+ spriteDraw('hero-'+(['side','back'].includes(n.facing)?n.facing:'front'),px*TILE+16,py*TILE+25-Math.sin(t*Math.PI)*2,30,44);ctx.fillStyle='#7ce4df';ctx.font='10px monospace';ctx.fillText(state.floor===1?'ROPE KEEPER':state.floor<=4?'SOUND SALVAGE':'NIGHT SHIFT',state.npc.x*TILE-8,state.npc.y*TILE-24)}if(state.wildAnimal&&seen[state.wildAnimal.y]?.[state.wildAnimal.x])drawAnimal(state.wildAnimal.species,state.wildAnimal.x,state.wildAnimal.y,false);drawHero(visualX,visualY);for(const [id,p] of Object.entries(netPlayers)){if(p.floor!==state.floor||p.hall)continue;const px=p.x*TILE+16,py=p.y*TILE+25;ctx.save();ctx.globalAlpha=.82;ctx.strokeStyle='#65c9d5';ctx.lineWidth=2;ctx.beginPath();ctx.arc(px,py-18,15,0,Math.PI*2);ctx.stroke();ctx.drawImage(crawlerPose('down',0,p.character||{},p.gear||{}),px-12,py-30,24,32);ctx.fillStyle='#a7e6ee';ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText((p.name||'ALLY').slice(0,10),px,py-51);ctx.restore();}
 for(let p of particles){let x=p.x*TILE+16,y=p.y*TILE+16;if(p.kind==='pulse'){ctx.strokeStyle='#60c9e2';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,15+p.t*100,0,Math.PI*2);ctx.stroke()}if(p.kind==='magic'||p.kind==='hit'||p.kind==='hurt'){ctx.fillStyle=p.kind==='magic'?'#77d9ee':'#f0a18b';ctx.font='bold 15px monospace';ctx.fillText(p.text||'',x,y-p.t*24)}if(p.kind==='death'||p.kind==='dodge'){ctx.fillStyle=p.kind==='death'?'#d6d8d4':'#9fdbe2';ctx.globalAlpha=Math.max(0,1-p.t*2);ctx.fillRect(x-7,y-7,14,14);ctx.globalAlpha=1}}
 ctx.restore();let glow=ctx.createRadialGradient(canvas.width/2,canvas.height/2,40,canvas.width/2,canvas.height/2,canvas.width*(state.torchTurns>0?.68:.43));glow.addColorStop(0,'rgba(255,177,83,.08)');glow.addColorStop(.5,'rgba(0,0,0,0)');glow.addColorStop(1,'rgba(2,5,12,.78)');ctx.fillStyle=glow;ctx.fillRect(0,0,canvas.width,canvas.height);if(performance.now()-hurtAt<220){ctx.fillStyle='rgba(180,20,25,.15)';ctx.fillRect(0,0,canvas.width,canvas.height)}}
 function drawMini(){if(state.hall){
@@ -1286,6 +1547,7 @@ mini.fillStyle='#182222';mini.fillRect(0,0,240,180);mini.fillStyle='#725e48';min
 mini.fillStyle='#efc783';mini.fillRect(118,61,7,7);mini.fillStyle='#93cfc3';mini.fillRect(118,143,8,5);
 mini.fillStyle='#fff1ba';mini.fillRect(34+state.hall.x*14,21+state.hall.y*15,7,7);return}
 let m=$('#minimap'),w=m.width,h=m.height;mini.fillStyle='#070b0f';mini.fillRect(0,0,w,h);let s=Math.min(w/W,h/H);let ox=(w-W*s)/2,oy=(h-H*s)/2;for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(!seen[y][x])continue;mini.fillStyle=inArena(x,y)&&tiles[y][x]===1?'#9d6549':tiles[y][x]===2?'#26323a':tiles[y][x]===3?'#d6a65a':'#655e50';mini.fillRect(ox+x*s,oy+y*s,Math.ceil(s),Math.ceil(s))}for(let e of entities){if(!e.alive||!seen[e.y]?.[e.x])continue;mini.fillStyle=e.type==='loot'?'#d6a65a':'#e34e4b';mini.beginPath();mini.arc(ox+(e.x+.5)*s,oy+(e.y+.5)*s,2.6,0,Math.PI*2);mini.fill()}for(let e of entities.filter(e=>!e.alive&&e.type==='enemy'&&!e.looted)){if(!seen[e.y]?.[e.x])continue;mini.fillStyle='#eee';mini.fillRect(ox+(e.x+.3)*s,oy+(e.y+.3)*s,3,3)}for(let q of state.sanctuaries||[state.safe].filter(Boolean)){if(personalMenusLocked()||seen[q.y]?.[q.x]){mini.fillStyle='#71cfa2';mini.fillRect(ox+(q.x+.5)*s-2,oy+(q.y+.5)*s-2,4,4)}}for(const p of state.scenery||[]){if(!seen[p.y]?.[p.x])continue;mini.fillStyle=p.art<3?'#36363a':p.art<6?'#c58555':'#90d4ca';mini.fillRect(ox+p.x*s,oy+p.y*s,Math.ceil(s),Math.ceil(s))}
+if(state.relay?.pinned){mini.fillStyle='#83dcef';mini.fillRect(ox+state.relay.x*s-2,oy+state.relay.y*s-2,5,5)}
 mini.fillStyle='#f2d36e';mini.beginPath();mini.arc(ox+(state.x+.5)*s,oy+(state.y+.5)*s,3.5,0,Math.PI*2);mini.fill();for(const p of Object.values(netPlayers)){if(p.floor!==state.floor||p.hall)continue;mini.fillStyle='#65c9d5';mini.beginPath();mini.arc(ox+(p.x+.5)*s,oy+(p.y+.5)*s,3,0,Math.PI*2);mini.fill()}}
 function drawFieldMap(){let m=$('#fieldMini');if(m){let c=m.getContext('2d');c.clearRect(0,0,m.width,m.height);c.drawImage($('#minimap'),0,0,m.width,m.height)}}function drawPortrait(){portrait.fillStyle='#0b1117';portrait.fillRect(0,0,96,96);if(state.character){portrait.imageSmoothingEnabled=false;portrait.drawImage(crawlerPose('down',0),12,0,72,96);return}const im=sprites['hero-front'];if(im?.complete&&im.naturalWidth){let h=88,w=h*im.naturalWidth/im.naturalHeight;portrait.drawImage(im,(96-w)/2,4,w,h)}else{portrait.fillStyle='#1c2b36';portrait.fillRect(18,16,60,65)}portrait.strokeStyle='#a98852';portrait.strokeRect(1,1,94,94)}
 function renderFeed(){let el=$('#feed');if(!el)return;el.innerHTML=(state.feed||[]).slice(0,9).map(x=>`<div class="feed-line"><span class="time">${x.tm}</span>${x.s}</div>`).join('')||'<div class="feed-line">The dungeon is quiet. For now.</div>'}
@@ -1306,7 +1568,7 @@ state.hp=Math.min(state.hp,state.maxHp);state.mp=Math.min(state.mp,state.maxMp);
 state.skillPoints+=Object.values(ranks).reduce((sum,n)=>sum+n,0);state.branches={};state.specialization=null;
 }
 function chooseClass(n){if(personalMenusLocked()){lockHint();return}if(state.floor<4||state.specialization===n||!['Vanguard','Arcanist','Reaver'].includes(n))return;
-const missingHp=state.maxHp-state.hp,missingMp=state.maxMp-state.mp;if(state.specialization)removeClass();state.specialization=n;if(n==='Vanguard'){state.maxHp+=15;state.hp+=15;state.armor+=2}else if(n==='Arcanist'){state.maxMp+=20;state.mp+=20}else state.power+=4;state.hp=Math.max(1,state.maxHp-missingHp);state.mp=Math.max(0,state.maxMp-missingMp);save();render();openTab('skills')}function openTab(t){if(personalMenusLocked()){lockHint();return}if(t==='companions'){companionMenu();return}if(t==='skills'){bagSection='skills';backpack();return}if(t==='inventory'){backpack();return}tab=t;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));let c=$('#tabContent');if(t==='journal'){c.innerHTML='<div class="panel-title">DUNGEON FEED <span class="muted">LIVE</span></div><div id="feed" class="feed"></div>';renderFeed()}else if(t==='map'){c.innerHTML='<div class="panel-title">CARTOGRAPHER’S MAP</div><p class="feed-line">The map reveals itself as you explore. Red marks living threats; white marks fallen enemies; gold marks your position and the exit.</p><div class="feed-line">Explored tiles: '+seen.flat().filter(Boolean).length+' / '+(W*H)+'</div>'}else if(t==='inventory'){c.innerHTML='<div class="panel-title">CRAWLER INVENTORY</div><div class="equipment-strip">⚔ Weapon • ⬟ Armor</div><div class="item-list inventory-grid">'+state.inventory.map(i=>`<div class="item-row"><span class="ico">${i.icon}</span><div><b>${i.name} ×${i.qty}</b><small>${i.desc}</small></div>${(['tonic','torch','shard'].includes(i.id)||i.id.startsWith('box-')||i.slot)?`<button class="smallbtn" data-use="${i.id}">${i.slot?(state.equipment?.[i.slot]===i.id?'EQUIPPED':'EQUIP'):i.id.startsWith('box-')?'OPEN':'USE'}</button>`:''}</div>`).join('')+'</div>'}else if(t==='party'){c.innerHTML='<div class="panel-title">PRIVATE CRAWLER PARTY</div><p>Connect to a hosted Dungeon Crawler relay to create an invite-only room. This alpha synchronizes party presence and positions; combat and dungeon state are not yet authoritative/shared.</p><div class="item-list"><label>SERVER WSS URL<input id="netEndpoint" class="modal-input" placeholder="wss://your-relay-host.example" value="'+safeAttr(localStorage.getItem('dck-net-url')||'')+'"></label><label>CRAWLER NAME<input id="netName" class="modal-input" maxlength="16" value="'+safeAttr(localStorage.getItem('dck-net-name')||'Crawler')+'"></label><div class="item-row"><button class="smallbtn" id="netCreate">CREATE PRIVATE ROOM</button><button class="smallbtn" id="netJoin">JOIN WITH CODE</button><button class="smallbtn" id="netLeave">LEAVE</button></div><div class="item-row"><span class="ico">♙</span><div><b id="netStatus">'+(window.DCKNet?.connected?'CONNECTED':'SOLO MODE')+'</b><small id="netRoom">'+(window.DCKNet?.roomCode?'ROOM '+window.DCKNet.roomCode:'No active room')+'</small></div><span class="achievement">ALPHA</span></div><div id="netRoster" class="feed-line">Remote crawlers: '+Object.keys(netPlayers).length+'</div></div><p>Use a secure WSS address for public hosting. Room codes are private invite codes, not user accounts or strong authentication.</p>'}}
+const missingHp=state.maxHp-state.hp,missingMp=state.maxMp-state.mp;if(state.specialization)removeClass();state.specialization=n;if(n==='Vanguard'){state.maxHp+=15;state.hp+=15;state.armor+=2}else if(n==='Arcanist'){state.maxMp+=20;state.mp+=20}else state.power+=4;state.hp=Math.max(1,state.maxHp-missingHp);state.mp=Math.max(0,state.maxMp-missingMp);save();render();openTab('skills')}function openTab(t){if(personalMenusLocked()){lockHint();return}if(t==='companions'){companionMenu();return}if(t==='skills'){bagSection='skills';backpack();return}if(t==='inventory'){backpack();return}tab=t;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));let c=$('#tabContent');if(t==='journal'){c.innerHTML='<div class="panel-title">DUNGEON FEED <span class="muted">LIVE</span></div><div id="feed" class="feed"></div>';renderFeed()}else if(t==='map'){c.innerHTML='<div class="panel-title">CARTOGRAPHER’S MAP</div><p class="feed-line">The map reveals itself as you explore. Red marks living threats; white marks fallen enemies; gold marks your position and the exit.</p><div class="feed-line">Explored tiles: '+seen.flat().filter(Boolean).length+' / '+(W*H)+'</div>'+button('mapNotes','Open field manual');$('#mapNotes').onclick=fieldManual}else if(t==='inventory'){c.innerHTML='<div class="panel-title">CRAWLER INVENTORY</div><div class="equipment-strip">⚔ Weapon • ⬟ Armor</div><div class="item-list inventory-grid">'+state.inventory.map(i=>`<div class="item-row"><span class="ico">${i.icon}</span><div><b>${i.name} ×${i.qty}</b><small>${i.desc}</small></div>${(['tonic','torch','shard'].includes(i.id)||i.id.startsWith('box-')||i.slot)?`<button class="smallbtn" data-use="${i.id}">${i.slot?(state.equipment?.[i.slot]===i.id?'EQUIPPED':'EQUIP'):i.id.startsWith('box-')?'OPEN':'USE'}</button>`:''}</div>`).join('')+'</div>'}else if(t==='party'){c.innerHTML='<div class="panel-title">PRIVATE CRAWLER PARTY</div><p>Connect to a hosted Dungeon Crawler relay to create an invite-only room. This alpha synchronizes party presence and positions; combat and dungeon state are not yet authoritative/shared.</p><div class="item-list"><label>SERVER WSS URL<input id="netEndpoint" class="modal-input" placeholder="wss://your-relay-host.example" value="'+safeAttr(localStorage.getItem('dck-net-url')||'')+'"></label><label>CRAWLER NAME<input id="netName" class="modal-input" maxlength="16" value="'+safeAttr(localStorage.getItem('dck-net-name')||'Crawler')+'"></label><div class="item-row"><button class="smallbtn" id="netCreate">CREATE PRIVATE ROOM</button><button class="smallbtn" id="netJoin">JOIN WITH CODE</button><button class="smallbtn" id="netLeave">LEAVE</button></div><div class="item-row"><span class="ico">♙</span><div><b id="netStatus">'+(window.DCKNet?.connected?'CONNECTED':'SOLO MODE')+'</b><small id="netRoom">'+(window.DCKNet?.roomCode?'ROOM '+window.DCKNet.roomCode:'No active room')+'</small></div><span class="achievement">ALPHA</span></div><div id="netRoster" class="feed-line">Remote crawlers: '+Object.keys(netPlayers).length+'</div></div><p>Use a secure WSS address for public hosting. Room codes are private invite codes, not user accounts or strong authentication.</p>'}}
 function modalOpen(){return !$('#modal').classList.contains('hidden')}
 function strideDuration(){return runPointer!==null||keys.shift?RUN_MS:WALK_MS}
 function updatePace(){
@@ -1585,20 +1847,26 @@ if(nearby.length){if(partyGuest())window.DCKNet.sendIntent('loot');else startLoo
 let sanctuary=sanctuaryAt(state.x,state.y);if(sanctuary){sanctuaryMenu(sanctuary);return}notify('No remains or cache nearby.')}function action(a){if(a==='loot')loot();if(a==='attack')attack();if(a==='interact')interact();if(a==='hot')hotUse()}
 let worldClock=0;const remoteCooldown=new Map();
 function partyGuest(){return !!window.DCKNet?.inRoom&&!window.DCKNet.isHost}
-function sendPartyWorld(){if(!window.DCKNet?.isHost)return;window.DCKNet.sendWorld({floor:state.floor,campaignWon:!!state.campaignWon,loot:activeLoot,scenery:state.scenery,chests:(state.sanctuaries||[]).map(q=>!!q.cache),enemies:entities.map((e,i)=>({i,x:e.x,y:e.y,hp:e.hp,alive:e.alive,looted:!!e.looted,hatchling:!!e.hatchling})),collapse:Math.ceil(state.collapseLeft)})}
-function applyPartyWorld(w){if(!partyGuest()||!w||!Number.isInteger(w.floor)||w.floor<1||w.floor>999)return;if(w.campaignWon&&w.floor>=FINAL_FLOOR&&!state.campaignWon){state.campaignWon=true;caption('Rescue frequency','All eighteen floors clear. Seattle hears the last bell.',true);persistCampaign()}syncLoot(w.loot);if(w.floor!==state.floor){bossFight=null;state.dead=false;state.hp=Math.max(1,state.hp);state.floor=w.floor;if(state.floor>=4&&!state.maxMp)state.mp=state.maxMp=35;generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();closeModal();notify('PARTY FLOOR '+state.floor)}if(Array.isArray(w.scenery))state.scenery=w.scenery;if(Array.isArray(w.chests))(state.sanctuaries||[]).forEach((q,i)=>q.cache=!!w.chests[i]);for(let v of w.enemies||[]){let e=entities[v.i];if(v.hatchling&&state.floor===2&&Number.isInteger(v.i)&&v.i>=0&&v.i<95&&!e?.hatchling){e={...floorEnemy(2,0,v.x,v.y),hatchling:true,budded:true,name:'Grub hatchling',max:5};while(entities.length<v.i)entities.push({type:'loot',alive:false,looted:true,x:0,y:0});entities[v.i]=e}if(!e||!Number.isInteger(v.x)||!Number.isInteger(v.y)||v.x<0||v.x>=W||v.y<0||v.y>=H)continue;e.x=v.x;e.y=v.y;if(Number.isFinite(v.hp))e.hp=Math.max(0,Math.min(e.max||9999,v.hp));e.alive=!!v.alive;e.looted=!!v.looted}if(Number.isFinite(w.collapse))state.collapseLeft=Math.max(0,w.collapse)}
+function sendPartyWorld(){if(!window.DCKNet?.isHost)return;window.DCKNet.sendWorld({floor:state.floor,npc:state.npc,relay:state.relay,crew:state.season?.crew,campaignWon:!!state.campaignWon,loot:activeLoot,scenery:state.scenery,chests:(state.sanctuaries||[]).map(q=>!!q.cache),enemies:entities.map((e,i)=>({i,x:e.x,y:e.y,hp:e.hp,alive:e.alive,looted:!!e.looted,hatchling:!!e.hatchling})),collapse:Math.ceil(state.collapseLeft)})}
+function applyPartyWorld(w){if(!partyGuest()||!w||!Number.isInteger(w.floor)||w.floor<1||w.floor>999)return;if(w.campaignWon&&w.floor>=FINAL_FLOOR&&!state.campaignWon){state.campaignWon=true;caption('Rescue frequency','All eighteen floors clear. Seattle hears the last bell.',true);persistCampaign()}syncLoot(w.loot);if(w.floor!==state.floor){bossFight=null;state.dead=false;state.hp=Math.max(1,state.hp);state.floor=w.floor;if(state.floor>=4&&!state.maxMp)state.mp=state.maxMp=35;generate();$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();closeModal();notify('PARTY FLOOR '+state.floor)}if(w.relay?.floor===state.floor){const pinned=state.relay?.pinned;state.relay={...w.relay,pinned}}if(w.npc&&Number.isInteger(w.npc.x)&&Number.isInteger(w.npc.y)){
+ const old=state.npc,moved=old&&(old.x!==w.npc.x||old.y!==w.npc.y);
+ state.npc={...w.npc,fromX:moved?old.x:old?.fromX,fromY:moved?old.y:old?.fromY,walkAt:moved?performance.now():old?.walkAt};
+ }if(w.crew)season().crew=w.crew;if(Array.isArray(w.scenery))state.scenery=w.scenery;if(Array.isArray(w.chests))(state.sanctuaries||[]).forEach((q,i)=>q.cache=!!w.chests[i]);for(let v of w.enemies||[]){let e=entities[v.i];if(v.hatchling&&state.floor===2&&Number.isInteger(v.i)&&v.i>=0&&v.i<95&&!e?.hatchling){e={...floorEnemy(2,0,v.x,v.y),hatchling:true,budded:true,name:'Grub hatchling',max:5};while(entities.length<v.i)entities.push({type:'loot',alive:false,looted:true,x:0,y:0});entities[v.i]=e}if(!e||!Number.isInteger(v.x)||!Number.isInteger(v.y)||v.x<0||v.x>=W||v.y<0||v.y>=H)continue;e.x=v.x;e.y=v.y;if(Number.isFinite(v.hp))e.hp=Math.max(0,Math.min(e.max||9999,v.hp));e.alive=!!v.alive;e.looted=!!v.looted}if(Number.isFinite(w.collapse))state.collapseLeft=Math.max(0,w.collapse)}
 function partyIntent(d){if(!window.DCKNet?.isHost||d.player?.floor!==state.floor)return;
 if(activeLoot){if(activeLoot.owner===d.id){
 if(d.action==='loot_close')finishLoot();else if(d.action.startsWith('take_'))transferLoot(d.action.slice(5))
 }return}
 if(d.action.startsWith('take_')||d.action==='loot_close')return;
-let now=performance.now();if(now-(remoteCooldown.get(d.id)||-1000)<450)return;remoteCooldown.set(d.id,now);let p=d.player;if(d.action!=='loot'&&sanctuaryAt(p.x,p.y))return;if(!['loot','attack'].includes(d.action))return;let range=2.15;if(bossFight){let e=bossFight.e;if(!['attack','spell'].includes(d.action)||Math.hypot(e.x-p.x,e.y-p.y)>range)return;bossFight.assist=Math.min(60,(bossFight.assist||0)+8+Math.min(20,p.level||1));bossFight.log='An ally joins the assault. Bonus damage ready: '+bossFight.assist;bossScreen();return}if(d.action==='loot'){const sources=nearbyContainers(p);if(sources.length&&!modalOpen())startLoot(sources,d.id);return}let targets=entities.filter(e=>e.type==='enemy'&&e.alive&&!e.boss&&Math.hypot(e.x-p.x,e.y-p.y)<=range).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));if(d.action==='attack')targets=targets.slice(0,1);for(let e of targets){let damage=8+Math.min(100,p.level||1)*2;e.hp-=damage;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+damage});if(e.hp<=0){e.alive=false;e.deathAt=now;window.DCKNet.sendReward(d.id,8,e.xp||0,null)}}sendPartyWorld()}
+let now=performance.now();if(now-(remoteCooldown.get(d.id)||-1000)<450)return;remoteCooldown.set(d.id,now);let p=d.player;if(d.action!=='loot'&&sanctuaryAt(p.x,p.y))return;if(!['loot','attack'].includes(d.action))return;let range=2.15;if(bossFight){let e=bossFight.e;if(!['attack','spell'].includes(d.action)||Math.hypot(e.x-p.x,e.y-p.y)>range)return;bossFight.assist=Math.min(60,(bossFight.assist||0)+8+Math.min(20,p.level||1));bossFight.log='An ally joins the assault. Bonus damage ready: '+bossFight.assist;bossScreen();return}if(d.action==='loot'){const sources=nearbyContainers(p);if(sources.length&&!modalOpen())startLoot(sources,d.id);return}let targets=entities.filter(e=>e.type==='enemy'&&e.alive&&!e.boss&&Math.hypot(e.x-p.x,e.y-p.y)<=range).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));if(d.action==='attack')targets=targets.slice(0,1);for(let e of targets){let damage=8+Math.min(100,p.level||1)*2;e.hp-=damage;particles.push({x:e.x,y:e.y,t:0,kind:'hit',text:'-'+damage});if(e.hp<=0){e.alive=false;broadcastKill(e);e.deathAt=now;window.DCKNet.sendReward(d.id,8,e.xp||0,null)}}sendPartyWorld()}
 function updatePartyRoster(){const el=$('#netRoster');if(el)el.textContent='Party members connected: '+(window.DCKNet?.inRoom?Object.keys(netPlayers).length+1:0)+' / 4'}
 window.addEventListener('dcknet',e=>{const d=e.detail||{};if(remoteLoot&&!partyGuest())syncLoot(null);
 if(activeLoot?.owner&&d.type==='player_left'&&activeLoot.owner===d.id)finishLoot();
 if(activeLoot?.owner&&!window.DCKNet?.inRoom)finishLoot();
 if(d.type==='loot_bundle'){if(partyGuest()){receiveLoot(d.items);persistCampaign();render()}}else if(d.type==='reward'){if(partyGuest()){petVictory();if(d.guardian)recordGuardian(d.guardian.floor,d.guardian.name);state.gold+=d.gold||0;state.xp+=d.xp||0;if(d.item)giveItem(d.item,1);checkLevel();save();render();notify('PARTY REWARD RECEIVED')}}else if(d.type==='world'){applyPartyWorld(d.world)}else if(d.type==='combat_intent'){partyIntent(d)}else if(d.type==='players'){netPlayers=d.players||{};render();updatePartyRoster()}else if(d.type==='player_state'){netPlayers[d.id]=d.player;render();updatePartyRoster()}else if(d.type==='player_left'){delete netPlayers[d.id];render();updatePartyRoster()}else if(d.type==='room'){notify('PRIVATE ROOM '+d.code);render()}else if(d.type==='status'){const el=$('#netStatus');if(el)el.textContent=d.text;const room=$('#netRoom');if(room)room.textContent=d.code?'ROOM '+d.code:'No active room';updatePartyRoster()}else if(d.type==='error'){notify('CO-OP: '+d.message)}});
-function collapseTick(dt){if(state.campaignWon)return;if(state.hall&&!window.DCKNet?.inRoom)return;if(bossFight&&!window.DCKNet?.inRoom)return;if(state.chapter==='surface'||state.chapter==='create'||state.dead)return;state.collapseLeft=Math.max(0,(state.collapseLeft??900)-dt);let n=Math.ceil(state.collapseLeft),el=$('#collapseClock');if(el){el.textContent='COLLAPSE '+Math.floor(n/60)+':'+String(n%60).padStart(2,'0');el.style.color=n<=60?'#ff7766':'#e6c47d'}for(let t of [300,60,10])if(n<=t&&!state.warned.includes(t)){state.warned.push(t);ai('Floor collapse in '+t+' seconds. Find the stairs, crawler.');notify('COLLAPSE WARNING: '+t+'s')}if(n===0){bossFight=null;state.collapsed=true;state.dead=true;state.hp=0;save();showModal('<h2>FLOOR COLLAPSED</h2><p>You failed to reach the stairs in time.</p><button class="widebtn" id="collapseRestart">NEW RUN</button>');$('#collapseRestart').onclick=campaignMenu}}document.addEventListener('click',e=>{let b=e.target.closest('[data-class]');if(b)chooseClass(b.dataset.class);let t=e.target.closest('[data-branch]');if(t)trainBranch(t.dataset.branch)});function tick(ts){
+function collapseTick(dt){if(state.campaignWon)return;if(state.hall&&!window.DCKNet?.inRoom)return;if(bossFight&&!window.DCKNet?.inRoom)return;if(state.chapter==='surface'||state.chapter==='create'||state.dead)return;state.collapseLeft=Math.max(0,(state.collapseLeft??900)-dt);if(state.floor===2&&state.relay&&!state.relay.used){const high=highWater();if(high!==!!state.relay.high){state.relay.high=high;
+   if(high){beep(480,.12);setTimeout(()=>beep(480,.12),220);notify('Two bells · blue crossings submerged')}else notify('Water recedes · crossings open')}}
+ if(state.relay?.race==='live'&&state.relay.raceStart-state.collapseLeft>75){state.relay.race='lost';highlight('Night Shift reached the station first and took the purse.',4)}
+ let n=Math.ceil(state.collapseLeft),el=$('#collapseClock');if(el){el.textContent='COLLAPSE '+Math.floor(n/60)+':'+String(n%60).padStart(2,'0');el.style.color=n<=60?'#ff7766':'#e6c47d'}for(let t of [300,60,10])if(n<=t&&!state.warned.includes(t)){state.warned.push(t);ai('Floor collapse in '+t+' seconds. Find the stairs, crawler.');notify('COLLAPSE WARNING: '+t+'s')}if(n===0){bossFight=null;state.collapsed=true;state.dead=true;state.hp=0;save();showModal('<h2>FLOOR COLLAPSED</h2><p>You failed to reach the stairs in time.</p><button class="widebtn" id="collapseRestart">NEW RUN</button>');$('#collapseRestart').onclick=campaignMenu}}document.addEventListener('click',e=>{let b=e.target.closest('[data-class]');if(b)chooseClass(b.dataset.class);let t=e.target.closest('[data-branch]');if(t)trainBranch(t.dataset.branch)});function tick(ts){
 if(pauseStarted!==null){last=ts;requestAnimationFrame(tick);return}
 if(bossFight&&!window.DCKNet?.inRoom){last=ts;requestAnimationFrame(tick);return}
 if(activeLoot||remoteLoot){last=ts;requestAnimationFrame(tick);return}let elapsed=last?Math.max(0,(ts-last)/1000||0):0,dt=Math.min(.05,elapsed);let nextStepStart=ts;last=ts;collapseTick(Math.min(elapsed,1));if(step){let p=Math.min(1,(ts-step.start)/step.duration);p=Math.max(0,p);visualX=step.x+(step.nx-step.x)*p;visualY=step.y+(step.ny-step.y)*p;if(p>=1){let done=step;nextStepStart=Math.max(ts-32,done.start+done.duration);if(!done.returning)finishStep(done.nx,done.ny);step=null;visualX=(state.hall||state).x;visualY=(state.hall||state).y}}else{visualX=(state.hall||state).x;visualY=(state.hall||state).y}if(!state.dead){if(!step){let x=joyX||((keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)),y=joyY||((keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0));if(x||y){if(Math.abs(x)>Math.abs(y))move(Math.sign(x),0,nextStepStart);else move(0,Math.sign(y),nextStepStart);
@@ -1611,6 +1879,6 @@ if(step){
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 if(!load()){startStory()}else{if(!state.sanctuaries?.length&&state.safe)state.sanctuaries=[state.safe];if(state.hall&&!state.sanctuaries?.[state.hall.index]?.door)state.hall=null;
   if(!state.hall&&!state.dead){const q=sanctuaryAt(state.x,state.y);if(q?.door)enterHall(q)}
-  if(!Array.isArray(state.scenery))furnishFloor();if(!state.hall&&!bossFight&&!state.dead&&state.chapter==='mine'&&(solid(state.x,state.y)||sanctuaryAt(state.x,state.y)||[[1,0],[-1,0],[0,-1],[0,1]].every(([dx,dy])=>solid(state.x+dx,state.y+dy))))chooseLanding();if(state.chapter==='mine'&&state.wildAnimal===undefined)placeAnimal();populatePatrols(true);reveal();render();if(state.chapter==='create')showCreator()}bind();render();if(state.dead)openDeath();else if(bossFight)bossScreen();if(!personalMenusLocked())openTab('journal');if(state.storyLine)caption(state.storyLine.speaker,state.storyLine.line);else if(!state.chapter)ai(quips[0]);$('#packBtn').onclick=backpack;$('#editCrawler').onclick=()=>{if(!state.dead&&!bossFight)showCreator()};requestAnimationFrame(tick);
+  if(!Array.isArray(state.scenery))furnishFloor();if(!state.hall&&!bossFight&&!state.dead&&state.chapter==='mine'&&(solid(state.x,state.y)||sanctuaryAt(state.x,state.y)||[[1,0],[-1,0],[0,-1],[0,1]].every(([dx,dy])=>solid(state.x+dx,state.y+dy))))chooseLanding();if(state.chapter==='mine'&&state.wildAnimal===undefined)placeAnimal();populatePatrols(true);initialiseRelay();reveal();render();if(state.chapter==='create')showCreator()}bind();render();if(state.dead)openDeath();else if(bossFight)bossScreen();if(!personalMenusLocked())openTab('journal');if(state.storyLine)caption(state.storyLine.speaker,state.storyLine.line);else if(!state.chapter)ai(quips[0]);$('#packBtn').onclick=backpack;$('#editCrawler').onclick=()=>{if(!state.dead&&!bossFight)showCreator()};requestAnimationFrame(tick);
 })();
 
