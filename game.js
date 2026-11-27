@@ -756,12 +756,12 @@ function meetAnimal(){
 function petStats(){
  const p=state.pet;if(!p?.crawler)return null;
  const level=p.level||1,gear=p.gear||{},mutation=p.mutation;
- return {maxHp:24+level*6+(gear.armor?.rank||0)*5+(mutation==='Ironhide'?20:0),power:2+level+(gear.weapon?.rank||0)*3+(mutation==='Razorclaw'?5:0),armor:(gear.armor?.rank||0)*2+(mutation==='Ironhide'?4:0)};
+ return {maxHp:24+level*6+(gear.armor?.rank||0)*5+(mutation==='Ironhide'?20:0),power:2+Math.min(20,Math.floor(level*.8))+(gear.weapon?.rank||0)*3+(mutation==='Razorclaw'?5:0),armor:(gear.armor?.rank||0)*2+(mutation==='Ironhide'?4:0)};
 }
 function readyPet(){const p=state.pet,stats=petStats();if(!stats||orphanedPet())return null;p.hp=Math.min(stats.maxHp,p.hp??stats.maxHp);return p.hp>0?{p,stats}:null}
 function petVictory(){
   const pet=state.pet;if(!pet||orphanedPet())return;
-  pet.wins=(pet.wins||0)+1;if(pet.crawler){pet.level=1+Math.floor(pet.wins/4);const stats=petStats();pet.hp=Math.min(stats.maxHp,(pet.hp??stats.maxHp)+4)}
+  pet.wins=(pet.wins||0)+1;if(pet.crawler){pet.level=Math.min(30,1+Math.floor(pet.wins/5));const stats=petStats();pet.hp=Math.min(stats.maxHp,(pet.hp??stats.maxHp)+4)}
   if(pet.wins%5===0)awardBox('Pet');
 }
 function setPetTile(pos){
@@ -1127,7 +1127,7 @@ function encounterAllies(b){
  if(b.recruitTurn!==b.turn&&(b.turn===1||b.turn%3===0)){
  b.recruitTurn=b.turn;
  const nearby=entities.map((e,i)=>({e,i})).filter(({e,i})=>e.alive&&e.type==='enemy'&&!e.boss&&e!==b.e&&!b.group.includes(i)&&!sanctuaryAt(e.x,e.y)&&Math.hypot(e.x-state.x,e.y-state.y)<=3.5+Math.min(2,state.floor/6));
- const cap=Math.min(5,1+Math.floor(state.floor/3));
+ const cap=Math.min(4,1+Math.floor((state.floor-2)/4));
  for(const {i} of nearby.slice(0,Math.max(0,cap-b.group.filter(i=>entities[i]?.alive).length)))b.group.push(i);
  }
  return b.group.map(i=>entities[i]).filter(e=>e?.alive&&e!==b.e);
@@ -1223,7 +1223,7 @@ function encounterScreen(spellMenu=false){
   battle.roundId??=crypto.randomUUID().replace(/-/g,'');battle.partyActions??={};
   const allies=encounterAllies(battle);
   const moves=[['attack',state.equipment?.weapon?'Swing':'Punch'],['guard','Guard'],['heal','Health potion']];
-  if(!enemy.boss)moves.push(['retreat','Run away']);
+  if(state.maxMp>0)moves.push(['focus','Focus · restore MP']);if(!enemy.boss)moves.push(['retreat','Run away']);
   if(Object.keys(techniques).some(learned))moves.push(['spells','Spells']);
   if(enemy.boss)moves.push(['trap',battle.trapUsed?'Trap spent':'Spring trap']);
   if(spellMenu)moves.splice(0,moves.length,...prepared().map(id=>[id,moveName(id)+' · '+techniques[id].cost+' MP']),['back','Back']);
@@ -1316,14 +1316,14 @@ async function animateTurn(action){
 }
 
 function bossScreen(){encounterScreen()}
-function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(techniques[action]&&action!=='mend'){if(!prepared().includes(action)||state.mp<techniques[action].cost)return;state.mp-=techniques[action].cost;d=strike;guard=action==='brace'||action==='bastion'||!!techniques[action].guard}if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(35)}if(d>0){const magical=!!techniques[action]&&(['magic','mana'].includes(techniques[action].scale)||['bell','tide','catalyst','racial'].includes(action));const armor=magical?Math.floor((e.armor||0)/3):e.armor||0;d=Math.max(1,d-armor);if(intent==='DEFENSIVE STANCE'&&!magical)d=Math.max(1,Math.floor(d*.5));if(magical&&['skeleton','bone-champion'].includes(e.sprite))d=Math.ceil(d*1.25);if(magical&&e.sprite==='wraith')d=Math.max(1,Math.floor(d*.75));}if(techniques[action]?.heal)state.hp=Math.min(state.maxHp,state.hp+Math.floor(Math.min(e.hp,d)*techniques[action].heal));d+=(b.assist||0)+resolvePartyTargets(b);b.assist=0;const companion=readyPet();let petLog='';if(companion&&e.hp>d){const {p,stats}=companion;const damage=stats.power;d+=damage;petLog=(p.name||animalNames[p.species]||'Companion')+' strikes for '+damage+'. ';}const assist=crawlerAssist(b,e,d);d+=assist.bonus;petLog+=assist.log;e.hp-=d;if(e.boss&&e.hp>0&&e.hp<=e.max*.5&&!b.spokenHalf){b.spokenHalf=true;b.speech=guardianDialogue[state.floor]?.[1]||'You will regret that.'}else if(b.turn>1)b.speech=null;if(e.hp<=0){partyRoundDamage(b,e,true);e.alive=false;broadcastKill(e);e.deathAt=performance.now();state.kills++;petVictory();crawlerAllyVictory();if(!e.boss){
+function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(techniques[action]&&action!=='mend'){if(!prepared().includes(action)||state.mp<techniques[action].cost)return;state.mp-=techniques[action].cost;d=strike;guard=action==='brace'||action==='bastion'||!!techniques[action].guard}if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='focus'){state.mp=Math.min(state.maxMp,state.mp+Math.max(5,Math.floor(state.maxMp*.12)));guard=true}if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(tonicHealing())}if(d>0){const magical=!!techniques[action]&&(['magic','mana'].includes(techniques[action].scale)||['bell','tide','catalyst','racial'].includes(action));const armor=magical?Math.floor((e.armor||0)/3):e.armor||0;d=Math.max(1,d-armor);if(intent==='DEFENSIVE STANCE'&&!magical)d=Math.max(1,Math.floor(d*.5));if(magical&&['skeleton','bone-champion'].includes(e.sprite))d=Math.ceil(d*1.25);if(magical&&e.sprite==='wraith')d=Math.max(1,Math.floor(d*.75));}if(techniques[action]?.heal)state.hp=Math.min(state.maxHp,state.hp+Math.floor(Math.min(e.hp,d)*techniques[action].heal));d+=(b.assist||0)+resolvePartyTargets(b);b.assist=0;const companion=readyPet();let petLog='';if(companion&&e.hp>d){const {p,stats}=companion;const damage=stats.power;d+=damage;petLog=(p.name||animalNames[p.species]||'Companion')+' strikes for '+damage+'. ';}const assist=crawlerAssist(b,e,d);d+=assist.bonus;petLog+=assist.log;e.hp-=d;if(e.boss&&e.hp>0&&e.hp<=e.max*.5&&!b.spokenHalf){b.spokenHalf=true;b.speech=guardianDialogue[state.floor]?.[1]||'You will regret that.'}else if(b.turn>1)b.speech=null;if(e.hp<=0){partyRoundDamage(b,e,true);e.alive=false;broadcastKill(e);e.deathAt=performance.now();state.kills++;petVictory();crawlerAllyVictory();if(!e.boss){
 state.xp+=e.xp;state.gold+=5+Math.floor(Math.random()*12)+Math.floor(state.floor/2);if(e.localBoss){state.gold+=50+state.floor*15;awardBox(state.floor>=8?'Gold':'Silver');feed('Hidden local boss defeated. Premium loot awarded.')}const next=encounterAllies(b)[0];if(next){b.group=b.group.filter(i=>entities[i]!==next);b.e=next;b.partyActions={};b.turn++;b.log=e.name+' falls. '+next.name+' steps forward!';checkLevel();persistCampaign();bossScreen();render();return}bossFight=null;
 const milestones={10:['Unlicensed Exterminator','Silver'],30:['The Neighborhood Is Quiet Now','Gold'],100:['Population Control Department','Celestial']};
 if(milestones[state.kills])ridiculous(...milestones[state.kills]);
 if(!e.hatchling&&Math.random()<.08+state.floor*.003)awardBox(state.floor>=12?'Gold':state.floor>=6?'Silver':'Bronze');
 if(Math.random()<.4)entities.push({type:'loot',x:e.x,y:e.y,icon:'✦',name:'Dropped cache',alive:true});
 closeModal();if(state.kills===1){unlock('First blood');ridiculous('Local Pest Control')}checkLevel();feed(e.name+' falls. Search its belongings with Loot.');persistCampaign();render();return
-}recordGuardian(state.floor,e.name,b.turn,b.guards||0);state.xp+=e.xp+100;state.gold+=250+state.floor*50;if(window.DCKNet?.isHost)for(let [id,p] of Object.entries(netPlayers))if(p.floor===state.floor&&Math.hypot(p.x-e.x,p.y-e.y)<=8)window.DCKNet.sendReward(id,50,e.xp||100,'tonic',{floor:state.floor,name:e.name});if(state.achievements.includes('Management Has Been Terminated'))awardBox('Gold');else ridiculous('Management Has Been Terminated','Gold');awardBox(state.floor>=9?'Celestial':'Gold');checkLevel();$('#bossbar').classList.add('hidden');bossFight=null;showModal('<h2>GUARDIAN DEFEATED</h2><p>Two premium loot boxes and bonus gold awarded. Loot the remains in the dungeon.</p><button class="widebtn" id="bossDone">CONTINUE</button>');if(state.floor===3&&state.foundKeeper){state.minersFree=true;caption('Iven','Hear that? Three bells. The cage is moving. My crew is going home.',true)}$('#bossDone').onclick=closeModal;save();render();return}let hit=Math.max(1,Math.floor((e.atk*(intent==='AIMED SHOT'?1.5:intent==='DEVASTATING STRIKE'?1.7:intent==='ENRAGED ATTACK'?1.25:1)-state.armor)*(guard?.25:1)));partyRoundDamage(b,e);if(intent==='BUDDING'&&hatchGrub(e)){b.log='The grub splits. A hatchling wriggles onto the floor beside it.';b.turn++;persistCampaign();sendPartyWorld();bossScreen();render();return}
+}recordGuardian(state.floor,e.name,b.turn,b.guards||0);state.xp+=e.xp+100;state.gold+=250+state.floor*50;if(window.DCKNet?.isHost)for(let [id,p] of Object.entries(netPlayers))if(p.floor===state.floor&&Math.hypot(p.x-e.x,p.y-e.y)<=8)window.DCKNet.sendReward(id,50,e.xp||100,'tonic',{floor:state.floor,name:e.name});giveItem('tonic',2+Math.floor(state.floor/6));if(state.floor>=6)giveItem('shard',2);if(state.achievements.includes('Management Has Been Terminated'))awardBox('Gold');else ridiculous('Management Has Been Terminated','Gold');awardBox(state.floor>=9?'Celestial':'Gold');checkLevel();$('#bossbar').classList.add('hidden');bossFight=null;showModal('<h2>GUARDIAN DEFEATED</h2><p>Two premium loot boxes and bonus gold awarded. Loot the remains in the dungeon.</p><button class="widebtn" id="bossDone">CONTINUE</button>');if(state.floor===3&&state.foundKeeper){state.minersFree=true;caption('Iven','Hear that? Three bells. The cage is moving. My crew is going home.',true)}$('#bossDone').onclick=closeModal;save();render();return}let hit=Math.max(1,Math.floor((e.atk*(intent==='AIMED SHOT'?1.5:intent==='DEVASTATING STRIKE'?1.7:intent==='ENRAGED ATTACK'?1.25:1)-state.armor)*(guard?.25:1)));partyRoundDamage(b,e);if(intent==='BUDDING'&&hatchGrub(e)){b.log='The grub splits. A hatchling wriggles onto the floor beside it.';b.turn++;persistCampaign();sendPartyWorld();bossScreen();render();return}
 if(intent==='SOUL SIPHON'&&!guard){const drain=Math.min(state.mp,5+Math.floor(state.floor/2));state.mp-=drain;e.hp=Math.min(e.max,e.hp+Math.max(3,drain*2));hit+=Math.floor(state.floor/2)}
 if(intent==='SICKENING MIST')mistCloud(e);
 if(intent==='SICKENING MIST'&&!guard)(state.wounds??={}).sick=true;
@@ -1540,11 +1540,12 @@ const rewardCatalog=[
  {id:'ember-tea',name:'Ember tea',icon:'♨',effect:'buff'},
  {id:'undertow',name:'Boon of the Undertow',icon:'≈',effect:'boon'}
 ];
+function rankedModifiers(base,rank){return Object.fromEntries(Object.entries(base.mods||{}).map(([key,n])=>[key,n>0?n+(rank-1)*(base.slot==='armor'||base.slot==='weapon'?2:1):n]))}
 function rollReward(tier){
   const pool=rewardCatalog.filter(i=>!['cage-cleaver','relay-maul','warden-plate','mirror-ward','cinder-seal'].includes(i.id)||['Gold','Legendary','Celestial'].includes(tier));
   const item=pool[Math.floor(Math.random()*pool.length)];
   const rank=({Bronze:1,Silver:2,Gold:3,Legendary:4,Celestial:5})[tier]||1;
-  const mods=Object.fromEntries(Object.entries(item.mods||{}).map(([key,n])=>[key,n>0?n+rank-1:n]));
+  const mods=rankedModifiers(item,rank);
   const label={power:'power',armor:'armor',spellBonus:'spell damage'};
   const desc=item.effect==='buff'?'Gain '+(2+rank)+' power until you leave this floor. Replaces any active tea.':
     item.effect==='boon'?'Spend 5 mana to learn a permanent +'+rank+' spell damage.':
@@ -1580,7 +1581,7 @@ if(it.slot){equipItem(it);save();render();openTab('inventory');return}
 if(it.effect==='boon'&&state.floor<4){notify('Spell boons unlock on Floor 4.');return}
 if(it.effect==='buff'){state.power-=state.teaPower||0;state.teaPower=2+it.rank;state.power+=state.teaPower;it.qty--;notify('Ember tea active on this floor.')}
 else if(it.effect==='boon'){if(state.mp<5){notify('Requires 5 MP.');return}state.mp-=5;state.spellBonus=(state.spellBonus||0)+it.rank;it.qty--;notify('Spell boon learned.')}
-else if(id.startsWith('box-')){it.qty--;const tier=id.slice(4),reward=rollReward(tier);showModal('<div class="box-reveal"><h2>'+safeAttr(tier)+' loot box</h2><div class="reward-chest">'+reward.icon+'</div><h3>'+reward.name+'</h3><p>'+reward.desc+'</p><button class="widebtn" id="inspectReward">Inspect reward</button><button class="widebtn" id="rewardDone">Back to backpack</button></div>');$('#inspectReward').onclick=()=>inspectOwned(reward);$('#rewardDone').onclick=backpack;feed('Unboxed '+reward.name+'.')}else if(id==='tonic'){let v=Math.min(35,state.maxHp-state.hp);if(!v&&!conditionText()){notify('Health already full.');return}restoreHealth(v);it.qty--;feed('Health potion restores '+v+' HP and treats injuries.')}else if(id==='shard'){let v=Math.min(20,state.maxMp-state.mp);if(!v){notify('Mana already full.');return}state.mp+=v;it.qty--;feed('Mana shard restores '+v+' MP.')}else if(id==='torch'){state.torchTurns=40;it.qty--;reveal();feed('You light a torch. The shadows retreat.')}save();render();if(!quick&&!id.startsWith('box-'))openTab('inventory')}
+else if(id.startsWith('box-')){it.qty--;const tier=id.slice(4),reward=rollReward(tier);showModal('<div class="box-reveal"><h2>'+safeAttr(tier)+' loot box</h2><div class="reward-chest">'+reward.icon+'</div><h3>'+reward.name+'</h3><p>'+reward.desc+'</p><button class="widebtn" id="inspectReward">Inspect reward</button><button class="widebtn" id="rewardDone">Back to backpack</button></div>');$('#inspectReward').onclick=()=>inspectOwned(reward);$('#rewardDone').onclick=backpack;feed('Unboxed '+reward.name+'.')}else if(id==='tonic'){let v=Math.min(tonicHealing(),state.maxHp-state.hp);if(!v&&!conditionText()){notify('Health already full.');return}restoreHealth(v);it.qty--;feed('Health potion restores '+v+' HP and treats injuries.')}else if(id==='shard'){let v=Math.min(20,state.maxMp-state.mp);if(!v){notify('Mana already full.');return}state.mp+=v;it.qty--;feed('Mana shard restores '+v+' MP.')}else if(id==='torch'){state.torchTurns=40;it.qty--;reveal();feed('You light a torch. The shadows retreat.')}save();render();if(!quick&&!id.startsWith('box-'))openTab('inventory')}
 function nextFloor(){if(state.chapter==='surface'){
 state.chapter='mine';generate();$('#objective').textContent='FIND THE STAIRS • SURVIVE';
 caption('Beneath Seattle','Street noise fades above you. A blue bell rope trails under Seattle. Beside it, someone has scratched three words: Find the keeper.',true);
@@ -1782,6 +1783,7 @@ function registerHit(enemy,hit,guard=false,venom=false){
   if(venom)w.poison=true;
   if(enemy.sprite==='sewer-rat'&&Math.random()<.12)w.sick=true;
 }
+function tonicHealing(){return Math.max(35,Math.ceil(state.maxHp*.30))}
 function restoreHealth(amount){
   state.hp=Math.min(state.maxHp,state.hp+amount);state.wounds={};
   if(bossFight)bossFight.poison=0;
@@ -2502,7 +2504,7 @@ function canonicalDrop(id,qty){
  if(id==='shard')return {id,name:'Mana shard',icon:'✦',qty};
  if(/^box-(Bronze|Silver|Gold|Legendary|Celestial|Pet)$/.test(id))return {id,name:id.slice(4)+' loot box',icon:'🎁',qty,desc:'Open for randomized dungeon rewards.'};
  const match=/^(.+)-([1-5])$/.exec(id),base=match&&rewardCatalog.find(i=>i.id===match[1]);if(!base)return null;
- const rank=Number(match[2]),mods=Object.fromEntries(Object.entries(base.mods||{}).map(([k,n])=>[k,n>0?n+rank-1:n]));
+ const rank=Number(match[2]),mods=rankedModifiers(base,rank);
  return {...base,id,rank,mods,qty};
 }
 function requestGuestDrop(item,qty){
@@ -2536,10 +2538,10 @@ function processGuestDrop(d){
 function recoverRankedGear(id,qty){
  const match=/^(.+)-([1-5])$/.exec(id);if(!match)return false;
  const base=rewardCatalog.find(i=>i.id===match[1]);if(!base)return false;
- const rank=Number(match[2]),mods=Object.fromEntries(Object.entries(base.mods||{}).map(([key,n])=>[key,n>0?n+rank-1:n]));
+ const rank=Number(match[2]),mods=rankedModifiers(base,rank);
  const labels={power:'power',armor:'armor',spellBonus:'spell damage'};
  const desc=base.effect==='buff'?'Gain '+(2+rank)+' power until you leave this floor. Replaces any active tea.':base.effect==='boon'?'Spend 5 mana to learn a permanent +'+rank+' spell damage.':Object.entries(mods).map(([key,n])=>(n>0?'+':'')+n+' '+labels[key]).join(' · ');
- const existing=state.inventory.find(i=>i.id===id);if(existing){Object.assign(existing,{...base,id,rank,mods,desc,qty:existing.qty+qty})}else state.inventory.push({...base,id,rank,mods,desc,qty});
+ const existing=state.inventory.find(i=>i.id===id);if(existing){existing.qty+=qty}else state.inventory.push({...base,id,rank,mods,desc,qty});
  return true;
 }
 function receiveLoot(bundle){
