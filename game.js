@@ -909,6 +909,7 @@ function bossIntent(b){
  }
  return b.e.sprite==='wraith'&&b.turn%3===2?'MANA DRAIN':b.e.sprite==='bone-champion'&&b.turn%4===0?'ARMOR SHATTER':b.turn%3===0?'DEVASTATING STRIKE':b.e.sprite==='spider-boss'&&b.turn%2===0?'VENOM BITE':b.e.hp<b.e.max/2?'ENRAGED ATTACK':'Standard attack'}let animatingTurn=false;
 const techniques={
+  racial:{name:'Racial signature',floor:4,cost:7,desc:'Your race-specific attack. Unlock the second racial skill at rank 2.'},
   mend:{name:'Mend',floor:4,job:'Arcanist',cost:8,desc:'Restore health and treat injuries.'},
   brace:{name:'Shieldbreaker',floor:4,job:'Vanguard',cost:5,desc:'Strike for power + 6 and guard the counterattack.'},
   rend:{name:'Rending blow',floor:4,job:'Reaver',cost:6,desc:'Strike for twice your power.'},
@@ -916,10 +917,11 @@ const techniques={
   lunge:{name:'Driving lunge',floor:9,cost:8,desc:'Strike for twice your power + 4.'},
   tide:{name:'Undertow',floor:12,cost:12,desc:'Deal 32 damage plus twice your spell bonus.'}
 };
-function learned(id){const a=techniques[id];return !!a&&state.floor>=a.floor&&(!a.job||a.job===state.specialization)}
+function learned(id){if(id==='racial')return !!state.identityLocked&&(state.racialRanks?.[1]||0)>=2;const a=techniques[id];return !!a&&state.floor>=a.floor&&(!a.job||a.job===state.specialization)}
 function prepared(){return (state.spellLoadout||[]).filter(learned).slice(0,3)}
 function techniqueDamage(id){
   switch(id){
+    case 'racial':return racialMoves[state.character?.race]?.[2]?24+2*(state.spellBonus||0):state.power*2+10;
     case 'brace':return state.power+6;
     case 'rend':return state.power*2;
     case 'bell':return Math.max(1,16+(state.spellBonus||0));
@@ -928,11 +930,12 @@ function techniqueDamage(id){
     default:return 0;
   }
 }
+function moveName(id){return id==='racial'?(racialMoves[state.character?.race]?.[0]||'Racial signature'):techniques[id].name}
 function spellLoadoutPanel(){
   const ready=prepared();
   return '<details class="skill-limb" data-path="Spells" '+(openPaths.has('Spells')?'open':'')+'><summary>Spell menu <small>'+ready.length+'/3 prepared</small></summary><div class="skill-stem">'+Object.entries(techniques).map(([id,a])=>{
     const equipped=ready.includes(id);
-    return '<div class="skill-node"><div><b>'+a.name+'</b><small>'+a.cost+' MP · '+a.desc+'</small></div>'+(learned(id)?'<button class="smallbtn" data-prepare="'+id+'" aria-pressed="'+equipped+'" '+(!equipped&&ready.length===3?'disabled':'')+'>'+(equipped?'Remove':'Prepare')+'</button>':'<small>Floor '+a.floor+(a.job?' · '+a.job:'')+'</small>')+'</div>';
+    return '<div class="skill-node"><div><b>'+moveName(id)+'</b><small>'+a.cost+' MP · '+a.desc+'</small></div>'+(learned(id)?'<button class="smallbtn" data-prepare="'+id+'" aria-pressed="'+equipped+'" '+(!equipped&&ready.length===3?'disabled':'')+'>'+(equipped?'Remove':'Prepare')+'</button>':'<small>Floor '+a.floor+(a.job?' · '+a.job:'')+'</small>')+'</div>';
   }).join('')+'</div></details>';
 }
 
@@ -944,7 +947,7 @@ function encounterScreen(spellMenu=false){
   if(!enemy.boss)moves.push(['retreat','Run away']);
   if(Object.keys(techniques).some(learned))moves.push(['spells','Spells']);
   if(enemy.boss)moves.push(['trap',battle.trapUsed?'Trap spent':'Spring trap']);
-  if(spellMenu)moves.splice(0,moves.length,...prepared().map(id=>[id,techniques[id].name+' · '+techniques[id].cost+' MP']),['back','Back']);
+  if(spellMenu)moves.splice(0,moves.length,...prepared().map(id=>[id,moveName(id)+' · '+techniques[id].cost+' MP']),['back','Back']);
   showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':enemy.chief?'ROAMING MINIBOSS':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><button class="smallbtn" data-campaign-menu>Campaign saves</button><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions command-fan">'+(spellMenu&&!prepared().length?'<p>Prepare abilities in Backpack → Skills → Spell menu.</p>':'')+moves.map(([id,label])=>'<button class="duel-command" data-boss="'+id+'" '+((techniques[id]&&state.mp<techniques[id].cost)||(id==='mend'&&state.hp===state.maxHp&&!conditionText())||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!quantity('tonic'))?'disabled':'')+'><i aria-hidden="true">'+(({attack:'⚔',guard:'⬟',heal:'✚',retreat:'↗',spells:'✧',trap:'⌖',back:'‹'})[id]||'✦')+'</i><span>'+label+'</span></button>').join('')+'</div></div>');
   $('#duelHero').src=crawlerPose('side',0).toDataURL();
   const stage=$('.duel-stage');const theme=enemy.boss&&guardianThemes[state.floor];if(theme){stage.style.background='repeating-linear-gradient(45deg,'+theme.floor+' 0 18px,'+theme.color+'33 19px 20px)';stage.setAttribute('aria-label',theme.detail)}const opponent=stage.querySelector('.opponent img');if(opponent)opponent.style.filter=enemyArtFilter(enemy);stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
@@ -1805,6 +1808,24 @@ const skillPaths={
   Arcanist:{bonus:'+20 maximum mana · unlock Mend',nodes:[['Reservoir','+8 maximum mana'],['Channeling','+5 spell bonus']]},
   Reaver:{bonus:'+4 power',nodes:[['Precision','+2 power'],['Ferocity','+3 power']]}
 };
+const racialPaths={
+ Human:[['Adaptability','power',2],['Survivor','maxHp',10]],
+ Elf:[['Moon reserve','maxMp',8],['Arcane affinity','spellBonus',4]],
+ Dwarf:[['Stone skin','armor',2],['Deep endurance','maxHp',12]],
+ Cat:[['Sharp claws','power',3],['Nine lives','maxHp',10]],
+ Dog:[['Pack strength','power',2],['Iron loyalty','maxHp',15]],
+ 'Mutant Crab':[['Shell plating','armor',3],['Crusher claw','power',4]],
+ Wizard:[['Mana well','maxMp',12],['Runic mastery','spellBonus',5]],
+ Zombie:[['Undead vigor','maxHp',15],['Grave strength','power',3]]
+};
+const racialMoves={Human:['Last Stand',6,0],Elf:['Moonbolt',7,1],Dwarf:['Stonebreaker',6,0],Cat:['Razor Pounce',5,0],Dog:['Pack Charge',6,0],'Mutant Crab':['Pincer Crush',7,0],Wizard:['Runic Flare',8,1],Zombie:['Grave Strike',6,0]};
+function trainRace(index){
+ const path=racialPaths[state.character?.race],ranks=state.racialRanks??=[0,0];
+ if(!state.identityLocked||!path||![0,1].includes(index)||state.skillPoints<1||ranks[index]>=3||(index===1&&ranks[0]<2))return;
+ const [name,stat,amount]=path[index];state.skillPoints--;ranks[index]++;
+ state[stat]=(state[stat]||0)+amount;if(stat==='maxHp')state.hp+=amount;if(stat==='maxMp')state.mp+=amount;
+ openPaths.add('Racial abilities');persistCampaign();render();backpack();
+}
 const openPaths=new Set(['Foundations']);
 function skillsPanel(){
   const points=state.skillPoints;
@@ -1822,6 +1843,8 @@ function skillsPanel(){
     }
     html+=limb(name,locked?'Unlocks on Floor 4':active?'Active class':'Class path',nodes);
   }
+  const race=state.character?.race,path=racialPaths[race],ranks=state.racialRanks||[0,0];
+  if(state.identityLocked&&path){html+=limb('Racial abilities',race,path.map(([name,stat,amount],i)=>node(name+' · '+ranks[i]+'/3','+'+amount+' '+({maxHp:'maximum HP',maxMp:'maximum MP',spellBonus:'spell damage'}[stat]||stat)+' per rank'+(i?' · requires first skill at rank 2':''),ranks[i]>=3?'':cost('data-racial="'+i+'"',i===1&&ranks[0]<2))).join('')+node(racialMoves[race][0],'Unlocks at racial second skill rank 2',''))}
   return html+spellLoadoutPanel()+'</div>';
 }
 let bagSection='general';
@@ -1866,6 +1889,7 @@ function backpack(){
     $$('[data-choice]').forEach(b=>b.onclick=()=>inspectOwned(choices[Number(b.dataset.choice)]));
   });
   if(bagSection==='skills'){
+    $('[data-racial]').forEach(b=>b.onclick=()=>trainRace(Number(b.dataset.racial)));
     for(const limb of $$('[data-path]'))limb.ontoggle=()=>{if(!limb.isConnected)return;if(limb.open)openPaths.add(limb.dataset.path);else openPaths.delete(limb.dataset.path)};
     for(const b of $$('[data-prepare]'))b.onclick=()=>{
       const id=b.dataset.prepare,ready=prepared();if(!learned(id))return;
