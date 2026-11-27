@@ -4,7 +4,15 @@
   "private": true,
   "description": "Private room WebSocket relay for Dungeon Crawler Kyle co-op alpha",
   "main": "relay.js",
-  "scripts": { "start": "node relay.js" },
-  "engines": { "node": ">=20" },
-  "dependencies": { "ws": "^8.18.0" }
+  "scripts": {
+    "start": "node relay.js",
+    "check": "node --check game.js && node --check multiplayer.js && node --check relay.js && node --check sw.js && node --check music.js",
+    "test": "npm run check && node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
 }
