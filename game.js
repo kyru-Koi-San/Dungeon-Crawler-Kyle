@@ -1592,7 +1592,7 @@ function nextFloor(){if(state.chapter==='surface'){
 state.chapter='mine';generate();$('#objective').textContent='FIND THE STAIRS • SURVIVE';
 caption('Beneath Seattle','Street noise fades above you. A blue bell rope trails under Seattle. Beside it, someone has scratched three words: Find the keeper.',true);
 const guild=state.sanctuaries?.find(q=>q.door);if(guild&&personalMenusLocked())enterHall(guild);persistCampaign();return}
-if(partyGuest()){notify('Wait for the party host to descend.');return}if(entities.some(e=>e.boss&&e.alive)){notify('Defeat the guardian before descending.');return}
+if(partyGuest()){notify('Wait for the party host to descend.');return}if(state.dead||bossFight||state.hall||tile(state.x,state.y)!==3){notify('Reach the stairs outside combat to descend.');return}if(state.floor>=4&&!state.identityLocked){notify('Register your race and class at the guild before descending.');return}if(entities.some(e=>e.boss&&e.alive)){notify('Defeat the guardian before descending.');return}
 if(state.floor>=FINAL_FLOOR){
   if(!state.campaignWon){state.campaignWon=true;feed('The last bell rings. Seattle hears the all-clear.');persistCampaign();sendPartyWorld()}
   showModal('<h2>Seattle hears the last bell</h2><p>You cleared all 18 floors. Above the rescue shaft, the street lamps come back on.</p><button class="widebtn" id="campaignDone">Return to the floor</button>');
@@ -1641,7 +1641,7 @@ function campaignMenu(){
   for(let i=1;i<=3;i++){
     const key=slotKey(i),row=document.createElement('section'),title=document.createElement('strong'),summary=document.createElement('small');
     let raw=null,data=null;
-    try{raw=localStorage.getItem(key);if(raw)data=JSON.parse(raw);if(!data?.state||!Array.isArray(data.tiles)||!data.tiles.length||!Array.isArray(data.seen))data=null}catch{}
+    try{raw=localStorage.getItem(key);if(raw)data=JSON.parse(raw);if(!validCampaign(data))data=null}catch{}
     title.textContent='Slot '+i;
     summary.textContent=data?campaignSummary(data)+(data.savedAt?' · '+new Date(data.savedAt).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''):raw?'Unreadable save':'Empty slot';
     const write=()=>{try{writeCampaign(key);campaignMenu();notice.textContent='Campaign saved to slot '+i+'.'}catch{notice.textContent='Save failed. Check available browser storage.'}};
@@ -1689,12 +1689,13 @@ function companionMenu(){
 }
 
 function writeCampaign(key=saveKey){
-if(switchingCampaign)return;
+if(switchingCampaign)throw Error('Campaign is switching');
 const encounter=bossFight?{...bossFight,e:entities.indexOf(bossFight.e)}:null;
 localStorage.setItem(key,JSON.stringify({state,tiles,seen,entities,encounter,savedAt:Date.now()}));
 }
 function persistCampaign(){try{writeCampaign();flushPartyRounds()}catch{}}
-function save(){try{writeCampaign();notify('CAMPAIGN SAVED');}catch(e){notify('Save unavailable on this browser.')}}function load(){try{let o=JSON.parse(localStorage.getItem(saveKey));if(o?.state&&o.tiles){state=o.state;tiles=o.tiles;W=tiles[0].length;H=tiles.length;state.collapseLeft??=900;state.warned??=[];seen=o.seen;entities=o.entities||[];
+function save(){try{writeCampaign();notify('CAMPAIGN SAVED');}catch(e){notify('Save unavailable on this browser.')}}function validCampaign(o){if(!o?.state||!Number.isInteger(o.state.floor)||o.state.floor<1||o.state.floor>FINAL_FLOOR||!Number.isFinite(o.state.hp)||!Number.isFinite(o.state.maxHp)||o.state.maxHp<=0||!Number.isInteger(o.state.level)||o.state.level<1||!Array.isArray(o.state.inventory)||!Array.isArray(o.tiles)||!o.tiles.length||o.tiles.length>80||!Array.isArray(o.tiles[0])||!o.tiles[0].length||o.tiles[0].length>118||!Array.isArray(o.seen)||o.seen.length!==o.tiles.length||!Array.isArray(o.entities))return false;const width=o.tiles[0].length;return o.tiles.every(row=>Array.isArray(row)&&row.length===width&&row.every(t=>Number.isInteger(t)&&t>=0&&t<=3))&&o.seen.every(row=>Array.isArray(row)&&row.length===width)&&o.entities.every(e=>e&&Number.isFinite(e.x)&&Number.isFinite(e.y))}
+function load(){try{let o=JSON.parse(localStorage.getItem(saveKey));if(validCampaign(o)){bossFight=null;state=o.state;tiles=o.tiles;W=tiles[0].length;H=tiles.length;state.collapseLeft??=900;state.warned??=[];seen=o.seen;entities=o.entities||[];
 if(state.floor<4){
  if(state.character)state.character.race='Human';
  if(state.specialization)removeClass();
@@ -1712,8 +1713,9 @@ if(state.chapter==='mine')entities.forEach((e,i)=>{
   const elite=e.chief?1.8:1,max=Math.ceil(fresh.max*elite);Object.assign(e,{max,hp:Math.max(1,Math.round(max*ratio)),atk:Math.ceil(fresh.atk*(e.chief?1.2:1)),armor:fresh.armor+(e.chief?2:0),rosterVersion:2});
 });
 if(!state.progressionVersion){state.nextXp=progressionXp(state.level);state.progressionVersion=1}state.dead=!!(state.dead||state.collapsed||state.hp<=0);
-const guardian=entities[o.encounter?.e];
-if(!state.dead&&guardian?.type==='enemy'&&guardian.alive)bossFight={...o.encounter,e:guardian};
+for(const e of entities){if(!e.boss||!e.alive||e.balanceVersion>=1)continue;const b=guardianBalance(state.floor),ratio=Math.max(0,Math.min(1,e.hp/Math.max(1,e.max)));Object.assign(e,{max:b.hp,hp:Math.max(1,Math.ceil(b.hp*ratio)),atk:b.atk,armor:b.armor,xp:b.xp,balanceVersion:1})}
+const guardian=Number.isInteger(o.encounter?.e)?entities[o.encounter.e]:null;
+if(!state.dead&&guardian?.type==='enemy'&&guardian.alive)bossFight={...o.encounter,e:guardian,turn:Math.max(1,Math.floor(o.encounter.turn||1)),group:(Array.isArray(o.encounter.group)?o.encounter.group:[]).filter(i=>Number.isInteger(i)&&entities[i]?.alive&&entities[i]?.type==='enemy'&&entities[i]!==guardian),hostChoice:null};
 return true}}catch(e){}return false}
 function inArena(x,y){let a=state.arena;return !!a&&x>=a.x&&x<a.x+a.w&&y>=a.y&&y<a.y+a.h}const terrainCache=new Map();
 function cachedArt(cache,key){const value=cache.get(key);if(value){cache.delete(key);cache.set(key,value)}return value}
