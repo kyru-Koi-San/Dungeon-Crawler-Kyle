@@ -2621,7 +2621,7 @@ function transferLoot(key){
     if(source.droppedBag&&!owner){const existing=state.inventory.find(i=>i.id===piece.id);if(existing)existing.qty+=piece.qty;else state.inventory.push({...piece})}else bundle[row.id]=(bundle[row.id]||0)+piece.qty;
     if(!source.contents.length){
       if(row.index<0)source.cache=true;else{source.looted=true;if(source.type==='loot')source.alive=false}
-      if(!owner){unlock('Scavenger');state.loots=(state.loots||0)+1;if(state.loots===3)ridiculous('Personal Space Is for the Living');if(state.loots===15)ridiculous('Estate Sale Enthusiast','Silver')}
+      if(!owner&&!source.droppedBag){unlock('Scavenger');state.loots=(state.loots||0)+1;if(state.loots===3)ridiculous('Personal Space Is for the Living');if(state.loots===15)ridiculous('Estate Sale Enthusiast','Silver')}
     }
   }
   if(Object.keys(bundle).length){
