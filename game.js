@@ -328,7 +328,7 @@ function rivalEncounter(n){
  if(!n||n.gone||partyGuest())return;
  const p=n.profile,hostile=p.temper==='hostile'||(p.temper==='deceptive'&&n.trust<0);
  n.met=true;persistCampaign();
- dialogueFrame(p.name,hostile?'Hand over your supplies. I am not asking twice.':p.temper==='deceptive'?'I know a shortcut. Trust me.':n.trust?'Still alive? Good.':'Easy. I am just trying to survive.',p,[
+ dialogueFrame(p.name,hostile?'Hand over your supplies. I am not asking twice.':p.temper==='deceptive'?'I know a shortcut. Trust me.':n.trust?'Still alive? Good.':p.temper==='wary'?'Keep your weapon where I can see it. Information costs trust.':'Easy. I am just trying to survive.',p,[
  {label:'Ask about the floor',run:()=>{if(hostile){startRivalFight(n);return}if(!n.sharedTip){n.sharedTip=true;n.trust++}persistCampaign();dialogueFrame(p.name,relayFloors[state.floor-1][1],p,[{label:'Return to conversation',run:()=>rivalEncounter(n)},{label:'Leave',run:closeModal}])}},
  {label:'Offer 15 gold',disabled:state.gold<15,run:()=>{if(state.gold<15)return;state.gold-=15;n.trust+=2;if(p.temper==='deceptive'&&!n.betrayed){n.betrayed=true;n.trust=-2;startRivalFight(n);return}if(p.temper==='hostile')p.temper='wary';else if(n.trust>=2){p.temper='friendly';if(!n.rewarded){n.rewarded=true;giveItem('tonic',1);notify('Crawler shares a health tonic.')}}closeModal();persistCampaign();render()}},
  {label:'Invite into your party',disabled:hostile||p.temper!=='friendly'||n.trust<2||recruitedCrawlers().length>=2,run:()=>{if(recruitRival(n)){closeModal();notify(p.name+' joined your party.');persistCampaign();sendPartyWorld();render()}}},
@@ -338,7 +338,8 @@ function rivalEncounter(n){
 function startRivalFight(n){
  if(n.gone||bossFight||partyGuest())return;
  const p=n.profile,rank=Math.min(5,1+Math.floor(state.floor/4)),gear=p.gear.weapon==='hammer'?'relay-maul':'cage-cleaver',armor=p.gear.armor==='coat'?'raincoat':'warden-plate',hp=32+state.floor*9;
- n.gone=true;const e={type:'enemy',name:p.name,sprite:'goblin',profile:p,hostileCrawler:true,x:n.x,y:n.y,hp,max:hp,atk:7+state.floor*3,armor:2+Math.floor(state.floor*.8),xp:30+state.floor*6,alive:true,cool:0,rosterVersion:2,contents:[{id:gear+'-'+rank,qty:1},{id:armor+'-'+rank,qty:1},{id:'gold',qty:15+state.floor*3}]};
+ const charm=p.gear.charm==='glass'?'storm-glass':p.gear.charm==='iron'?'cold-iron':'bell-ring',heavy=p.gear.weapon==='hammer',plated=p.gear.armor==='steel',mail=p.gear.armor==='mail';
+ n.gone=true;const e={type:'enemy',name:p.name,sprite:'goblin',profile:p,hostileCrawler:true,x:n.x,y:n.y,hp,max:hp,atk:7+state.floor*3+(heavy?3:0),armor:2+Math.floor(state.floor*.8)+(plated?4:mail?2:0),xp:30+state.floor*6,alive:true,cool:0,rosterVersion:2,contents:[{id:gear+'-'+rank,qty:1},{id:armor+'-'+rank,qty:1},{id:charm+'-'+rank,qty:1},{id:'gold',qty:15+state.floor*3}]};
  entities.push(e);closeModal();beginBoss(e);persistCampaign();sendPartyWorld();
 }
 function tickRivals(dt){
