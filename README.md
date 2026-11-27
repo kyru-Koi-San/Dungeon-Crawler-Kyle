@@ -76,3 +76,6 @@ For GitHub Pages, upload the contents of this project folder to the repository r
 ## Relay protocol update
 
 The private relay now accepts host world snapshots up to 512 KiB and 5,000 entities, session-scoped loot claims, ranked item IDs, and eight character races. Ordinary incoming messages remain capped at 8 KiB. Combat remains host-authoritative rather than server-authoritative. Restart/redeploy the Node relay after updating. No live multi-device validation has been completed.
+
+### Persistent relay storage
+Set `DCK_STORAGE_FILE=/data/relay.json` on the relay and mount a persistent writable volume at `/data`. Run one relay process per storage file. The relay checkpoints dirty room state about once per second, commits trade receipts before acknowledgment, and cancels unfinished trades after restart. Keep this file private: it contains reconnect and trade tokens. Connected sessions can recover for up to 24 hours after restart; ordinary disconnects retain the two-minute recovery window. The client must retain its reconnect token. Storage is opt-in; without the variable the relay is memory-only. `/health` reports whether persistence is configured and whether a write error occurred. Back up the volume independently. This is host-trusted co-op, not an authoritative multiplayer server.
