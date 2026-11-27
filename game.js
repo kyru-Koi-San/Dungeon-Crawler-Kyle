@@ -487,16 +487,16 @@ function chooseLanding(){
   if(eligible.length)[state.x,state.y]=eligible[0];
 }
 
-function generate(){state.grubHatches=0;state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;const depth=Math.min(FINAL_FLOOR,state.floor)-1;W=118-depth*4;H=80-depth*2;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
+function generate(){state.patrolFloor=0;state.grubHatches=0;state.hall=null;state.scenery=[];state.power-=state.teaPower||0;state.teaPower=0;step=null;const depth=Math.min(FINAL_FLOOR,state.floor)-1;W=118-depth*4;H=80-depth*2;state.collapseLeft=900;state.collapsed=false;state.warned=[];visualX=null;let r=rng((state.floor*982451653+0xdecafbad)>>>0);tiles=Array.from({length:H},()=>Array(W).fill(0));seen=Array.from({length:H},()=>Array(W).fill(false));entities=[];particles=[];state.x=15;state.y=9;state.boss=null;state.stairs=false;spawnedFloor=state.floor;
 // carve connected rooms and corridors
 let rooms=[];for(let i=0;i<54-depth*2;i++){let rw=4+Math.floor(r()*6),rh=3+Math.floor(r()*5),rx=1+Math.floor(r()*((state.floor%3===0?W-12:W)-rw-2)),ry=1+Math.floor(r()*(H-rh-2));let room={x:rx,y:ry,w:rw,h:rh,cx:Math.floor(rx+rw/2),cy:Math.floor(ry+rh/2)};for(let y=ry;y<ry+rh;y++)for(let x=rx;x<rx+rw;x++)tiles[y][x]=1;if(rooms.length){let p=rooms[rooms.length-1];let x=room.cx,y=room.cy;while(x!==p.cx){tiles[y][x]=1;x+=Math.sign(p.cx-x)}while(y!==p.cy){tiles[y][x]=1;y+=Math.sign(p.cy-y)}}rooms.push(room)}
 // walls around corridors
 for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++)if(tiles[y][x]===0){for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(tiles[y+dy]?.[x+dx]===1){tiles[y][x]=2;break}}
 state.x=rooms[0].cx;state.y=rooms[0].cy;state.rooms=rooms.length;let safe=rooms[0];state.safe={x:safe.cx,y:safe.cy};state.sanctuaries=[{...state.safe,rested:false}];for(let room of rooms.slice(2,-1)){if(state.sanctuaries.length>=6)break;if(r()<.28&&state.sanctuaries.every(q=>Math.hypot(q.x-room.cx,q.y-room.cy)>8))state.sanctuaries.push({x:room.cx,y:room.cy,rested:false})}buildSanctuaries();chooseLanding();let npc=rooms[1];state.npc={x:npc.cx,y:npc.cy,met:false};state.rested=false;
-for(let i=0;i<Math.min(24+state.floor*2,65);i++){let room=rooms[1+Math.floor(r()*(rooms.length-1))],ex=room.cx+Math.floor(r()*3)-1,ey=room.cy+Math.floor(r()*3)-1;if(!sanctuaryAt(ex,ey)&&!solid(ex,ey)&&!entities.some(e=>e.x===ex&&e.y===ey)&&Math.abs(ex-state.x)+Math.abs(ey-state.y)>5)spawnEnemy(ex,ey,r)}
+if(state.floor===1)for(let i=0;i<26;i++){let room=rooms[1+Math.floor(r()*(rooms.length-1))],ex=room.cx+Math.floor(r()*3)-1,ey=room.cy+Math.floor(r()*3)-1;if(!sanctuaryAt(ex,ey)&&!solid(ex,ey)&&!entities.some(e=>e.x===ex&&e.y===ey)&&Math.abs(ex-state.x)+Math.abs(ey-state.y)>5)spawnEnemy(ex,ey,r)}
 let dist=Array.from({length:H},()=>Array(W).fill(-1)),queue=[[state.x,state.y]];dist[state.y][state.x]=0;for(let i=0;i<queue.length;i++){let [x,y]=queue[i];for(let [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){let a=x+dx,b=y+dy;if(tile(a,b)===1&&!sanctuaryAt(a,b)&&!state.sanctuaries.some(q=>q.door?.x===a&&q.door?.y===b)&&dist[b][a]<0){dist[b][a]=dist[y][x]+1;queue.push([a,b])}}}let end=rooms.slice(1).sort((a,b)=>dist[b.cy][b.cx]-dist[a.cy][a.cx])[0];const far=queue[queue.length-1];if(dist[end.cy][end.cx]<1||sanctuaryAt(end.cx,end.cy))end={...end,cx:far[0],cy:far[1]};tiles[end.cy][end.cx]=3;state.stairs=true;
 if(state.floor%3===0){let candidates=[];for(let y=2;y<H-9;y++)for(let x=2;x<W-11;x++){let w=8,h=6,clear=true;for(let j=y-1;j<=y+h;j++)for(let i=x-1;i<=x+w;i++)if(tile(i,j)===1||tile(i,j)===3)clear=false;if(!clear)continue;for(let [dx,dy] of [[0,-1],[0,1],[-1,0],[1,0]]){let gx=dx<0?x-1:dx>0?x+w:x+4,gy=dy<0?y-1:dy>0?y+h:y+3;if(tile(gx+dx,gy+dy)===1&&dist[gy+dy][gx+dx]>12)candidates.push({x,y,w,h,gx,gy,score:dist[gy+dy][gx+dx]})}}candidates.sort((a,b)=>b.score-a.score);let a=candidates[0];if(!a){let x=W-10,y=H-10,w=8,h=6,gx=x-1,gy=y+3;let nearest=queue.filter(([i,j])=>i<gx).sort((p,q)=>Math.abs(p[0]-gx)+Math.abs(p[1]-gy)-Math.abs(q[0]-gx)-Math.abs(q[1]-gy))[0];if(nearest){let [i,j]=nearest;while(j!==gy){tiles[j][i]=1;j+=Math.sign(gy-j)}while(i<gx){tiles[j][i]=1;i++}a={x,y,w,h,gx,gy}}}if(a){for(let j=a.y-1;j<=a.y+a.h;j++)for(let i=a.x-1;i<=a.x+a.w;i++)tiles[j][i]=i>=a.x&&i<a.x+a.w&&j>=a.y&&j<a.y+a.h?1:2;tiles[a.gy][a.gx]=1;state.arena={x:a.x,y:a.y,w:a.w,h:a.h,gates:[{x:a.gx,y:a.gy}]};spawnBoss(a.x+4,a.y+3)}else{let room=rooms.filter(q=>q!==end&&dist[q.cy][q.cx]>12).sort((a,b)=>b.w*b.h-a.w*a.h)[0]||rooms[1];state.arena={x:room.x,y:room.y,w:room.w,h:room.h,gates:[]};entities=entities.filter(e=>!(e.x>=room.x&&e.x<room.x+room.w&&e.y>=room.y&&e.y<room.y+room.h));spawnBoss(room.cx,room.cy)}}else state.arena=null;
-furnishFloor();placeAnimal();feed('You descend into <b>'+names[(state.floor-1)%names.length]+'</b>.');ai(quips[Math.floor(r()*quips.length)]);reveal();render();}
+populatePatrols();furnishFloor();placeAnimal();feed('You descend into <b>'+names[(state.floor-1)%names.length]+'</b>.');ai(quips[Math.floor(r()*quips.length)]);reveal();render();}
 const floorMobs=[
  [['Drain rat','sewer-rat'],['Tunnel goblin','goblin'],['Pack llama','pack-llama']],
  [['Flood grub','flood-grub'],['Mire leprechaun','mire-leprechaun']],
@@ -528,6 +528,45 @@ function floorEnemy(floor,index,x,y){
 function spawnEnemy(x,y,r=Math.random){
  r(); // Preserve the seeded room placement sequence used by existing campaigns.
  entities.push(floorEnemy(state.floor,entities.length,x,y));
+}
+// Distribute patrols by walking distance so both the approach and the far rooms see traffic.
+function populatePatrols(upgrading=false){
+ if(state.chapter!=='mine'||state.dead||state.campaignWon||state.patrolFloor===state.floor)return;
+ const random=rng(19391*state.floor),key=(x,y)=>y*W+x;
+ const forbidden=new Set();
+ for(const p of [...entities,...(state.scenery||[]),state.npc,state.wildAnimal,state.pet,
+   ...(state.sanctuaries||[]).map(q=>q.door),...(state.arena?.gates||[])]){
+   if(p)forbidden.add(key(p.x,p.y));
+ }
+ const start=state.hall?{x:state.hall.returnX,y:state.hall.returnY}:state;
+ const queue=[[start.x,start.y,0]],visited=new Set([key(start.x,start.y)]),spots=[];
+ for(let i=0;i<queue.length;i++){
+   const [x,y,d]=queue[i];
+   if(d>=6&&Math.hypot(x-state.x,y-state.y)>=5&&!forbidden.has(key(x,y))&&
+      !inArena(x,y)&&tile(x,y)===1&&(!upgrading||!seen[y]?.[x]))spots.push({x,y});
+   for(const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]){
+     const a=x+dx,b=y+dy,k=key(a,b);
+     if(visited.has(k)||solid(a,b)||tile(a,b)!==1||sanctuaryAt(a,b)||
+       state.sanctuaries?.some(q=>q.door?.x===a&&q.door.y===b))continue;
+     visited.add(k);queue.push([a,b,d+1]);
+   }
+ }
+ const existing=entities.filter(e=>e.type==='enemy'&&!e.boss).length;
+ const target=state.floor===1?existing+2:42+2*(state.floor-2);
+ const count=Math.min(spots.length,Math.max(0,target-existing));
+ for(let i=0;i<count;i++){
+   const first=Math.floor(i*spots.length/count),end=Math.floor((i+1)*spots.length/count);
+   const {x,y}=spots[first+Math.floor(random()*(end-first))];
+   const enemy=floorEnemy(state.floor,existing+i,x,y);
+   enemy.den={x,y};
+   const chief=i===Math.floor(count*.35)?'bruiser':i===Math.floor(count*.78)?'hexer':null;
+   if(chief){
+     enemy.chief=chief;enemy.name+=(chief==='bruiser'?' Pit Champion':' Hexcaller');
+     enemy.max=Math.ceil(enemy.max*1.8);enemy.hp=enemy.max;enemy.xp*=3;
+   }
+   entities.push(enemy);
+ }
+ state.patrolFloor=state.floor;
 }
 function hatchGrub(parent){
  if(parent.budded||(state.grubHatches||0)>=6||entities.length>=95)return false;
@@ -568,6 +607,8 @@ let bossFight=null;
 function beginBoss(e){if(bossFight||state.dead||modalOpen()||sanctuaryAt(state.x,state.y)||(e.boss&&state.arena&&!inArena(state.x,state.y)))return;bossFight={e,turn:1,log:e.boss?'The arena seals.':'The '+e.name.toLowerCase()+' advances.'};step=null;visualX=state.x;visualY=state.y;joyX=joyY=0;if(e.boss)ai('BOSS BATTLE! Please make your inevitable suffering entertaining.');bossScreen();persistCampaign()}
 function bossIntent(b){
  if(!b.e.boss){
+   if(b.e.chief==='bruiser'&&b.turn%3===0)return 'ARMOR SHATTER';
+   if(b.e.chief==='hexer'&&b.turn%3===0)return 'MANA DRAIN';
    if(b.e.sprite==='flood-grub'&&!b.e.budded&&(state.grubHatches||0)<6&&b.turn%2===0)return 'BUDDING';
    if(b.e.sprite==='mire-leprechaun'&&b.turn%2===0)return 'SICKENING MIST';
    if(b.e.sprite==='archer'&&b.turn%3===2)return 'AIMED SHOT';
@@ -612,7 +653,7 @@ function encounterScreen(spellMenu=false){
   if(Object.keys(techniques).some(learned))moves.push(['spells','Spells']);
   if(enemy.boss)moves.push(['trap',battle.trapUsed?'Trap spent':'Spring trap']);
   if(spellMenu)moves.splice(0,moves.length,...prepared().map(id=>[id,techniques[id].name+' · '+techniques[id].cost+' MP']),['back','Back']);
-  showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><button class="smallbtn" data-campaign-menu>Campaign saves</button><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions command-fan">'+(spellMenu&&!prepared().length?'<p>Prepare abilities in Backpack → Skills → Spell menu.</p>':'')+moves.map(([id,label])=>'<button class="duel-command" data-boss="'+id+'" '+((techniques[id]&&state.mp<techniques[id].cost)||(id==='mend'&&state.hp===state.maxHp&&!conditionText())||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!quantity('tonic'))?'disabled':'')+'><i aria-hidden="true">'+(({attack:'⚔',guard:'⬟',heal:'✚',retreat:'↗',spells:'✧',trap:'⌖',back:'‹'})[id]||'✦')+'</i><span>'+label+'</span></button>').join('')+'</div></div>');
+  showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':enemy.chief?'ROAMING MINIBOSS':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><button class="smallbtn" data-campaign-menu>Campaign saves</button><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions command-fan">'+(spellMenu&&!prepared().length?'<p>Prepare abilities in Backpack → Skills → Spell menu.</p>':'')+moves.map(([id,label])=>'<button class="duel-command" data-boss="'+id+'" '+((techniques[id]&&state.mp<techniques[id].cost)||(id==='mend'&&state.hp===state.maxHp&&!conditionText())||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!quantity('tonic'))?'disabled':'')+'><i aria-hidden="true">'+(({attack:'⚔',guard:'⬟',heal:'✚',retreat:'↗',spells:'✧',trap:'⌖',back:'‹'})[id]||'✦')+'</i><span>'+label+'</span></button>').join('')+'</div></div>');
   $('#duelHero').src=crawlerPose('side',0).toDataURL();
   const stage=$('.duel-stage');stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
   if(state.equipment?.weapon)stage.classList.add('armed');
@@ -698,8 +739,8 @@ if(e.pursuit>0){
 if(state.retreatGrace&&Math.hypot(e.x-state.x,e.y-state.y)<1.4)continue;
 if(Math.hypot(e.x-state.x,e.y-state.y)<1.4){if(!window.DCKNet?.inRoom){beginBoss(e);return}if(e.cool<=0){e.attackAt=performance.now();
  if(e.sprite==='flood-grub'&&hatchGrub(e))notify('A grub hatchling emerges.');
- else{if(e.sprite==='mire-leprechaun'&&Math.random()<.4)(state.wounds??={}).sick=true;takeDamage(e.atk,e)}e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<dt*.72){
-const chasing=Math.hypot(e.x-state.x,e.y-state.y)<7;
+ else{if(e.sprite==='mire-leprechaun'&&Math.random()<.4)(state.wounds??={}).sick=true;takeDamage(e.atk,e)}e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<dt*(state.floor===1?.72:1+Math.min(state.floor,12)*.035)){
+const chasing=Math.hypot(e.x-state.x,e.y-state.y)<(state.floor===1?7:9+Math.floor(state.floor/5));
 const target=chasing?state:e.den;if(!target)continue;
 let dx=Math.sign(target.x-e.x),dy=Math.sign(target.y-e.y);let opts=Math.random()<.5?[[dx,0],[0,dy]]:[[0,dy],[dx,0]];for(let [ax,ay] of opts)if((ax||ay)&&!(step&&e.x+ax===step.nx&&e.y+ay===step.ny)&&!solid(e.x+ax,e.y+ay)&&!sanctuaryAt(e.x+ax,e.y+ay)&&!entities.some(q=>q!==e&&q.alive&&q.x===e.x+ax&&q.y===e.y+ay)){e.x+=ax;e.y+=ay;break}}}}
 function checkLevel(){while(state.xp>=state.nextXp){state.xp-=state.nextXp;state.level++;state.nextXp=Math.floor(state.nextXp*1.35);state.maxHp+=12;restoreHealth(state.maxHp);if(state.floor>=4){state.maxMp+=4;state.mp=state.maxMp}state.power+=2;state.skillPoints++;feed('<b>LEVEL UP!</b> You reached level '+state.level+'. Stats increased.');notify('LEVEL UP — LEVEL '+state.level);unlock('Getting stronger');beep(660,.2,'sine')}}
@@ -1570,5 +1611,6 @@ if(step){
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 if(!load()){startStory()}else{if(!state.sanctuaries?.length&&state.safe)state.sanctuaries=[state.safe];if(state.hall&&!state.sanctuaries?.[state.hall.index]?.door)state.hall=null;
   if(!state.hall&&!state.dead){const q=sanctuaryAt(state.x,state.y);if(q?.door)enterHall(q)}
-  if(!Array.isArray(state.scenery))furnishFloor();if(!state.hall&&!bossFight&&!state.dead&&state.chapter==='mine'&&(solid(state.x,state.y)||sanctuaryAt(state.x,state.y)||[[1,0],[-1,0],[0,-1],[0,1]].every(([dx,dy])=>solid(state.x+dx,state.y+dy))))chooseLanding();if(state.chapter==='mine'&&state.wildAnimal===undefined)placeAnimal();reveal();render();if(state.chapter==='create')showCreator()}bind();render();if(state.dead)openDeath();else if(bossFight)bossScreen();if(!personalMenusLocked())openTab('journal');if(state.storyLine)caption(state.storyLine.speaker,state.storyLine.line);else if(!state.chapter)ai(quips[0]);$('#packBtn').onclick=backpack;$('#editCrawler').onclick=()=>{if(!state.dead&&!bossFight)showCreator()};requestAnimationFrame(tick);
+  if(!Array.isArray(state.scenery))furnishFloor();if(!state.hall&&!bossFight&&!state.dead&&state.chapter==='mine'&&(solid(state.x,state.y)||sanctuaryAt(state.x,state.y)||[[1,0],[-1,0],[0,-1],[0,1]].every(([dx,dy])=>solid(state.x+dx,state.y+dy))))chooseLanding();if(state.chapter==='mine'&&state.wildAnimal===undefined)placeAnimal();populatePatrols(true);reveal();render();if(state.chapter==='create')showCreator()}bind();render();if(state.dead)openDeath();else if(bossFight)bossScreen();if(!personalMenusLocked())openTab('journal');if(state.storyLine)caption(state.storyLine.speaker,state.storyLine.line);else if(!state.chapter)ai(quips[0]);$('#packBtn').onclick=backpack;$('#editCrawler').onclick=()=>{if(!state.dead&&!bossFight)showCreator()};requestAnimationFrame(tick);
 })();
+
