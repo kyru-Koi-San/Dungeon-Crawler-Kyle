@@ -4,7 +4,8 @@ const http=require('node:http');
 const crypto=require('node:crypto');
 const {WebSocketServer,WebSocket}=require('ws');
 const PORT=Number(process.env.PORT||8080),MAX_PLAYERS=4,MAX_MESSAGE=524288;
-const rooms=new Map(),clients=new Map();
+const rooms=new Map(),clients=new Map(),tradeReceipts=new Map();
+const RECEIPT_TTL=7*24*60*60*1000;
 const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function code(){let s='';for(let i=0;i<6;i++)s+=alphabet[crypto.randomInt(alphabet.length)];return s}
 function send(ws,data){if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(data))}
@@ -20,6 +21,9 @@ wss.on('connection',(ws,req)=>{
   if(raw.length>MAX_MESSAGE)return ws.close(1009,'Message too large');
   const now=Date.now();if(now-client.windowStart>1000){client.windowStart=now;client.messages=0}if(++client.messages>30)return ws.close(1008,'Rate limit');
   let m;try{m=JSON.parse(raw.toString())}catch{return send(ws,{type:'error',message:'Invalid message.'})}
+  if(!m||typeof m!=='object'||Array.isArray(m))return;
+  if(raw.length>8192&&m.type!=='world_snapshot')return ws.close(1009,'Message too large');
+  if(m.type==='trade_recover'){const receipt=tradeReceipts.get(m.id);const token=String(m.token||'');if(receipt&&/^[a-f0-9]{32}$/.test(token)&&receipt.results.has(token)){send(ws,receipt.results.get(token));return}send(ws,{type:'trade_recovery_unknown',id:String(m.id||'').slice(0,36)});return}
   if(m.type==='create_room'){
    leave(ws);let roomCode;do{roomCode=code()}while(rooms.has(roomCode));const room={code:roomCode,host:id,players:new Map(),world:null,revision:0};rooms.set(roomCode,room);client.room=roomCode;client.name=cleanName(m.name);room.players.set(id,{ws,name:client.name,state:{name:client.name,floor:1,x:15,y:9,level:1,hp:100,maxHp:100}});send(ws,{type:'room_joined',code:roomCode,players:publicPlayers(room),host:room.host});return;
   }
@@ -67,21 +71,22 @@ wss.on('connection',(ws,req)=>{
  });
  ws.on('close',()=>{leave(ws);clients.delete(ws)});ws.on('error',()=>{leave(ws);clients.delete(ws)});
 });
+function recordTradeResult(room,t,ok){const results=new Map();for(const who of [t.a,t.b]){const token=t.tokens?.[who];const result={type:'trade_end',id:t.id,ok,received:ok?t.offers[who===t.a?t.b:t.a]:undefined};if(token)results.set(token,result);const p=room.players.get(who);if(p)send(p.ws,result)}tradeReceipts.set(t.id,{results,expires:Date.now()+RECEIPT_TTL})}
 function tradeView(room,t){
  for(const id of [t.a,t.b]){const p=room.players.get(id);if(p)send(p.ws,{type:'trade_state',trade:{id:t.id,peer:id===t.a?t.b:t.a,peerName:room.players.get(id===t.a?t.b:t.a)?.name||'Crawler',mine:t.offers[id]||null,theirs:t.offers[id===t.a?t.b:t.a]||null,accepted:!!t.accept[id],peerAccepted:!!t.accept[id===t.a?t.b:t.a],version:t.version}})}
 }
-function cancelTrade(room,t){room.trades.delete(t.id);for(const id of [t.a,t.b]){const p=room.players.get(id);if(p)send(p.ws,{type:'trade_end',id:t.id,ok:false})}}
+function cancelTrade(room,t){room.trades.delete(t.id);recordTradeResult(room,t,false)}
 function tradeNear(a,b){return a&&b&&a.hp>0&&b.hp>0&&a.floor===b.floor&&!a.hall&&!b.hall&&Math.hypot(a.x-b.x,a.y-b.y)<=3}
 function tradeMessage(room,id,m){
  room.trades??=new Map();const p=room.players.get(id);if(!p)return;
- if(m.type==='trade_open'){const other=room.players.get(m.target);if(!other||m.target===id||!tradeNear(p.state,other.state)||[...room.trades.values()].some(t=>[t.a,t.b].some(v=>v===id||v===m.target)))return send(p.ws,{type:'error',message:'Trade unavailable. Stand near an available crawler.'});const t={id:crypto.randomUUID(),a:id,b:m.target,offers:{},accept:{},version:0};room.trades.set(t.id,t);tradeView(room,t);return}
+ if(m.type==='trade_open'){const other=room.players.get(m.target);if(!other||m.target===id||!tradeNear(p.state,other.state)||[...room.trades.values()].some(t=>[t.a,t.b].some(v=>v===id||v===m.target)))return send(p.ws,{type:'error',message:'Trade unavailable. Stand near an available crawler.'});const t={id:crypto.randomUUID(),a:id,b:m.target,offers:{},tokens:{},accept:{},version:0};room.trades.set(t.id,t);tradeView(room,t);return}
  const t=room.trades.get(m.id);if(!t||![t.a,t.b].includes(id))return;
  if(m.type==='trade_cancel'){cancelTrade(room,t);return}
- if(m.type==='trade_offer'){if(t.offers[id])return;const rows=Array.isArray(m.offer)?m.offer:[m.offer];if(rows.length<1||rows.length>12)return;const seen=new Set();for(const o of rows){if(!o||typeof o.item!=='string'||!/^[A-Za-z][A-Za-z0-9-]{0,63}$/.test(o.item)||['constructor','prototype'].includes(o.item)||!Number.isSafeInteger(o.qty)||o.qty<1||o.qty>9999||seen.has(o.item))return;seen.add(o.item)}t.offers[id]=rows.map(o=>({item:o.item,qty:o.qty}));t.accept={};t.version++;tradeView(room,t);return}
- if(m.type==='trade_accept'){if(m.version!==t.version||!t.offers[t.a]||!t.offers[t.b])return;if(!tradeNear(room.players.get(t.a)?.state,room.players.get(t.b)?.state)){cancelTrade(room,t);return}t.accept[id]=true;if(!t.accept[t.a]||!t.accept[t.b]){tradeView(room,t);return}room.trades.delete(t.id);for(const who of [t.a,t.b]){const q=room.players.get(who);if(q)send(q.ws,{type:'trade_end',id:t.id,ok:true,received:t.offers[who===t.a?t.b:t.a]})}}
+ if(m.type==='trade_offer'){if(t.offers[id])return;if(!/^[a-f0-9]{32}$/.test(m.token||''))return;const rows=Array.isArray(m.offer)?m.offer:[m.offer];if(rows.length<1||rows.length>12)return;const seen=new Set();for(const o of rows){if(!o||typeof o.item!=='string'||!/^[A-Za-z][A-Za-z0-9-]{0,63}$/.test(o.item)||['constructor','prototype'].includes(o.item)||!Number.isSafeInteger(o.qty)||o.qty<1||o.qty>9999||seen.has(o.item))return;seen.add(o.item)}t.tokens[id]=m.token;t.offers[id]=rows.map(o=>({item:o.item,qty:o.qty}));t.accept={};t.version++;tradeView(room,t);return}
+ if(m.type==='trade_accept'){if(m.version!==t.version||!t.offers[t.a]||!t.offers[t.b])return;if(!tradeNear(room.players.get(t.a)?.state,room.players.get(t.b)?.state)){cancelTrade(room,t);return}t.accept[id]=true;if(!t.accept[t.a]||!t.accept[t.b]){tradeView(room,t);return}room.trades.delete(t.id);recordTradeResult(room,t,true)}
 }
 function cleanName(s){return String(s||'Crawler').replace(/[^\w -]/g,'').slice(0,16)||'Crawler'}
 function clampInt(v,min,max){v=Number(v);return Number.isFinite(v)?Math.max(min,Math.min(max,Math.floor(v))):min}
-const heartbeat=setInterval(()=>{for(const ws of wss.clients){if(ws.isAlive===false){ws.terminate();continue}ws.isAlive=false;ws.ping()}},30000);
+const heartbeat=setInterval(()=>{for(const [id,r] of tradeReceipts)if(r.expires<=Date.now())tradeReceipts.delete(id);for(const ws of wss.clients){if(ws.isAlive===false){ws.terminate();continue}ws.isAlive=false;ws.ping()}},30000);
 wss.on('close',()=>clearInterval(heartbeat));
 server.listen(PORT,'0.0.0.0',()=>console.log(`DCK relay listening on ${PORT}`));
