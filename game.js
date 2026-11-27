@@ -895,7 +895,7 @@ function populateSecrets(){
  if(!visited.has(k)&&!solid(a,b)&&!sanctuaryAt(a,b)&&!hazardAt(a,b)){visited.add(k);queue.push([a,b])}
  if(tile(a,b)!==2||Math.hypot(x-state.x,y-state.y)<8||inArena(x,y)||nearHazardObject(x,y))continue;
  const cx=a+dx*2,cy=b+dy*2;if(cx<3||cx>=W-3||cy<3||cy>=H-3)continue;
- let clear=true;for(let j=-2;j<=2;j++)for(let m=-2;m<=2;m++){const xx=cx+m,yy=cy+j;if(xx===a&&yy===b)continue;if(tile(xx,yy)!==0||sanctuaryAt(xx,yy)||inArena(xx,yy))clear=false}
+ let clear=true;for(let j=-2;j<=2;j++)for(let m=-2;m<=2;m++){const xx=cx+m,yy=cy+j;if(xx===a&&yy===b)continue;if((tile(xx,yy)!==0&&tile(xx,yy)!==2)||sanctuaryAt(xx,yy)||inArena(xx,yy))clear=false}
  if(clear)candidates.push({x:a,y:b,cx,cy,dx,dy,approachX:x,approachY:y});
  }}
  if(candidates.length){const p=candidates[Math.floor(rand()*candidates.length)];state.secrets.push({...p,opened:false,id:state.floor+'-secret'});}
