@@ -1228,15 +1228,35 @@ function battleFrames(duration,paint,valid){
     frame(last);
   });
 }
-function guardianAttackFx(stage,battle){
- if(!battle.e.boss&&!battle.e.localBoss)return;
- const intent=bossIntent(battle);
- const theme=({3:['#d3ad69','▥','CAGE IMPACT'],6:['#92c46c','✳','VENOM SURGE'],9:['#91cbe9','◇','SPECTRAL WAVE'],12:['#f69b54','✦','CINDER BURST'],15:['#c5a7df','▣','IRON IMPACT'],18:['#e7ce82','◎','BELL RESONANCE']})[state.floor]||['#e19a73','✦',intent];
- const fx=document.createElement('div');fx.textContent=theme[1];fx.setAttribute('aria-hidden','true');
- fx.style.cssText='position:absolute;left:18%;top:25%;font-size:58px;line-height:1;color:'+theme[0]+';text-shadow:0 0 16px '+theme[0]+';pointer-events:none;z-index:5';
- stage.appendChild(fx);
- if(fx.animate&&!ambientMotion.matches)fx.animate([{transform:'translateX(45px) scale(.4)',opacity:.1},{transform:'translateX(0) scale(1.3)',opacity:1},{transform:'scale(1.8)',opacity:0}],{duration:430});
- return fx;
+function combatFxTheme(action,enemy=false){
+ if(enemy)return ({
+ 'VENOM BITE':['#9dd35c','poison'],'SICKENING MIST':['#82b968','poison'],'MANA DRAIN':['#a8a1ff','vortex'],'SOUL SIPHON':['#c496ef','vortex'],'AIMED SHOT':['#e5c27e','arrow'],'ARMOR SHATTER':['#dfaf87','impact'],'DEVASTATING STRIKE':['#ec856b','impact'],'DEFENSIVE STANCE':['#accee3','shield'],'ENRAGED ATTACK':['#f17868','slash']
+ })[action]||['#e9a084','slash'];
+ if(['heal','mend','medic'].includes(action))return ['#83e2a9','heal'];
+ if(['guard','brace','bastion','aegis','commander'].includes(action))return ['#a0d7ed','shield'];
+ if(['volley','deadeye','pathfinder'].includes(action))return ['#f4cc8a','arrow'];
+ if(['bell','sage','racial'].includes(action))return ['#cdb0ff','vortex'];
+ if(['tide','stormcaller'].includes(action))return ['#8dd5ff','lightning'];
+ if(['catalyst','transmuter'].includes(action))return ['#f4ac59','burst'];
+ if(['focus'].includes(action))return ['#a5bfff','heal'];
+ if(['trap','juggernaut'].includes(action)||action==='attack'&&gearLook().weapon==='hammer')return ['#e3b27c','impact'];
+ return ['#eee0c0','slash'];
+}
+function combatEffect(stage,theme,target,battle,duration=420){
+ const [color,kind]=theme,c=document.createElement('canvas');c.width=240;c.height=120;c.setAttribute('aria-hidden','true');c.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:6;image-rendering:pixelated';stage.appendChild(c);
+ const g=c.getContext('2d'),tx=target==='hero'?52:188,ty=72,reduced=ambientMotion.matches;
+ const paint=p=>{g.clearRect(0,0,240,120);g.save();g.translate(tx,ty);g.strokeStyle=color;g.fillStyle=color;g.globalAlpha=Math.max(.05,1-p);g.lineWidth=2;
+ const ring=(r)=>{g.beginPath();g.arc(0,0,r,0,Math.PI*2);g.stroke()};
+ if(kind==='shield'){g.beginPath();g.moveTo(-18,-23);g.lineTo(18,-23);g.lineTo(15,9);g.lineTo(0,23);g.lineTo(-15,9);g.closePath();g.stroke();ring(24+7*p)}
+ else if(kind==='slash'){g.lineWidth=4;g.beginPath();g.arc(0,0,27,-2.4+p,0.6+p);g.stroke();g.lineWidth=1;g.beginPath();g.arc(0,0,32,-2.4+p,0.6+p);g.stroke()}
+ else if(kind==='arrow'){const direction=target==='hero'?-1:1;for(let i=0;i<3;i++){const x=direction*(-95*(1-p)-i*12),y=-12+i*9;g.fillRect(x,y,20,2);g.fillRect(x+(direction===1?17:0),y-3,4,8)}}
+ else if(kind==='lightning'){for(let i=0;i<3;i++){g.beginPath();g.moveTo(-16+i*15,-70);g.lineTo(-10+i*15,-42);g.lineTo(-24+i*15,-33);g.lineTo(i*12,0);g.stroke()}ring(15+20*p)}
+ else if(kind==='vortex'){for(let i=0;i<14;i++){const angle=i*.9+p*8,rad=35*(1-p)+5;g.fillRect(Math.cos(angle)*rad,Math.sin(angle)*rad,3,3)}ring(10+20*(1-p))}
+ else if(kind==='heal'){for(let i=0;i<6;i++){const x=-20+i*8,y=12-40*p+(i%2)*10;g.fillRect(x-3,y,7,2);g.fillRect(x,y-3,2,7)}}
+ else if(kind==='poison'){for(let i=0;i<12;i++){const angle=i*2.4,rad=8+28*p;g.fillRect(Math.cos(angle)*rad,Math.sin(angle)*rad-12*p,5,5)}}
+ else {ring(7+35*p);for(let i=0;i<10;i++){const angle=i*Math.PI/5,rad=8+32*p;g.fillRect(Math.cos(angle)*rad,Math.sin(angle)*rad,4,3)}}
+ g.restore()};
+ return battleFrames(reduced?1:duration,p=>paint(reduced?.4:p),()=>bossFight===battle&&stage.isConnected).finally(()=>c.remove())
 }
 async function animateTurn(action){
   if(window.DCKNet?.recovering)return;
@@ -1262,13 +1282,16 @@ async function animateTurn(action){
   try{
     $$('[data-boss]').forEach(button=>button.disabled=true);
     const melee=['attack','brace','rend','lunge'].includes(action);stage.dataset.move=melee?'attack':action;
-    if(damage>0)stage.querySelector('.impact').textContent='−'+damage;
-    if(melee)await playDuelStrike(stage,battle);else if(techniques[action]&&damage>0){const fx=document.createElement('div');fx.textContent='✦';fx.style.cssText='position:absolute;right:22%;top:36%;font-size:42px;color:#f6ce7a;text-shadow:0 0 18px #d79aff;pointer-events:none;z-index:4';stage.appendChild(fx);if(fx.animate&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches)fx.animate([{transform:'scale(.2)',opacity:0},{transform:'scale(1.6)',opacity:1},{transform:'scale(2.2)',opacity:0}],{duration:480});await wait(480);fx.remove()}else await wait(480);
+    // Actual damage is reported by the resolved combat log, not a raw pre-armor estimate.
+    stage.querySelector('.impact').textContent=damage>0?'✦':'';
+    const theme=combatFxTheme(action),target=['shield','heal'].includes(theme[1])?'hero':'enemy';
+    if(melee)await Promise.all([playDuelStrike(stage,battle),combatEffect(stage,theme,target,battle,520)]);
+    else await combatEffect(stage,theme,target,battle);
     if(bossFight!==battle)return;
     for(const img of stage.querySelectorAll('.duel-crawler-ally')){if(img.animate&&!ambientMotion.matches){const role=img.dataset.role;img.animate(role==='Striker'?[{transform:'translateX(0)'},{transform:'translateX('+Math.round(stage.clientWidth*.38)+'px)'},{transform:'translateX(0)'}]:[{filter:'brightness(1)'},{filter:'brightness(2)'},{filter:'brightness(1)'}],{duration:300})}}if(stage.querySelector('.duel-crawler-ally'))await wait(300);const helper=readyPet();
     if(helper&&damage<battle.e.hp){const portrait=stage.querySelector('.duel-companion');const impact=stage.querySelector('.impact');if(impact)impact.textContent='−'+helper.stats.power+' (ally)';if(portrait?.animate&&!ambientMotion.matches)portrait.animate([{transform:'translate(0,0)'},{transform:'translate('+Math.round(stage.clientWidth*.48)+'px,-18px) scale(1.15)',offset:.5},{transform:'translate(0,0)'}],{duration:360});await wait(360)}
     if(bossFight!==battle)return;
-    if(damage+(helper?.stats.power||0)<battle.e.hp){stage.classList.add('counter');const fx=guardianAttackFx(stage,battle);await wait(460);fx?.remove()}
+    if(damage+(helper?.stats.power||0)<battle.e.hp){stage.classList.add('counter');const intent=bossIntent(battle),theme=combatFxTheme(intent,true);await combatEffect(stage,theme,intent==='DEFENSIVE STANCE'?'enemy':'hero',battle,460)}
     if(bossFight!==battle)return;
     animatingTurn=false;bossTurn(action,strike);
   }finally{animatingTurn=false}
