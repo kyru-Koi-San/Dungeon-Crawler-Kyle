@@ -195,3 +195,26 @@ body:has(#modal:not(.hidden)){overflow:hidden}.modal,.modal-card{overscroll-beha
 #awardDescription{max-width:45ch;margin:12px auto;color:#fff4de;font:600 clamp(14px,3vmin,20px)/1.35 system-ui}
 #awardReward:not([hidden]){display:table;margin:10px auto;padding:6px 12px;background:#ffe4a2;color:#3a1937;border:2px solid #ecad55;font-weight:800}
 .earned-award{width:100%;padding:5px;border-bottom:1px solid #4d483e}.earned-award summary{color:#e9ce93;cursor:pointer}.earned-award p{margin:5px 0;color:#e1ded5}.earned-award small{color:#eaca87}
+
+/* Mobile combat and conversation polish */
+.conversation{display:grid;gap:12px;color:#e8dfcc;text-align:left}
+.conversation-head{display:flex;align-items:center;gap:14px;padding:12px;background:linear-gradient(110deg,#302b25,#151d25);border:1px solid #8b7655}
+.conversation-head canvas{width:72px;height:96px;flex:none;image-rendering:pixelated;background:#101820;border:1px solid #746349}
+.conversation-head h2{margin:4px 0;color:#f2d49b;font:700 24px/1.1 Georgia,serif}
+.conversation-head small{color:#c8b69a;letter-spacing:.05em}
+#conversationLine{min-height:4em;line-height:1.55;margin:0;padding:10px 12px;border-left:2px solid #a68b60;background:#101820}
+#conversationSkip{justify-self:end;min-height:36px}
+.conversation-choices{display:grid;gap:6px}
+.conversation-choices button{min-height:44px;text-align:left;padding:10px 12px}
+.boss-speech{padding:8px 12px;border-left:3px solid #b97464;background:#3b2529;text-align:left}
+.boss-speech small{color:#e2a18a;text-transform:uppercase;letter-spacing:.08em}
+.boss-speech p{min-height:0;margin:4px 0;font:italic 16px/1.4 Georgia,serif}
+.group-roster{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 0;border-bottom:1px solid #514a3e}
+.group-roster p{min-height:0;margin:0;font-size:13px}
+.group-roster button{min-height:44px;color:#f3e2ca;background:#302a2c;white-space:normal}
+.group-roster small{color:#d6be8c}
+.command-fan .duel-command[data-boss=focus]{background:linear-gradient(110deg,#294c54,#19272e 80%);border-left-color:#8cd4d9}
+.command-fan .duel-command[data-boss=heal]{border-left-color:#95bd92}
+.command-fan .duel-command{min-height:44px}
+@media(max-width:480px){.duel h2{font-size:clamp(19px,5vw,26px)}.duel .command-fan{gap:5px;padding:5px}.command-fan .duel-command{font-size:14px;gap:4px;padding:6px 8px}.conversation-head{padding:8px;gap:10px}.conversation-head canvas{width:54px;height:72px}}
+@media(prefers-reduced-motion:reduce){.duel-stage .fighter,.duel-stage .fighter img,.duel-stage .impact{animation:none!important}}
