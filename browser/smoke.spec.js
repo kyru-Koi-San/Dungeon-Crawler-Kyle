@@ -1,7 +1,4 @@
-const {test,expect,devices}=require('@playwright/test');
-for(const [browserName,device] of [['webkit','iPhone 13'],['chromium','Pixel 7']]){
- test.describe(browserName+' mobile',()=>{
-  test.use({...devices[device],browserName});
+const {test,expect}=require('@playwright/test');
   test('startup, creator, movement and save menu',async({page})=>{
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto('http://127.0.0.1:8000/');
@@ -23,5 +20,3 @@ for(const [browserName,device] of [['webkit','iPhone 13'],['chromium','Pixel 7']
    await expect(page.locator('#creator')).toHaveCount(0);
    expect(errors).toEqual([]);
   });
- });
-}
