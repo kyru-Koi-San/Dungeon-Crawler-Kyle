@@ -136,5 +136,16 @@ test('guardian battle controls, victory and corpse loot',async({page})=>{
  expect(result.entities[0].alive).toBe(false);
  expect(result.entities[0].looted).toBe(true);
  expect(result.state.inventory.filter(i=>i.id==='box-Gold').reduce((n,i)=>n+i.qty,0)).toBeGreaterThanOrEqual(2);
+ // Use the recovered premium boxes for a real inventory transfer and dropped-bag round trip.
+ await page.locator('#packBtn').click();
+ await page.locator('[data-bag-section="boxes"]').click();
+ await page.locator('.bag-slot[data-slot]').filter({hasText:'Gold loot box'}).click();
+ await page.getByRole('button',{name:/Move .* to For sale/}).click();
+ await page.locator('[data-bag-section="trade"]').click();
+ await expect(page.locator('.bag-slot[data-slot]').filter({hasText:'Gold loot box'})).toBeVisible();
+ const transfer=await page.evaluate(()=>JSON.parse(localStorage.getItem('dck-final-save-v1')).state);
+ expect(transfer.tradeInventory.find(i=>i.id==='box-Gold').qty).toBeGreaterThanOrEqual(2);
+ expect(transfer.inventory.some(i=>i.id==='box-Gold'&&i.qty>0)).toBe(false);
+
  expect(errors).toEqual([]);
 });
