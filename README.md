@@ -12,11 +12,11 @@ A mobile-first, installable browser RPG prototype. The build now uses a purpose-
 - Explored minimap with red living-enemy dots and white fallen-enemy remains.
 - Local campaign save and installable PWA shell with the sprite files precached for offline launch after first successful load.
 - Co-op alpha client with private room creation/joining, 6-character invite codes, up to four party members, presence/position sync, and remote crawler rendering.
-- Node.js WebSocket relay scaffold in `server/` with room capacity, input validation, message-size/rate limits, and health endpoint.
+- Node.js WebSocket relay in the repository root (`relay.js` and `package.json`) with room capacity, input validation, message-size/rate limits, and health endpoint.
 
 ## Important co-op status
 
-This is a **multiplayer foundation, not a completed co-op game**. The current relay shares party membership and player position/status snapshots. It does not yet synchronize combat outcomes, enemy AI, dungeon generation, loot, quests, player accounts, reconnect recovery, or authoritative anti-cheat state. A hosted relay is not included; you must deploy `server/` to a Node-capable host and use its secure `wss://` address in the Party tab. The relay uses room codes as invite tokens and is intended for a private alpha only; it is not production authentication.
+This is a **multiplayer foundation, not a completed co-op game**. The current relay shares party membership and player position/status snapshots. It does not yet synchronize combat outcomes, enemy AI, dungeon generation, loot, quests, player accounts, reconnect recovery, or authoritative anti-cheat state. A hosted relay is not included; you must deploy the repository-root relay to a Node-capable host and use its secure `wss://` address in the Party tab. The relay uses room codes as invite tokens and is intended for a private alpha only; it is not production authentication.
 
 ## Run locally for development
 
@@ -32,7 +32,7 @@ Then open `http://localhost:8000`. On iPhone, use a published HTTPS host (for ex
 
 1. Extract the ZIP on your iPhone or in the Files app.
 2. Open your GitHub repository in Safari.
-3. Upload the *contents* of `Dungeon_Crawler_Kyle_Final` into the repository root. `index.html` must be at the root, with `assets/`, `server/`, and the JavaScript/CSS files alongside it.
+3. Upload the *contents* of `Dungeon_Crawler_Kyle_Final` into the repository root. `index.html` must be at the root, with the JavaScript/CSS files and image assets alongside it.
 4. In GitHub repository Settings → Pages, select Deploy from a branch, `main`, and `/(root)`; save.
 5. Open the HTTPS Pages URL in Safari and add it to your Home Screen.
 
@@ -43,7 +43,6 @@ If a previous PWA build is installed, close it and reload the hosted page so the
 Requires Node.js 20+ on a server that supports WebSockets.
 
 ```bash
-cd server
 npm install
 npm start
 ```
@@ -73,3 +72,7 @@ Real-device testing and a hosted multi-device co-op session have not yet been pe
 The hero now uses four-frame directional walk cycles (front, back, side), a four-frame attack sequence, and timed movement/attack playback. Enemy archetypes also have four-frame idle/recoil loops. These animation frames are derived from the approved pixel-art character assets and preserve their original style. They are lightweight sprite frames loaded locally and precached for offline play.
 
 For GitHub Pages, upload the contents of this project folder to the repository root (not the enclosing folder). Keep `index.html` at the repository root.
+
+## Relay protocol update
+
+The private relay now accepts host world snapshots up to 512 KiB and 5,000 entities, session-scoped loot claims, ranked item IDs, and eight character races. Ordinary incoming messages remain capped at 8 KiB. Combat remains host-authoritative rather than server-authoritative. Restart/redeploy the Node relay after updating. No live multi-device validation has been completed.
