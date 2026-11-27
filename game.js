@@ -1244,6 +1244,11 @@ function inspectOwned(item,duplicate=false){
 }
 function unlock(n,tier=null){if(!state.achievements.includes(n)){state.achievements.push(n);if(tier)(state.achievementPrizes??={})[n]=tier;achievementBanner(n,tier);feed('Achievement unlocked: <b>'+n+'</b>.');}}
 const rewardCatalog=[
+ {id:'cage-cleaver',name:'Cage cleaver',slot:'weapon',look:'knife',icon:'⚔',mods:{power:9,armor:-1}},
+ {id:'relay-maul',name:'Relay maul',slot:'weapon',look:'hammer',icon:'⚒',mods:{power:11,spellBonus:-2}},
+ {id:'warden-plate',name:'Warden plate',slot:'armor',look:'mail',icon:'⬟',mods:{armor:8,power:-1}},
+ {id:'mirror-ward',name:'Mirror ward',slot:'charm',look:'glass',icon:'◆',mods:{armor:3,spellBonus:4}},
+ {id:'cinder-seal',name:'Cinder seal',slot:'charm',look:'bell',icon:'♢',mods:{spellBonus:8,armor:-2}},
  {id:'dock-knife',name:'Dock knife',slot:'weapon',look:'knife',icon:'⚔',mods:{power:3}},
  {id:'raincoat',name:'Riveted raincoat',slot:'armor',look:'coat',icon:'⬟',mods:{armor:3}},
  {id:'rail-hammer',name:'Rail hammer',slot:'weapon',look:'hammer',icon:'⚒',mods:{power:6,armor:-2}},
@@ -1255,7 +1260,8 @@ const rewardCatalog=[
  {id:'undertow',name:'Boon of the Undertow',icon:'≈',effect:'boon'}
 ];
 function rollReward(tier){
-  const item=rewardCatalog[Math.floor(Math.random()*rewardCatalog.length)];
+  const pool=rewardCatalog.filter(i=>!['cage-cleaver','relay-maul','warden-plate','mirror-ward','cinder-seal'].includes(i.id)||['Gold','Legendary','Celestial'].includes(tier));
+  const item=pool[Math.floor(Math.random()*pool.length)];
   const rank=({Bronze:1,Silver:2,Gold:3,Legendary:4,Celestial:5})[tier]||1;
   const mods=Object.fromEntries(Object.entries(item.mods||{}).map(([key,n])=>[key,n>0?n+rank-1:n]));
   const label={power:'power',armor:'armor',spellBonus:'spell damage'};
@@ -1876,6 +1882,23 @@ const skillPaths={
   Alchemist:{bonus:'+12 MP · +3 spell damage',nodes:[['Catalyst','+4 spell bonus'],['Elixir craft','+8 maximum health']]},
   Sentinel:{bonus:'+4 armor · +10 HP',nodes:[['Iron wall','+2 armor'],['Retaliation','+3 power']]}
 };
+const subclasses={
+ Vanguard:[['Aegis','armor',5],['Juggernaut','maxHp',35]],
+ Arcanist:[['Stormcaller','spellBonus',9],['Mana Sage','maxMp',35]],
+ Reaver:[['Executioner','power',9],['Blood Knight','maxHp',30]],
+ Ranger:[['Deadeye','power',8],['Pathfinder','maxHp',30]],
+ Alchemist:[['Transmuter','spellBonus',8],['Field Medic','maxHp',30]],
+ Sentinel:[['Bulwark Commander','armor',6],['Avenger','power',8]]
+};
+function chooseSubclass(index){
+ const options=subclasses[state.specialization],entry=options?.[index];
+ if(!entry||state.subclass||!state.identityLocked||state.floor<8||state.skillPoints<2)return;
+ const nodes=skillPaths[state.specialization].nodes;
+ if(nodes.some(([name])=>(state.branches?.[name]||0)<2))return;
+ const [name,stat,bonus]=entry;state.skillPoints-=2;state.subclass=name;state[stat]=(state[stat]||0)+bonus;
+ if(stat==='maxHp')state.hp+=bonus;if(stat==='maxMp')state.mp+=bonus;
+ openPaths.add('Advanced subclass');persistCampaign();render();backpack();
+}
 const racialPaths={
  Human:[['Adaptability','power',2],['Survivor','maxHp',10]],
  Elf:[['Moon reserve','maxMp',8],['Arcane affinity','spellBonus',4]],
@@ -1910,6 +1933,11 @@ function skillsPanel(){
       nodes+=node(skill+' · '+rank+'/3',effect+' per rank'+(requires?' · Requires '+path.nodes[0][0]+' 2/3':''),rank===3?'':cost('data-branch="'+skill+'"',!active||locked||requires));
     }
     html+=limb(name,locked?'Unlocks on Floor 4':active?'Active class':'Class path',nodes);
+  }
+  const options=subclasses[state.specialization];
+  if(state.identityLocked&&options){
+    const available=state.floor>=8&&skillPaths[state.specialization].nodes.every(([n])=>(state.branches?.[n]||0)>=2);
+    html+=limb('Advanced subclass','Floor 8 · Both class skills rank 2 · 2 SP',options.map(([name,stat,bonus],i)=>node(name,'+'+bonus+' '+({maxHp:'maximum HP',maxMp:'maximum MP',spellBonus:'spell damage'}[stat]||stat),state.subclass?(state.subclass===name?'Selected':'Locked'):'<button class="smallbtn" data-subclass="'+i+'" '+(!available||points<2?'disabled':'')+'>Choose · 2 SP</button>')).join(''));
   }
   const race=state.character?.race,path=racialPaths[race],ranks=state.racialRanks||[0,0];
   if(state.identityLocked&&path){html+=limb('Racial abilities',race,path.map(([name,stat,amount],i)=>node(name+' · '+ranks[i]+'/3','+'+amount+' '+({maxHp:'maximum HP',maxMp:'maximum MP',spellBonus:'spell damage'}[stat]||stat)+' per rank'+(i?' · requires first skill at rank 2':''),ranks[i]>=3?'':cost('data-racial="'+i+'"',i===1&&ranks[0]<2))).join('')+node(racialMoves[race][0],'Unlocks at racial second skill rank 2',''))}
@@ -1957,6 +1985,7 @@ function backpack(){
     $$('[data-choice]').forEach(b=>b.onclick=()=>inspectOwned(choices[Number(b.dataset.choice)]));
   });
   if(bagSection==='skills'){
+    $('[data-subclass]').forEach(b=>b.onclick=()=>chooseSubclass(Number(b.dataset.subclass)));
     $('[data-racial]').forEach(b=>b.onclick=()=>trainRace(Number(b.dataset.racial)));
     for(const limb of $$('[data-path]'))limb.ontoggle=()=>{if(!limb.isConnected)return;if(limb.open)openPaths.add(limb.dataset.path);else openPaths.delete(limb.dataset.path)};
     for(const b of $$('[data-prepare]'))b.onclick=()=>{
