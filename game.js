@@ -1016,7 +1016,7 @@ function encounterScreen(spellMenu=false){
   if(spellMenu)moves.splice(0,moves.length,...prepared().map(id=>[id,moveName(id)+' · '+techniques[id].cost+' MP']),['back','Back']);
   showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':enemy.localBoss?'HIDDEN LOCAL BOSS':enemy.chief?'ROAMING MINIBOSS':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><button class="smallbtn" data-campaign-menu>Campaign saves</button><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions command-fan">'+(spellMenu&&!prepared().length?'<p>Prepare abilities in Backpack → Skills → Spell menu.</p>':'')+moves.map(([id,label])=>'<button class="duel-command" data-boss="'+id+'" '+((techniques[id]&&state.mp<techniques[id].cost)||(id==='mend'&&state.hp===state.maxHp&&!conditionText())||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!quantity('tonic'))?'disabled':'')+'><i aria-hidden="true">'+(({attack:'⚔',guard:'⬟',heal:'✚',retreat:'↗',spells:'✧',trap:'⌖',back:'‹'})[id]||'✦')+'</i><span>'+label+'</span></button>').join('')+'</div></div>');
   $('#duelHero').src=crawlerPose('side',0).toDataURL();
-  const stage=$('.duel-stage');const pet=readyPet();if(pet){const info=document.createElement('p');info.textContent=(pet.p.name||animalNames[pet.p.species])+' · '+pet.p.hp+'/'+pet.stats.maxHp+' HP · Attack '+pet.stats.power;stage.after(info)}if(allies.length){const roster=document.createElement('div');roster.className='group-roster';roster.style.cssText='display:flex;flex-wrap:wrap;gap:6px;padding:6px';for(const ally of allies){const label=document.createElement('button');label.type='button';label.textContent='Target '+ally.name+' · '+ally.hp+' HP';label.onclick=()=>{if(animatingTurn||bossFight!==battle||!ally.alive)return;battle.group=battle.group.filter(i=>entities[i]!==ally);battle.group.push(entities.indexOf(battle.e));battle.e=ally;persistCampaign();encounterScreen(spellMenu)};label.style.cssText='border:1px solid #a65b51;padding:5px;border-radius:5px';roster.appendChild(label)}stage.after(roster)}const theme=enemy.boss&&guardianThemes[state.floor];if(theme){stage.style.background='repeating-linear-gradient(45deg,'+theme.floor+' 0 18px,'+theme.color+'33 19px 20px)';stage.setAttribute('aria-label',theme.detail)}const opponent=stage.querySelector('.opponent img');if(opponent)opponent.style.filter=enemyArtFilter(enemy);stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
+  const stage=$('.duel-stage');const pet=readyPet();if(pet){const info=document.createElement('p');info.textContent=(pet.p.name||animalNames[pet.p.species])+' · '+pet.p.hp+'/'+pet.stats.maxHp+' HP · Attack '+pet.stats.power;stage.after(info)}if(allies.length){const roster=document.createElement('div');roster.className='group-roster';roster.style.cssText='display:flex;flex-wrap:wrap;gap:6px;padding:6px';for(const ally of allies){const label=document.createElement('button');label.type='button';label.textContent='Target '+ally.name+' · '+ally.hp+' HP';label.onclick=()=>{if(animatingTurn||bossFight!==battle||!ally.alive)return;battle.group=battle.group.filter(i=>entities[i]!==ally);battle.group.push(entities.indexOf(battle.e));battle.e=ally;persistCampaign();encounterScreen(spellMenu)};label.style.cssText='border:1px solid #a65b51;padding:5px;border-radius:5px';roster.appendChild(label)}stage.after(roster)}const theme=enemy.boss&&guardianThemes[state.floor];if(theme){stage.style.background='repeating-linear-gradient(45deg,'+theme.floor+' 0 18px,'+theme.color+'33 19px 20px)';stage.setAttribute('aria-label',theme.detail)}const opponent=stage.querySelector('.opponent img');if(opponent){const original=customEnemy(enemy);if(original){opponent.src=original.toDataURL();opponent.style.filter='none';opponent.style.imageRendering='pixelated'}else opponent.style.filter=enemyArtFilter(enemy);}stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
   if(state.equipment?.weapon)stage.classList.add('armed');
   $$('[data-boss]').forEach(button=>button.onclick=()=>{const id=button.dataset.boss;if(id==='spells'||id==='back')encounterScreen(id==='spells');else animateTurn(id)});
 }
@@ -1633,6 +1633,42 @@ const guardianThemes={
 18:{name:'The Last Bellkeeper',color:'#e7ce82',floor:'#40382b',detail:'Ancient bell inscriptions and golden resonance',kind:5}
 };
 const mobHues=[0,0,42,190,270,36,155,75,215,15,245,350,170,205,285,110,320,55];
+// Cached original 32x40 pixel silhouettes for the six guardians and floor three wildlife.
+const customEnemyArt=new Map();
+function customEnemy(e,frame=0){
+ const floor=state.floor;
+ const kind=e.boss?'guardian-'+floor:floor===3&&!e.chief?(e.sprite==='goblin'?'cage-runner':e.sprite==='sewer-rat'?'ironwhisker':null):null;
+ if(!kind||(!['guardian-3','guardian-6','guardian-9','guardian-12','guardian-15','guardian-18','cage-runner','ironwhisker'].includes(kind)))return null;
+ const phase=frame%4,key=kind+'/'+phase;if(customEnemyArt.has(key))return customEnemyArt.get(key);
+ const c=document.createElement('canvas');c.width=40;c.height=48;const g=c.getContext('2d');
+ const R=(x,y,w,h,color)=>{g.fillStyle=color;g.fillRect(x,y,w,h)};
+ const P=(points,color)=>{g.fillStyle=color;g.beginPath();points.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fill()};
+ const dark='#171b23',step=[0,1,0,-1][phase];
+ const metal=(x,y,w,h,col,light)=>{R(x-1,y-1,w+2,h+2,dark);R(x,y,w,h,col);R(x+1,y+1,w-2,2,light);R(x+w-2,y+3,1,h-4,'#242c37')};
+ if(kind==='ironwhisker'){
+ P([[2,32],[8,26],[25,26],[36,31],[37,39],[12,42],[4,37]],dark);
+ R(8,29,23,10,'#777c82');metal(13,27,13,8,'#505a66','#b7b9ae');R(27,29,9,8,'#9d8b7b');R(30,27,4,5,'#a99b8a');R(34,32,2,2,'#efb34c');R(4,37,5,2,'#a99b8a');R(10,39+step,5,3,'#555760');R(26,39-step,5,3,'#555760');
+ }else if(kind==='guardian-6'){
+ for(let i=0;i<4;i++){const y=24+i*4;P([[18,y],[8,y-8+step],[2,y+5],[5,y+7],[11,y-3],[18,y+4]],dark);P([[22,y],[32,y-8-step],[38,y+5],[35,y+7],[29,y-3],[22,y+4]],dark);R(5,y+3,3,2,'#8eaa76');R(32,y+3,3,2,'#8eaa76')}
+ P([[12,9],[28,9],[34,21],[29,34],[11,34],[6,21]],dark);P([[14,11],[26,11],[31,21],[27,30],[13,30],[9,21]],'#4c6650');R(16,12,8,13,'#72845e');R(15,27,10,9,'#293c37');for(let i=0;i<3;i++){R(13+i*6,29,3,3,'#e0b85e')}R(16,36,2,6,'#c1cbb1');R(23,36,2,6,'#c1cbb1');
+ }else if(kind==='guardian-9'){
+ P([[20,3],[32,12],[29,24],[37,43],[25,39],[20,46],[14,39],[4,43],[11,24],[8,12]],dark);
+ P([[20,6],[29,13],[25,25],[31,38],[23,35],[20,42],[16,35],[10,39],[15,25],[11,13]],'#44637f');R(15,13,10,10,'#acc6ce');R(16,17,3,2,'#17273f');R(22,17,3,2,'#17273f');P([[11,11],[15,2],[19,9],[23,1],[27,9],[31,5],[29,13]],'#b8ccd5');R(5,26+step,4,9,'#a4dce8');R(32,26-step,4,9,'#a4dce8');
+ }else{
+ const pip=kind==='guardian-3',runner=kind==='cage-runner',bell=kind==='guardian-18',fire=kind==='guardian-12',mag=kind==='guardian-15';
+ const col=pip||runner?'#796d4a':fire?'#803b33':mag?'#65546f':'#86734e',hi=pip||runner?'#c4ad75':fire?'#ee9856':mag?'#c0a4d8':'#e7ce82';
+ R(12,34,7,10+step,dark);R(22,34,7,10-step,dark);metal(13,35,5,7+step,col,hi);metal(23,35,5,7-step,col,hi);
+ P([[12,18],[28,18],[33,32],[27,38],[13,38],[7,32]],dark);metal(12,20,16,14,col,hi);R(17,23,6,8,'#2b2830');
+ metal(9,19,6,12,col,hi);metal(26,19,6,12,col,hi);metal(13,7,14,12,pip||runner?'#738052':col,hi);
+ R(15,12,3,2,fire?'#ffd16b':'#edc36d');R(22,12,3,2,fire?'#ffd16b':'#edc36d');R(18,16,4,2,dark);
+ if(pip){R(12,3,16,3,hi);R(12,0,3,5,hi);R(19,0,3,5,hi);R(25,0,3,5,hi);metal(2,18,5,23,'#63533e',hi)}
+ else if(runner){metal(31,15,3,22,'#65717a','#c1c4b8')}
+ else if(fire){for(let i=0;i<3;i++){R(5+i*12,5+(i%2)*3,4,7,'#ad5034');R(6+i*12,3+(i%2)*3,2,5,'#ffb75a')}metal(34,13,3,27,col,hi)}
+ else if(mag){metal(2,18,7,18,col,hi);R(3,22,5,2,'#bdb5bf');metal(33,11,4,28,col,hi)}
+ else if(bell){P([[31,7],[35,7],[38,18],[39,21],[27,21],[29,18]],hi);R(32,21,2,3,'#b49c64');metal(32,24,3,17,col,hi)}
+ }
+ customEnemyArt.set(key,c);return c;
+}
 function enemyArtFilter(e){
  if(e.boss)return 'hue-rotate('+([0,42,95,320,240,35][Math.floor(state.floor/3)-1]||0)+'deg) saturate(1.25)';
  return state.floor<=2?'none':'hue-rotate('+mobHues[state.floor-1]+'deg) saturate(1.35)';
@@ -1690,16 +1726,16 @@ function drawEnemy(e){
   if(rat)ctx.scale(m.facing,1);
   if(now-m.hit<120)ctx.globalAlpha=.55;
   ctx.filter=enemyArtFilter(e);
-  const row=mobWalkRows.indexOf(base),frame=Math.floor(pose.phase*12+.5)%12;
-  if(['flood-grub','mire-leprechaun','pack-llama'].includes(base)){
+  const row=mobWalkRows.indexOf(base),frame=Math.floor(pose.phase*12+.5)%12,original=customEnemy(e,frame);
+  if(original){ctx.filter='none';ctx.drawImage(original,-w/2,-h+3,w,h)}else if(['flood-grub','mire-leprechaun','pack-llama'].includes(base)){
     const wave=Math.sin(pose.phase*2*Math.PI);ctx.scale(m.facing*(1+.055*wave),1-.05*wave);
     spriteDraw(base,0,-2-Math.abs(wave)*1.5,base==='flood-grub'?27:30,base==='flood-grub'?23:32);
   }else if(row>=0&&mobWalkAtlas.complete&&mobWalkAtlas.naturalWidth){
     ctx.drawImage(mobWalkAtlas,frame*64,row*64,64,64,-w/2,-2-h+TILE*.18,w,h);
   }else spriteDraw(base,0,-2,w,h);
   ctx.filter='none';
-  if(state.floor===3&&!e.boss){ctx.fillStyle='#b9aa83';ctx.fillRect(-7,-12,14,2);ctx.fillRect(-5,-17,2,5);ctx.fillRect(5,-17,2,5)}
-  if(e.boss&&state.floor===3){ctx.fillStyle='#bba16b';ctx.fillRect(-10,-19,20,3);ctx.fillRect(-2,-30,4,9);ctx.fillRect(-6,-27,12,3)}
+  if(!original&&state.floor===3&&!e.boss){ctx.fillStyle='#b9aa83';ctx.fillRect(-7,-12,14,2);ctx.fillRect(-5,-17,2,5);ctx.fillRect(5,-17,2,5)}
+  if(!original&&e.boss&&state.floor===3){ctx.fillStyle='#bba16b';ctx.fillRect(-10,-19,20,3);ctx.fillRect(-2,-30,4,9);ctx.fillRect(-6,-27,12,3)}
   ctx.restore();
   ctx.fillStyle='#3a1717';ctx.fillRect(x-11,y-26,22,3);
   ctx.fillStyle=e.boss?'#e2a65f':'#d45a55';ctx.fillRect(x-11,y-26,22*Math.max(0,e.hp/e.max),3);
