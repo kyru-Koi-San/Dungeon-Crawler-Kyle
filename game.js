@@ -2644,7 +2644,7 @@ function acceptPartyAction(d){
  b.partyTargets??={};b.partyDamage??={};b.partyTargets[d.id]=index;
  const slot=/^cast([0-2])$/.exec(m[3]),spell=slot&&p.spells?.[Number(slot[1])],ability=spell&&Object.hasOwn(techniques,spell)?techniques[spell]:null;
  if(slot&&(!ability||p.mp<ability.cost||state.floor<ability.floor))return;
- b.partyActions[d.id]=m[3];b.partySpellCosts??={};b.partySpellDetails??={};
+ b.partyActions[d.id]=m[3];(b.partyParticipants??={})[d.id]={...p};b.partySpellCosts??={};b.partySpellDetails??={};
  if(ability){b.partySpellCosts[d.id]=ability.cost;const power=Math.max(1,Math.min(200,p.power||1)),magic=Math.max(0,Math.min(100,p.spellBonus||0)),armor=Math.max(0,Math.min(100,p.armor||0));let damage=spell==='mend'?0:ability.scale==='magic'||['catalyst','tide','bell'].includes(spell)?20+2*magic:ability.scale==='armor'||spell==='bastion'?power+armor+6:power*2+6;damage=Math.min(400,damage);b.partyDamage[d.id]=damage;b.partySpellDetails[d.id]={spell,guard:!!ability.guard||['brace','bastion'].includes(spell),heal:spell==='mend'?25:Math.floor(damage*(ability.heal||0))};}
  if(m[3]==='strike')b.partyDamage[d.id]=8+Math.min(20,p.level||1);
  if(m[3]==='focus')b.partyDamage[d.id]=4+Math.floor(Math.min(20,p.level||1)/2);
@@ -2655,9 +2655,11 @@ function acceptPartyAction(d){
 function resolvePartyTargets(b){
  if(!window.DCKNet?.isHost)return 0;
  let primary=0;
- for(const [id,damage] of Object.entries(b.partyDamage||{})){
+ for(const [id,rawDamage] of Object.entries(b.partyDamage||{})){
+ const p=netPlayers[id]||b.partyParticipants?.[id];if(!p||p.hp<=0||p.floor!==state.floor||p.hall||Math.hypot(p.x-b.e.x,p.y-b.e.y)>3)continue;
  const index=b.partyTargets?.[id],target=entities[index];
  if(!target?.alive||!(target===b.e||(b.group||[]).includes(index)))continue;
+ const spell=b.partySpellDetails?.[id]?.spell,magic=spell&&(techniques[spell]?.scale==='magic'||['bell','tide','catalyst'].includes(spell));const damage=rawDamage>0?Math.max(1,rawDamage-(magic?Math.floor((target.armor||0)/3):(target.armor||0))):0;
  if(target===b.e){primary+=damage;continue}
  target.hp=Math.max(0,target.hp-damage);
  if(target.hp===0){target.alive=false;target.deathAt=performance.now();broadcastKill(target);state.kills++;state.xp+=target.xp||0;window.DCKNet.sendReward(id,8,target.xp||0,null);feed(target.name+' defeated by an ally.')}
@@ -2669,12 +2671,12 @@ function storePartyRound(key){const p=state.pendingPartyRounds?.[key];if(!p||!wi
 function partyRoundDamage(b,e,won=false){
  if(!window.DCKNet?.isHost)return;
  for(const [id,choice] of Object.entries(b.partyActions||{})){
- const p=netPlayers[id];if(!p||p.hp<=0||p.floor!==state.floor||p.hall||Math.hypot(p.x-e.x,p.y-e.y)>3)continue;
+ const p=netPlayers[id]||b.partyParticipants?.[id];if(!p||p.hp<=0||p.floor!==state.floor||p.hall||Math.hypot(p.x-e.x,p.y-e.y)>3)continue;
  const spell=b.partySpellDetails?.[id],cost=b.partySpellCosts?.[id]||0;
- const damage=won?0:Math.max(1,Math.floor(e.atk*((choice==='guard'||spell?.guard)?0.2:0.65)));
+ const survivors=(b.group||[]).map(i=>entities[i]).filter(v=>v?.alive&&v!==e);const threat=won?survivors[0]:e;const damage=threat?Math.max(1,Math.floor(threat.atk*((choice==='guard'||spell?.guard)?0.2:0.65))-Math.floor((p.armor||0)*.3)):0;
  const key=id+'/'+b.roundId+'/'+b.turn;(state.pendingPartyRounds??={})[key]={room:window.DCKNet.roomCode,target:id,roundId:b.roundId,turn:b.turn,damage,mana:choice==='focus'?4:-cost,heal:spell?.heal||0};
  }
- b.partyActions={};b.partySpellCosts={};b.partySpellDetails={};b.partyTargets={};b.partyDamage={};
+ b.partyActions={};b.partySpellCosts={};b.partySpellDetails={};b.partyTargets={};b.partyDamage={};b.partyParticipants={};
 }
 function receivePartyRound(d){
  if(!partyGuest()||!/^[a-f0-9]{32}$/.test(d.roundId||'')||!Number.isInteger(d.turn)||d.turn<1||!Number.isInteger(d.damage)||d.damage<0||!Number.isInteger(d.mana))return false;
