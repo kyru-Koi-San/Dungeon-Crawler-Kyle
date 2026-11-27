@@ -1,0 +1,25 @@
+name: Mobile browser smoke tests
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --ignore-scripts @playwright/test
+      - run: npx playwright install --with-deps webkit chromium
+      - run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 &
+          npx playwright test browser/smoke.spec.js --workers=1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-test-results
+          path: test-results/
