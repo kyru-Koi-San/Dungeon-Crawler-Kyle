@@ -857,7 +857,7 @@ function cityMarket(){
  $('#leaveMarket').onclick=closeModal;
 }
 function spawnBoss(x,y){let brood=state.floor%9===6,phantom=state.floor%9===0,hp=brood?155+state.floor*22:phantom?145+state.floor*24:130+state.floor*20;let b={type:'enemy',name:brood?'The Brood Matriarch':phantom?'The Hollow Regent':'The Ossuary Warden',sprite:brood?'spider-boss':phantom?'wraith':'bone-champion',x,y,hp,max:hp,atk:14+state.floor*2,xp:100+state.floor*10,icon:'♛',cool:0,alive:true,boss:true};if(state.floor===3)Object.assign(b,{name:'Pip, Keeper of the Cage',sprite:'goblin',small:true,hp:48,max:48,atk:5});
-if(state.floor===FINAL_FLOOR)b.name='The Last Bellkeeper';
+if(state.floor===12)Object.assign(b,{name:'The Cinder Inquisitor',sprite:'shaman'});if(state.floor===15)Object.assign(b,{name:'The Iron Magistrate',sprite:'bone-champion'});if(state.floor===FINAL_FLOOR)b.name='The Last Bellkeeper';
 entities.push(b);state.boss=entities.length-1;$('#bossbar').classList.add('hidden');$('#bossName').textContent=b.name;}
 function tile(x,y){return tiles[y]?.[x]??0}function solid(x,y){return !!state.scenery?.some(p=>p.art<3&&p.x===x&&p.y===y)||(tile(x,y)!==1&&tile(x,y)!==3)||!!(bossFight&&state.arena?.gates?.some(g=>g.x===x&&g.y===y))}
 function reveal(){if(state.hall)return;let rad=state.torchTurns>0?7:5;for(let y=Math.max(0,state.y-rad);y<=Math.min(H-1,state.y+rad);y++)for(let x=Math.max(0,state.x-rad);x<=Math.min(W-1,state.x+rad);x++)if(Math.hypot(x-state.x,y-state.y)<=rad)seen[y][x]=true}
@@ -935,7 +935,7 @@ function encounterScreen(spellMenu=false){
   if(spellMenu)moves.splice(0,moves.length,...prepared().map(id=>[id,techniques[id].name+' · '+techniques[id].cost+' MP']),['back','Back']);
   showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':enemy.chief?'ROAMING MINIBOSS':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><button class="smallbtn" data-campaign-menu>Campaign saves</button><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions command-fan">'+(spellMenu&&!prepared().length?'<p>Prepare abilities in Backpack → Skills → Spell menu.</p>':'')+moves.map(([id,label])=>'<button class="duel-command" data-boss="'+id+'" '+((techniques[id]&&state.mp<techniques[id].cost)||(id==='mend'&&state.hp===state.maxHp&&!conditionText())||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!quantity('tonic'))?'disabled':'')+'><i aria-hidden="true">'+(({attack:'⚔',guard:'⬟',heal:'✚',retreat:'↗',spells:'✧',trap:'⌖',back:'‹'})[id]||'✦')+'</i><span>'+label+'</span></button>').join('')+'</div></div>');
   $('#duelHero').src=crawlerPose('side',0).toDataURL();
-  const stage=$('.duel-stage');stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
+  const stage=$('.duel-stage');const theme=enemy.boss&&guardianThemes[state.floor];if(theme){stage.style.background='repeating-linear-gradient(45deg,'+theme.floor+' 0 18px,'+theme.color+'33 19px 20px)';stage.setAttribute('aria-label',theme.detail)}const opponent=stage.querySelector('.opponent img');if(opponent)opponent.style.filter=enemyArtFilter(enemy);stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
   if(state.equipment?.weapon)stage.classList.add('armed');
   $$('[data-boss]').forEach(button=>button.onclick=()=>{const id=button.dataset.boss;if(id==='spells'||id==='back')encounterScreen(id==='spells');else animateTurn(id)});
 }
@@ -1347,7 +1347,7 @@ function drawTile(x,y,t){if(state.chapter==="surface"||state.chapter==="create")
   edge(0,1,0,28,32,4);edge(0,-1,0,0,32,3);edge(-1,0,0,0,3,32);edge(1,0,29,0,3,32);
 }
 if(t===1){ctx.fillStyle='#dec79520';ctx.fillRect(px,py,32,32)}
-if(t===1&&inArena(x,y)){ctx.fillStyle='#9a463133';ctx.fillRect(px,py,32,32);ctx.strokeStyle='#a57b48';ctx.strokeRect(px+3,py+3,26,26);if(seed>.65){ctx.fillStyle='#a35e37';ctx.fillRect(px+14,py+8,4,16);ctx.fillRect(px+8,py+14,16,4)}}if(t===3){let g=ctx.createRadialGradient(px+16,py+16,2,px+16,py+16,25);g.addColorStop(0,'#ffe7a0');g.addColorStop(.35,'#d79c49');g.addColorStop(1,'#8b542500');ctx.fillStyle=g;ctx.fillRect(px-5,py-5,42,42);ctx.fillStyle='#8b6338';ctx.fillRect(px+6,py+6,20,21);ctx.fillStyle='#f0c66d';for(let i=0;i<4;i++)ctx.fillRect(px+8+i*4,py+8+i*3,14-i*4,2)}}
+if(t===1&&inArena(x,y))paintArenaTile(x,y,px,py,seed);if(t===3){let g=ctx.createRadialGradient(px+16,py+16,2,px+16,py+16,25);g.addColorStop(0,'#ffe7a0');g.addColorStop(.35,'#d79c49');g.addColorStop(1,'#8b542500');ctx.fillStyle=g;ctx.fillRect(px-5,py-5,42,42);ctx.fillStyle='#8b6338';ctx.fillRect(px+6,py+6,20,21);ctx.fillStyle='#f0c66d';for(let i=0;i<4;i++)ctx.fillRect(px+8+i*4,py+8+i*3,14-i*4,2)}}
 function drawRemains(e){const px=e.x*TILE,py=e.y*TILE;let age=performance.now()-(e.deathAt||-1000);if(age>=0&&age<300){ctx.save();ctx.globalAlpha=1-age/300;spriteDraw(enemySprite(e),px+16,py+25,39,43*(1-age/400));ctx.restore();return}ctx.save();ctx.globalAlpha=.78;ctx.fillStyle='#c8c9c1';ctx.beginPath();ctx.arc(px+16,py+16,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#818b8b';ctx.fillRect(px+8,py+18,16,3);ctx.fillRect(px+10,py+22,5,2);ctx.fillRect(px+18,py+22,5,2);ctx.fillStyle='#252b2d';ctx.fillRect(px+14,py+15,2,2);ctx.fillRect(px+19,py+15,2,2);ctx.restore()}
 
 function spriteDraw(name,x,y,w,h){const im=sprites[name];if(!im||!im.complete||!im.naturalWidth)return false;ctx.drawImage(im,x-w/2,y-h+TILE*.18,w,h);return true}
@@ -1515,6 +1515,32 @@ function drawHero(x,y){
   ctx.restore();
 }
 
+const guardianThemes={
+3:{name:'Pip, Keeper of the Cage',color:'#b5a17b',floor:'#524334',detail:'Iron cage tracks and brass locks',kind:0},
+6:{name:'The Brood Matriarch',color:'#a5bd84',floor:'#303c35',detail:'Silken nests and copper relay cables',kind:1},
+9:{name:'The Hollow Regent',color:'#91bde0',floor:'#29394c',detail:'Broken mirrors and spectral reflections',kind:2},
+12:{name:'The Cinder Inquisitor',color:'#f39b58',floor:'#482d28',detail:'Scorched tribunal tiles and embers',kind:3},
+15:{name:'The Iron Magistrate',color:'#c8b0df',floor:'#393344',detail:'Judgment seals and iron chains',kind:4},
+18:{name:'The Last Bellkeeper',color:'#e7ce82',floor:'#40382b',detail:'Ancient bell inscriptions and golden resonance',kind:5}
+};
+const mobHues=[0,0,42,190,270,36,155,75,215,15,245,350,170,205,285,110,320,55];
+function enemyArtFilter(e){
+ if(e.boss)return 'hue-rotate('+([0,42,95,320,240,35][Math.floor(state.floor/3)-1]||0)+'deg) saturate(1.25)';
+ return state.floor<=2?'none':'hue-rotate('+mobHues[state.floor-1]+'deg) saturate(1.35)';
+}
+function paintArenaTile(x,y,px,py,seed){
+ const theme=guardianThemes[state.floor];if(!theme)return;
+ ctx.fillStyle=theme.floor+'bb';ctx.fillRect(px,py,32,32);
+ ctx.strokeStyle=theme.color;ctx.globalAlpha=.65;
+ const k=theme.kind;
+ if(k===0){ctx.fillStyle=theme.color;ctx.fillRect(px+5,py,2,32);ctx.fillRect(px+25,py,2,32);ctx.fillRect(px+5,py+14,22,2)}
+ if(k===1){ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px+32,py+32);ctx.moveTo(px+32,py);ctx.lineTo(px,py+32);ctx.stroke();ctx.strokeRect(px+8,py+8,16,16)}
+ if(k===2){ctx.beginPath();ctx.moveTo(px+16,py+2);ctx.lineTo(px+30,py+16);ctx.lineTo(px+16,py+30);ctx.lineTo(px+2,py+16);ctx.closePath();ctx.stroke()}
+ if(k===3){for(let i=0;i<5;i++){ctx.fillStyle=theme.color;ctx.fillRect(px+3+(i*7)%25,py+3+(i*11)%25,2,2)}}
+ if(k===4){ctx.strokeRect(px+4,py+4,24,24);ctx.strokeRect(px+10,py+10,12,12)}
+ if(k===5){ctx.beginPath();ctx.arc(px+16,py+16,10,0,Math.PI*2);ctx.stroke();ctx.fillStyle=theme.color;ctx.fillRect(px+15,py+8,2,16)}
+ ctx.globalAlpha=1;
+}
 function enemySprite(e){if(e.boss)return e.sprite||'bone-champion';return e.sprite||'skeleton'}
 const enemyMotion=new WeakMap();
 const mobWalkRows=['sewer-rat','goblin','skeleton','archer','shaman','bone-champion','spider','spider-boss','wraith'];
@@ -1554,6 +1580,7 @@ function drawEnemy(e){
   if(!rat)ctx.rotate(.065*Math.sign(m.x-m.fromX)*Math.sin(Math.PI*progress));
   if(rat)ctx.scale(m.facing,1);
   if(now-m.hit<120)ctx.globalAlpha=.55;
+  ctx.filter=enemyArtFilter(e);
   const row=mobWalkRows.indexOf(base),frame=Math.floor(pose.phase*12+.5)%12;
   if(['flood-grub','mire-leprechaun','pack-llama'].includes(base)){
     const wave=Math.sin(pose.phase*2*Math.PI);ctx.scale(m.facing*(1+.055*wave),1-.05*wave);
@@ -1561,6 +1588,9 @@ function drawEnemy(e){
   }else if(row>=0&&mobWalkAtlas.complete&&mobWalkAtlas.naturalWidth){
     ctx.drawImage(mobWalkAtlas,frame*64,row*64,64,64,-w/2,-2-h+TILE*.18,w,h);
   }else spriteDraw(base,0,-2,w,h);
+  ctx.filter='none';
+  if(state.floor===3&&!e.boss){ctx.fillStyle='#b9aa83';ctx.fillRect(-7,-12,14,2);ctx.fillRect(-5,-17,2,5);ctx.fillRect(5,-17,2,5)}
+  if(e.boss&&state.floor===3){ctx.fillStyle='#bba16b';ctx.fillRect(-10,-19,20,3);ctx.fillRect(-2,-30,4,9);ctx.fillRect(-6,-27,12,3)}
   ctx.restore();
   ctx.fillStyle='#3a1717';ctx.fillRect(x-11,y-26,22,3);
   ctx.fillStyle=e.boss?'#e2a65f':'#d45a55';ctx.fillRect(x-11,y-26,22*Math.max(0,e.hp/e.max),3);
