@@ -53,6 +53,7 @@ test('surface to guild induction and backpack',async({page})=>{
  await page.keyboard.down('ArrowDown');
  try{await expect.poll(async()=> (await saved()).chapter,{timeout:20000}).toBe('mine')}finally{await page.keyboard.up('ArrowDown')}
  await expect.poll(async()=>!!(await saved()).hall).toBe(true);
+ if(await page.locator('#awardScreen').isVisible())await page.locator('#awardSkip').click();
  for(let i=0;i<6;i++){
   const h=(await saved()).hall;if(h.y<=4)break;
   await page.keyboard.press('ArrowUp');
@@ -61,6 +62,7 @@ test('surface to guild induction and backpack',async({page})=>{
  await page.keyboard.press('e');
  for(let i=0;i<4;i++)await page.locator('#guildNext').click();
  await expect.poll(async()=> (await saved()).guildTrained).toBe(true);
+ if(await page.locator('#awardScreen').isVisible())await page.locator('#awardSkip').click();
  await page.locator('#packBtn').click();
  await expect(page.locator('[data-bag-section="general"]')).toBeVisible();
  await page.locator('[data-bag-section="boxes"]').click();
