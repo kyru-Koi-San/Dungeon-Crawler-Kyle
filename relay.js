@@ -3,7 +3,7 @@
 const http=require('node:http');
 const crypto=require('node:crypto');
 const {WebSocketServer,WebSocket}=require('ws');
-const PORT=Number(process.env.PORT||8080),MAX_PLAYERS=4,MAX_MESSAGE=8192;
+const PORT=Number(process.env.PORT||8080),MAX_PLAYERS=4,MAX_MESSAGE=524288;
 const rooms=new Map(),clients=new Map();
 const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function code(){let s='';for(let i=0;i<6;i++)s+=alphabet[crypto.randomInt(alphabet.length)];return s}
@@ -18,7 +18,7 @@ wss.on('connection',(ws,req)=>{
  const id=crypto.randomUUID(),client={id,ws,room:null,name:'Crawler',windowStart:Date.now(),messages:0};clients.set(ws,client);ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true});send(ws,{type:'hello',id});
  ws.on('message',raw=>{
   if(raw.length>MAX_MESSAGE)return ws.close(1009,'Message too large');
-  const now=Date.now();if(now-client.windowStart>1000){client.windowStart=now;client.messages=0}if(++client.messages>15)return ws.close(1008,'Rate limit');
+  const now=Date.now();if(now-client.windowStart>1000){client.windowStart=now;client.messages=0}if(++client.messages>30)return ws.close(1008,'Rate limit');
   let m;try{m=JSON.parse(raw.toString())}catch{return send(ws,{type:'error',message:'Invalid message.'})}
   if(m.type==='create_room'){
    leave(ws);let roomCode;do{roomCode=code()}while(rooms.has(roomCode));const room={code:roomCode,host:id,players:new Map(),world:null,revision:0};rooms.set(roomCode,room);client.room=roomCode;client.name=cleanName(m.name);room.players.set(id,{ws,name:client.name,state:{name:client.name,floor:1,x:15,y:9,level:1,hp:100,maxHp:100}});send(ws,{type:'room_joined',code:roomCode,players:publicPlayers(room),host:room.host});return;
@@ -27,15 +27,16 @@ wss.on('connection',(ws,req)=>{
    leave(ws);const room=rooms.get(String(m.code||'').toUpperCase());if(!room)return send(ws,{type:'error',message:'Room not found. Check the invite code.'});if(room.players.size>=MAX_PLAYERS)return send(ws,{type:'error',message:'That party is full.'});client.room=room.code;client.name=cleanName(m.name);room.players.set(id,{ws,name:client.name,state:{name:client.name,floor:1,x:15,y:9,level:1,hp:100,maxHp:100}});send(ws,{type:'room_joined',code:room.code,players:publicPlayers(room),host:room.host});if(room.world)send(ws,{type:'world_snapshot',revision:room.revision,world:room.world});broadcast(room,{type:'room_update',players:publicPlayers(room)},id);broadcast(room,{type:'player_state',id,player:room.players.get(id).state},id);return;
   }
   if(m.type==='leave_room'){leave(ws);return}
-  if(m.type==='world_snapshot'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const world=m.world;if(!world||!Number.isInteger(world.floor)||world.floor<1||world.floor>999||!Array.isArray(world.enemies)||world.enemies.length>100)return;room.world=world;room.revision++;broadcast(room,{type:'world_snapshot',revision:room.revision,world},id);return;}
+  if(raw.length>8192&&m.type!=='world_snapshot')return ws.close(1009,'Message too large');
+  if(m.type==='world_snapshot'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const world=m.world;if(!world||!Number.isInteger(world.floor)||world.floor<1||world.floor>999||!Array.isArray(world.enemies)||world.enemies.length>5000)return;room.world=world;room.revision++;broadcast(room,{type:'world_snapshot',revision:room.revision,world},id);return;}
   if(m.type==='loot_bundle'){
    const room=rooms.get(client.room);if(!room||room.host!==id)return;
    const target=room.players.get(m.target);if(!target)return;
-   const items={};for(const key of ['gold','tonic','torch','box-Bronze','meth-cargo']){const n=clampInt(m.items?.[key],0,9999);if(n)items[key]=n}
+   const items=Object.create(null);for(const [key,value] of Object.entries(m.items||{}).slice(0,100)){if(!/^[a-zA-Z][a-zA-Z0-9-]{0,63}$/.test(key)||['constructor','prototype'].includes(key)||!Number.isSafeInteger(value)||value<1||value>9999)continue;items[key]=value}
    send(target.ws,{type:'loot_bundle',items});return;
   }
   if(m.type==='reward'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const target=room.players.get(m.target);if(target)send(target.ws,{type:'reward',guardian:m.guardian?{floor:clampInt(m.guardian.floor,1,999),name:String(m.guardian.name||'Guardian').slice(0,60)}:null,gold:clampInt(m.gold,0,100),xp:clampInt(m.xp,0,500),item:['tonic','torch','shard'].includes(m.item)?m.item:null});return;}
-  if(m.type==='combat_intent'){const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p||!['attack','spell','loot','loot_close','take_gold','take_torch','take_tonic','take_all'].includes(m.action)&&!/^take_[0-9]{1,3}$/.test(m.action))return;const host=room.players.get(room.host);if(host)send(host.ws,{type:'combat_intent',id,action:m.action,player:p.state});return;}
+  if(m.type==='combat_intent'){const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p||!['attack','spell','loot','loot_close','take_gold','take_torch','take_tonic','take_all'].includes(m.action)&&!/^take_(?:[a-z0-9]{1,8}_)?(?:all|[0-9]{1,4})$/.test(m.action))return;const host=room.players.get(room.host);if(host)send(host.ws,{type:'combat_intent',id,action:m.action,player:p.state});return;}
   if(m.type==='player_state'){
    const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p)return;
    const s=m.player||{};const floor=clampInt(s.floor,1,999),x=clampInt(s.x,0,117),y=clampInt(s.y,0,79);
@@ -45,7 +46,7 @@ wss.on('connection',(ws,req)=>{
    }
    const hair=['Signature','Crop','Pixie','Bob','Curls','Ponytail','Braid','Shaved'].includes(s.character?.hair)?s.character.hair:'Signature';
    const gender=['Woman','Man','Nonbinary'].includes(s.character?.gender)?s.character.gender:'Nonbinary';
-   const character={hair,gender,skin:clampInt(s.character?.skin??2,0,5),race:['Human','Elf','Dwarf'].includes(s.character?.race)?s.character.race:'Human'};
+   const character={hair,gender,skin:clampInt(s.character?.skin??2,0,5),race:['Human','Elf','Dwarf','Cat','Dog','Mutant Crab','Wizard','Zombie'].includes(s.character?.race)?s.character.race:'Human'};
    const hall=s.hall?{index:clampInt(s.hall.index,0,5),x:clampInt(s.hall.x,1,11),y:clampInt(s.hall.y,2,8)}:null;
    p.state={hall,gear,character,name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999)};
    broadcast(room,{type:'player_state',id,player:p.state},id);return;
