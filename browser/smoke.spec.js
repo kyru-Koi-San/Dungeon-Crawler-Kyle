@@ -111,6 +111,16 @@ test('guardian battle controls, victory and corpse loot',async({page})=>{
  await page.locator('[data-boss="attack"]').click();
  await expect(page.locator('.duel small').first()).toContainText('TURN 2');
  await expect(page.locator('.resolved-hit.enemy-hit')).toBeVisible();
+ const battleSave=()=>page.evaluate(()=>{const o=JSON.parse(localStorage.getItem('dck-final-save-v1'));return {turn:o.encounter?.turn,enemyHp:o.entities[0].hp,hp:o.state.hp,gold:o.state.gold}});
+ const beforeReload=await battleSave();
+ expect(beforeReload.turn).toBe(2);
+ expect(beforeReload.enemyHp).toBeLessThan(45);
+ await page.reload();
+ await expect(page.locator('.duel small').first()).toContainText('TURN 2');
+ await expect(page.locator('#bossbar')).not.toHaveClass(/hidden/);
+ expect(await battleSave()).toEqual(beforeReload);
+ await expect(page.locator('[data-boss="attack"]')).toBeEnabled();
+
  for(let i=0;i<3;i++){
   if(await page.locator('#bossDone').isVisible())break;
   await page.locator('[data-boss="attack"]').click();
