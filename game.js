@@ -674,6 +674,7 @@ function petVictory(){
 function setPetTile(pos){
   if(state.pet)state.pet.trail={x:pos.x,y:pos.y,floor:state.floor,hall:state.hall?.index??null};
 }
+let petVisual=null;
 function petPosition(heroX,heroY){
   const leader=state.hall||state;
   const hall=state.hall?.index??null;
@@ -691,19 +692,23 @@ function petPosition(heroX,heroY){
   const progress=step?Math.min(1,Math.abs(heroX-leader.x)+Math.abs(heroY-leader.y)):0;
   // When trading places in a narrow corridor, pass shoulder to shoulder.
   const passing=(heroX-leader.x)*dx+(heroY-leader.y)*dy<0?Math.sin(progress*Math.PI)*.4:0;
-  return {x:trail.x+dx*progress-dy*passing,y:trail.y+dy*progress+dx*passing};
+  const target={x:trail.x+dx*progress-dy*passing,y:trail.y+dy*progress+dx*passing};
+  const now=performance.now(),key=state.floor+'/'+hall;
+  if(!petVisual||petVisual.owner!==state.pet||petVisual.key!==key||Math.hypot(target.x-petVisual.x,target.y-petVisual.y)>1.5){petVisual={...target,key,owner:state.pet,time:now,facing:state.facing==='left'?-1:1}}
+  else{const dt=Math.max(0,Math.min(80,now-petVisual.time)),blend=1-Math.exp(-dt/55);if(Math.abs(target.x-petVisual.x)>.03)petVisual.facing=target.x>petVisual.x?1:-1;petVisual.x+=(target.x-petVisual.x)*blend;petVisual.y+=(target.y-petVisual.y)*blend;petVisual.time=now}
+  return {x:petVisual.x,y:petVisual.y,facing:petVisual.facing,walking:!!step||Math.hypot(target.x-petVisual.x,target.y-petVisual.y)>.04};
 }
-function drawAnimal(species,x,y,crawler,walking=false,g=ctx){
+function drawAnimal(species,x,y,crawler,walking=false,g=ctx,facing=1){
   const px=Math.round(x*TILE+16),py=Math.round(y*TILE+24);
   const fur={cat:'#bcb6ba',dog:'#bc845a',rabbit:'#e4cfaa'}[species];
-  const bob=walking?Math.round(Math.sin(performance.now()/65)):0;
-  g.save();g.translate(px,py+bob);
+  const phase=walking&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches?Math.sin(performance.now()/65):0,bob=Math.round(Math.abs(phase)*(species==='rabbit'?-3:-1));
+  g.save();g.translate(px,py+bob);g.scale(facing,1);
   const rect=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x,y,w,h)};
   rect(-8,0,15,2,'#141b20');rect(-6,-8,11,7,fur);rect(1,-12,8,8,fur);
   if(species==='rabbit'){rect(1,-19,2,8,fur);rect(5,-18,2,7,fur);rect(-9,-7,4,4,'#fae7cc')}
   else if(species==='cat'){rect(1,-15,3,4,fur);rect(6,-15,3,4,fur);rect(-8,-12,3,8,fur)}
   else{rect(0,-12,3,7,'#704632');rect(7,-8,5,3,fur);rect(-9,-10,4,4,fur)}
-  rect(-5,-2,3,3,fur);rect(3,-2,3,3,fur);rect(6,-10,2,2,'#1a2027');
+  rect(-5+Math.round(phase*2),-2,3,3,fur);rect(3-Math.round(phase*2),-2,3,3,fur);rect(6,-10,2,2,'#1a2027');
   if(crawler){rect(0,-6,6,2,'#5bc4cb');rect(1,-4,2,3,'#ffd575');const p=state.pet;if(p?.species===species){if(p.mutation==='Ironhide'){for(let i=0;i<4;i++){rect(-7+i*3,-10+(i%2),4,5,'#657684');rect(-7+i*3,-10+(i%2),3,1,'#bbc9ce')}rect(2,-14,6,3,'#87949b')}if(p.mutation==='Razorclaw'){rect(-6,0,5,2,'#e9dfcb');rect(3,0,6,2,'#e9dfcb');rect(6,-10,2,2,'#e05d4e');rect(-9,-11,2,5,'#85554e')}}}
   g.restore();
 }
@@ -1016,7 +1021,7 @@ function encounterScreen(spellMenu=false){
   if(spellMenu)moves.splice(0,moves.length,...prepared().map(id=>[id,moveName(id)+' · '+techniques[id].cost+' MP']),['back','Back']);
   showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':enemy.localBoss?'HIDDEN LOCAL BOSS':enemy.chief?'ROAMING MINIBOSS':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p><button class="smallbtn" data-campaign-menu>Campaign saves</button><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions command-fan">'+(spellMenu&&!prepared().length?'<p>Prepare abilities in Backpack → Skills → Spell menu.</p>':'')+moves.map(([id,label])=>'<button class="duel-command" data-boss="'+id+'" '+((techniques[id]&&state.mp<techniques[id].cost)||(id==='mend'&&state.hp===state.maxHp&&!conditionText())||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!quantity('tonic'))?'disabled':'')+'><i aria-hidden="true">'+(({attack:'⚔',guard:'⬟',heal:'✚',retreat:'↗',spells:'✧',trap:'⌖',back:'‹'})[id]||'✦')+'</i><span>'+label+'</span></button>').join('')+'</div></div>');
   $('#duelHero').src=crawlerPose('side',0).toDataURL();
-  const stage=$('.duel-stage');const pet=readyPet();if(pet){const info=document.createElement('p');info.textContent=(pet.p.name||animalNames[pet.p.species])+' · '+pet.p.hp+'/'+pet.stats.maxHp+' HP · Attack '+pet.stats.power;stage.after(info)}if(allies.length){const roster=document.createElement('div');roster.className='group-roster';roster.style.cssText='display:flex;flex-wrap:wrap;gap:6px;padding:6px';for(const ally of allies){const label=document.createElement('button');label.type='button';label.textContent='Target '+ally.name+' · '+ally.hp+' HP';label.onclick=()=>{if(animatingTurn||bossFight!==battle||!ally.alive)return;battle.group=battle.group.filter(i=>entities[i]!==ally);battle.group.push(entities.indexOf(battle.e));battle.e=ally;persistCampaign();encounterScreen(spellMenu)};label.style.cssText='border:1px solid #a65b51;padding:5px;border-radius:5px';roster.appendChild(label)}stage.after(roster)}const theme=enemy.boss&&guardianThemes[state.floor];if(theme){stage.style.background='repeating-linear-gradient(45deg,'+theme.floor+' 0 18px,'+theme.color+'33 19px 20px)';stage.setAttribute('aria-label',theme.detail)}const opponent=stage.querySelector('.opponent img');if(opponent){const original=customEnemy(enemy)||nativeFloorEnemy(enemy);if(original){opponent.src=original.toDataURL();opponent.style.filter='none';opponent.style.imageRendering='pixelated'}else opponent.style.filter=enemyArtFilter(enemy);}stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
+  const stage=$('.duel-stage');const pet=readyPet();if(pet){const portrait=document.createElement('canvas');portrait.width=32;portrait.height=32;portrait.className='duel-companion';portrait.setAttribute('aria-label','Companion crawler');portrait.style.cssText='position:absolute;left:9%;bottom:9%;width:56px;height:56px;image-rendering:pixelated;pointer-events:none;z-index:3';drawAnimal(pet.p.species,0,0,true,false,portrait.getContext('2d'));stage.appendChild(portrait);const info=document.createElement('p');info.textContent=(pet.p.name||animalNames[pet.p.species])+' · '+pet.p.hp+'/'+pet.stats.maxHp+' HP · Attack '+pet.stats.power;stage.after(info)}if(allies.length){const roster=document.createElement('div');roster.className='group-roster';roster.style.cssText='display:flex;flex-wrap:wrap;gap:6px;padding:6px';for(const ally of allies){const label=document.createElement('button');label.type='button';label.textContent='Target '+ally.name+' · '+ally.hp+' HP';label.onclick=()=>{if(animatingTurn||bossFight!==battle||!ally.alive)return;battle.group=battle.group.filter(i=>entities[i]!==ally);battle.group.push(entities.indexOf(battle.e));battle.e=ally;persistCampaign();encounterScreen(spellMenu)};label.style.cssText='border:1px solid #a65b51;padding:5px;border-radius:5px';roster.appendChild(label)}stage.after(roster)}const theme=enemy.boss&&guardianThemes[state.floor];if(theme){stage.style.background='repeating-linear-gradient(45deg,'+theme.floor+' 0 18px,'+theme.color+'33 19px 20px)';stage.setAttribute('aria-label',theme.detail)}const opponent=stage.querySelector('.opponent img');if(opponent){const original=customEnemy(enemy)||nativeFloorEnemy(enemy);if(original){opponent.src=original.toDataURL();opponent.style.filter='none';opponent.style.imageRendering='pixelated'}else opponent.style.filter=enemyArtFilter(enemy);}stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
   if(state.equipment?.weapon)stage.classList.add('armed');
   $$('[data-boss]').forEach(button=>button.onclick=()=>{const id=button.dataset.boss;if(id==='spells'||id==='back')encounterScreen(id==='spells');else animateTurn(id)});
 }
@@ -1066,7 +1071,10 @@ async function animateTurn(action){
     if(damage>0)stage.querySelector('.impact').textContent='−'+damage;
     if(melee)await playDuelStrike(stage,battle);else if(techniques[action]&&damage>0){const fx=document.createElement('div');fx.textContent='✦';fx.style.cssText='position:absolute;right:22%;top:36%;font-size:42px;color:#f6ce7a;text-shadow:0 0 18px #d79aff;pointer-events:none;z-index:4';stage.appendChild(fx);if(fx.animate&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches)fx.animate([{transform:'scale(.2)',opacity:0},{transform:'scale(1.6)',opacity:1},{transform:'scale(2.2)',opacity:0}],{duration:480});await wait(480);fx.remove()}else await wait(480);
     if(bossFight!==battle)return;
-    if(damage+(readyPet()?.stats.power||0)<battle.e.hp){stage.classList.add('counter');const fx=guardianAttackFx(stage,battle);await wait(460);fx?.remove()}
+    const helper=readyPet();
+    if(helper&&damage<battle.e.hp){const portrait=stage.querySelector('.duel-companion');const impact=stage.querySelector('.impact');if(impact)impact.textContent='−'+helper.stats.power+' (ally)';if(portrait?.animate&&!ambientMotion.matches)portrait.animate([{transform:'translate(0,0)'},{transform:'translate('+Math.round(stage.clientWidth*.48)+'px,-18px) scale(1.15)',offset:.5},{transform:'translate(0,0)'}],{duration:360});await wait(360)}
+    if(bossFight!==battle)return;
+    if(damage+(helper?.stats.power||0)<battle.e.hp){stage.classList.add('counter');const fx=guardianAttackFx(stage,battle);await wait(460);fx?.remove()}
     if(bossFight!==battle)return;
     animatingTurn=false;bossTurn(action,strike);
   }finally{animatingTurn=false}
@@ -1622,7 +1630,7 @@ function playDuelStrike(stage,battle){
   },()=>bossFight===battle&&stage.isConnected);
 }
 function drawHero(x,y){
-  if(state.pet&&!orphanedPet()){const pet=petPosition(x,y);if(pet)drawAnimal(state.pet.species,pet.x,pet.y,state.pet.crawler,!!step)}
+  if(state.pet&&!orphanedPet()){const pet=petPosition(x,y);if(pet)drawAnimal(state.pet.species,pet.x,pet.y,state.pet.crawler,pet.walking,ctx,pet.facing)}
   const now=performance.now(),px=x*TILE+16,ground=y*TILE+27;
   const p=step?Math.min(1,Math.max(0,(now-step.start)/step.duration)):0;
   const phase=step?((stepCount-1+p)*.5)%1:0;
