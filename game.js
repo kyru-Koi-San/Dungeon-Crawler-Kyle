@@ -8,7 +8,7 @@ const FINAL_FLOOR=18;
 const quips=['Welcome, crawler. Try not to die before the opening credits.','Your posture suggests a lack of confidence. And armor.','The audience loves a comeback. They love a dismemberment more.','I have seen rats with better tactical instincts.','Excellent footwork. Shame about the rest of you.','A new floor! The same questionable life choices.','Remember: pain is temporary. The highlight reel is forever.','That corpse had a family. Probably.','Your odds are improving. They were dreadful, so this is relative.','Do keep moving. The walls are not decorative.'];
 let state,tiles=[],seen=[],entities=[],particles=[],keys={},last=0,acc=0,walkUntil=0,attackStarted=0,sound=true,audio=null,toastTimer=0,attackCooldown=0,spawnedFloor=0,tab='journal',touchMove=null,netPlayers={},netSyncClock=0;
 let step=null,stepCount=0;const WALK_MS=275,RUN_MS=160;
-let runPointer=null;
+let runPointer=null,stickPointer=null;
 let joystickAxis=null;let visualX=null,visualY=null,visualFloor=0,joyX=0,joyY=0,hurtAt=0;const sprites={};
 const spriteNames=['pack-llama','flood-grub','mire-leprechaun','hero-front','hero-side','hero-back','hero-slash','hero-strike','sewer-rat','skeleton','goblin','spider','wraith','archer','shaman','spider-boss','bone-champion'];
 for(const name of spriteNames){const img=new Image();img.src=name+'.png';img.onload=()=>render();sprites[name]=img;}
@@ -1580,13 +1580,83 @@ function updatePace(){
   }
   $('#runButton').setAttribute('aria-pressed',String(duration===RUN_MS));
 }
+function resetStick(){
+  stickPointer=null;joyX=joyY=0;joystickAxis=null;
+  $('#joyKnob').style.transform='';
+}
 function clearMovement(){
-runPointer=null;
-keys={};updatePace();
-joyX=joyY=0;
-joystickAxis=null;
-$('#joyKnob').style.transform='';
-clearInterval(touchMove);
+  resetStick();runPointer=null;keys={};updatePace();clearInterval(touchMove);
+}
+function bindMovementControls(){
+  const joy=$('#joystick'),run=$('#runButton'),knob=$('#joyKnob');
+  const blocked=()=>pauseStarted!==null||bossFight||state.dead||modalOpen()||
+    $('#audioPanel').open||document.body.classList.contains('status-open');
+  function steer(point){
+    const b=joy.getBoundingClientRect(),x=point.clientX-b.left-b.width/2,y=point.clientY-b.top-b.height/2;
+    const d=Math.hypot(x,y),travel=Math.max(0,(Math.min(b.width,b.height)-knob.offsetWidth)/2);
+    const scale=Math.min(1,travel/Math.max(1,d));
+    knob.style.transform='translate('+x*scale+'px,'+y*scale+'px)';
+    if(d<=6){joyX=joyY=0;joystickAxis=null;return}
+    const horizontal=Math.abs(x),vertical=Math.abs(y);
+    if(joystickAxis==='x'&&vertical>horizontal*1.25)joystickAxis='y';
+    else if(joystickAxis==='y'&&horizontal>vertical*1.25)joystickAxis='x';
+    else if(!joystickAxis)joystickAxis=horizontal>=vertical?'x':'y';
+    joyX=joystickAxis==='x'?Math.sign(x):0;joyY=joystickAxis==='y'?Math.sign(y):0;
+    const now=performance.now();
+    if(step&&joyX===step.x-step.nx&&joyY===step.y-step.ny){
+      const p=Math.min(1,Math.max(0,(now-step.start)/step.duration));
+      [step.x,step.nx]=[step.nx,step.x];[step.y,step.ny]=[step.ny,step.y];
+      step.start=now-(1-p)*step.duration;step.returning=!step.returning;
+      state.facing=joyX<0?'left':joyX>0?'right':joyY<0?'up':'down';
+    }
+    if(!step)move(joyX,joyY,now);
+  }
+  const nativeTouch='ontouchstart' in window;
+  for(const control of [joy,run]){
+    const isStick=control===joy;
+    const owner=()=>isStick?stickPointer:runPointer;
+    function start(id,point){
+      if(blocked()||owner()!==null)return false;
+      if(isStick){stickPointer=id;steer(point)}else{runPointer=id;updatePace()}
+      return true;
+    }
+    function release(id){
+      if(id!==owner())return;
+      if(isStick)resetStick();else{runPointer=null;updatePace()}
+    }
+    if(nativeTouch){
+      // A touch keeps its original target even after the thumb slides off the pad.
+      const options={passive:false};
+      control.addEventListener('touchstart',e=>{
+        e.preventDefault();
+        if(owner()!==null&&!Array.from(e.touches).some(t=>'t'+t.identifier===owner()))release(owner());
+        const t=e.changedTouches[0];if(t)start('t'+t.identifier,t);
+      },options);
+      control.addEventListener('touchmove',e=>{
+        e.preventDefault();
+        const t=Array.from(e.changedTouches).find(t=>'t'+t.identifier===owner());
+        if(t&&isStick){if(blocked())resetStick();else steer(t)}
+      },options);
+      for(const name of ['touchend','touchcancel'])window.addEventListener(name,e=>{
+        if(typeof owner()==='string'&&owner().startsWith('t')&&
+           !Array.from(e.touches).some(t=>'t'+t.identifier===owner()))release(owner());
+      },true);
+    }
+    control.addEventListener('pointerdown',e=>{
+      if((nativeTouch&&e.pointerType==='touch')||e.button!==0)return;
+      if(start('p'+e.pointerId,e)){
+        e.preventDefault();
+        try{control.setPointerCapture(e.pointerId)}catch{} // Window listeners also track this drag.
+      }
+    });
+    window.addEventListener('pointermove',e=>{
+      if(!isStick||owner()!=='p'+e.pointerId)return;
+      if(blocked()||e.buttons===0)release(owner());else steer(e);
+    },true);
+    for(const name of ['pointerup','pointercancel'])window.addEventListener(name,e=>release('p'+e.pointerId),true);
+    control.addEventListener('lostpointercapture',e=>release('p'+e.pointerId));
+    control.addEventListener('contextmenu',e=>e.preventDefault());
+  }
 }
 function showModal(html){clearMovement();step=null;$('#modalBody').innerHTML=html;$('#modal').classList.remove('hidden')}function closeModal(){
 if(activeLoot){if(!activeLoot.owner)finishLoot();return}
@@ -1613,36 +1683,12 @@ function bind(){
   document.addEventListener('click',e=>{if(e.target.closest('[data-campaign-menu]'))campaignMenu()});
 
 sizePlayfield();new ResizeObserver(sizePlayfield).observe($('.canvas-wrap'));
-const run=$('#runButton');
-run.onpointerdown=e=>{
-  if(runPointer!==null||pauseStarted!==null||modalOpen())return;
-  e.preventDefault();runPointer=e.pointerId;run.setPointerCapture(e.pointerId);updatePace();
-};
-for(const event of ['pointerup','pointercancel','lostpointercapture'])run.addEventListener(event,e=>{
-  if(e.pointerId===runPointer){runPointer=null;updatePace()}
-});
-const status=$('#mobileStatus');status.onclick=()=>{if(personalMenusLocked()){lockHint();return}document.body.classList.add('status-open')};
+bindMovementControls();
+const status=$('#mobileStatus');status.onclick=()=>{if(personalMenusLocked()){lockHint();return}clearMovement();document.body.classList.add('status-open')};
 $('#statusClose').onclick=()=>document.body.classList.remove('status-open');
-let field=document.createElement('div');field.className='field-map';field.innerHTML='<canvas width="240" height="180" id="fieldMini"></canvas>';$('.canvas-wrap').appendChild(field);const joy=$('#joystick'),knob=$('#joyKnob');if(joy&&knob){let pointer=null;const update=e=>{let b=joy.getBoundingClientRect(),x=e.clientX-b.left-b.width/2,y=e.clientY-b.top-b.height/2,d=Math.hypot(x,y),m=Math.min(1,36/Math.max(1,d));knob.style.transform=`translate(${x*m}px,${y*m}px)`;if(d<=6||modalOpen()||pauseStarted!==null){
-joyX=joyY=0;
-joystickAxis=null;
-return;
-}
-const horizontal=Math.abs(x),vertical=Math.abs(y);
-if(joystickAxis==='x'&&vertical>horizontal*1.25)joystickAxis='y';
-else if(joystickAxis==='y'&&horizontal>vertical*1.25)joystickAxis='x';
-else if(!joystickAxis)joystickAxis=horizontal>=vertical?'x':'y';
-joyX=joystickAxis==='x'?Math.sign(x):0;
-joyY=joystickAxis==='y'?Math.sign(y):0;
-const now=performance.now();
-if(step&&joyX===step.x-step.nx&&joyY===step.y-step.ny){
-  const p=Math.min(1,Math.max(0,(now-step.start)/step.duration));
-  [step.x,step.nx]=[step.nx,step.x];[step.y,step.ny]=[step.ny,step.y];
-  step.start=now-(1-p)*step.duration;step.returning=!step.returning;
-  state.facing=joyX<0?"left":joyX>0?"right":joyY<0?"up":"down";
-}
-if(!step)move(joyX,joyY,now);
-};joy.addEventListener('pointerdown',e=>{if(pointer!==null)return;pointer=e.pointerId;joy.setPointerCapture(pointer);update(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===pointer)update(e)});const stop=e=>{if(e.pointerId!==pointer)return;pointer=null;joyX=joyY=0;joystickAxis=null;knob.style.transform=''};for(const ev of ['pointerup','pointercancel','lostpointercapture'])joy.addEventListener(ev,stop)}window.addEventListener('blur',clearMovement);
+let field=document.createElement('div');field.className='field-map';field.innerHTML='<canvas width="240" height="180" id="fieldMini"></canvas>';$('.canvas-wrap').appendChild(field);window.addEventListener('blur',clearMovement);
+window.addEventListener('pagehide',clearMovement);
+$('#soundBtn').addEventListener('click',clearMovement);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clearMovement()});
 document.addEventListener('keydown',e=>{
 if($('#audioPanel').open||pauseStarted!==null||modalOpen()||document.body.classList.contains('status-open')||e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable]'))return;
