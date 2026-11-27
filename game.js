@@ -1112,7 +1112,7 @@ const shelter=state.sanctuaries?.find(q=>(q.door?.x===nx&&q.door.y===ny)||q.room
 function nearby(){return entities.filter(e=>e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=1.65).sort((a,b)=>Math.hypot(a.x-state.x,a.y-state.y)-Math.hypot(b.x-state.x,b.y-state.y))[0]}
 let bossFight=null;
 const guardianDialogue={3:['You hear the chains? Every one holds a debt.','The cage will not open for you.'],6:['Little intruder. My brood has been hungry.','Every thread leads back to me.'],9:['I have worn a thousand faces. Yours will be next.','Even your reflection fears me.'],12:['The court finds you guilty of breathing.','Let the fire deliver its verdict.'],15:['You stand before the last tribunal.','Your armor is no defense against judgment.'],18:['One bell remains. Will it ring for you?','No one leaves the final echo.']};
-function beginBoss(e){if(bossFight||state.dead||modalOpen()||sanctuaryAt(state.x,state.y)||(e.boss&&state.arena&&!inArena(state.x,state.y)))return;bossFight={e,group:[],roundId:crypto.randomUUID().replace(/-/g,''),partyActions:{},turn:1,log:e.boss?'The arena seals.':'The '+e.name.toLowerCase()+' advances.',speech:e.boss?(guardianDialogue[state.floor]?.[0]||'You shall not pass.'):e.localBoss?'You found my hiding place. Now pay the price.':e.hostileCrawler?'Your supplies are mine.':null};step=null;visualX=state.x;visualY=state.y;joyX=joyY=0;if(e.boss||e.localBoss){ai('BOSS BATTLE! Please make your inevitable suffering entertaining.');guardianWarning()}bossScreen();persistCampaign();sendPartyWorld()}
+function beginBoss(e){if(bossFight||state.dead||modalOpen()||sanctuaryAt(state.x,state.y)||(e.boss&&state.arena&&!inArena(state.x,state.y)))return;bossFight={e,group:[],roundId:crypto.randomUUID().replace(/-/g,''),partyActions:{},turn:1,log:e.boss?'The arena seals.':'The '+e.name.toLowerCase()+' advances.',speech:e.boss?(guardianDialogue[state.floor]?.[0]||'You shall not pass.'):e.localBoss?'You found my hiding place. Now pay the price.':e.hostileCrawler?({Vanguard:'Your guard will break.',Arcanist:'Let us see how much mana you have left.',Reaver:'No mercy down here.',Ranger:'I never miss twice.',Alchemist:'Try not to breathe too deeply.',Sentinel:'You will not get through my armor.'}[e.profile?.job]||'Your supplies are mine.'):null};step=null;visualX=state.x;visualY=state.y;joyX=joyY=0;if(e.boss||e.localBoss){ai('BOSS BATTLE! Please make your inevitable suffering entertaining.');guardianWarning()}bossScreen();persistCampaign();sendPartyWorld()}
 function guardianWarning(){
  const old=document.getElementById('guardianWarning');if(old)old.remove();
  const banner=document.createElement('div');banner.id='guardianWarning';banner.setAttribute('role','alert');
@@ -1134,6 +1134,12 @@ function encounterAllies(b){
  return b.group.map(i=>entities[i]).filter(e=>e?.alive&&e!==b.e);
 }
 function bossIntent(b){
+ if(b.e.hostileCrawler&&b.e.profile){
+   const job=b.e.profile.job;
+   const tactics={Vanguard:'ARMOR SHATTER',Arcanist:'MANA DRAIN',Reaver:'DEVASTATING STRIKE',Ranger:'AIMED SHOT',Alchemist:'SICKENING MIST',Sentinel:'DEFENSIVE STANCE'};
+   if(b.turn%3===2&&Object.hasOwn(tactics,job))return tactics[job];
+   if(job==='Survivor'&&b.turn%4===2)return b.e.profile.gear?.weapon==='hammer'?'ARMOR SHATTER':'AIMED SHOT';
+ }
  if(!b.e.boss){
    if(b.turn%4===0&&state.floor>=7&&['bone-champion','skeleton','goblin'].includes(b.e.sprite))return 'DEFENSIVE STANCE';
    if(b.turn%4===2&&state.floor>=5&&['wraith','shaman'].includes(b.e.sprite))return 'SOUL SIPHON';
