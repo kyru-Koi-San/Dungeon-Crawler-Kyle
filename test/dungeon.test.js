@@ -5,7 +5,7 @@ function engine(){
  const el={getContext:()=>({}),classList:{add(){},remove(){},toggle(){}},style:{},dataset:{}};
  let stored=null;
  const context={window:{matchMedia:()=>({matches:false}),addEventListener(){}},document:{querySelector:()=>el,querySelectorAll:()=>[],addEventListener(){}},Image:class{},localStorage:{getItem:()=>stored,setItem:(k,v)=>stored=v},performance:{now:()=>0}};
- const api=vm.runInNewContext(source.slice(0,i)+`return {nextFloor,chooseSubclass,trainRace,trainBranch,learned,skillPaths, floorEnemy,fresh,generate,hatchGrub,moveStack,canonicalDrop,writeCampaign,load,solid,sanctuaryAt,snapshot:()=>({state,tiles,seen,entities,W,H}),setup:floor=>{state={...fresh(),floor,chapter:'mine'};bossFight=null;},quiet:()=>{render=()=>{};ai=()=>{};feed=()=>{};notify=()=>{};caption=()=>{};ridiculous=()=>{};unlock=()=>{};showModal=()=>{};closeModal=()=>{};guildIdentity=()=>{};enterHall=()=>{state.hall={index:0,x:6,y:7}};backpack=()=>{};openTab=()=>{};highlight=()=>{};}};})()`,context);
+ const api=vm.runInNewContext(source.slice(0,i)+`return {bossTurn,bossIntent,techniqueDamage,abilityCost,quantity,equipItem,applyClassBonus,battle:e=>{bossFight={e,turn:1,group:[],partyActions:{},roundId:'a'.repeat(32)}},encounter:()=>bossFight,nextFloor,chooseSubclass,trainRace,trainBranch,learned,skillPaths, floorEnemy,fresh,generate,hatchGrub,moveStack,canonicalDrop,writeCampaign,load,solid,sanctuaryAt,snapshot:()=>({state,tiles,seen,entities,W,H}),setup:floor=>{state={...fresh(),floor,chapter:'mine'};bossFight=null;},quiet:()=>{render=()=>{};ai=()=>{};feed=()=>{};notify=()=>{};caption=()=>{};ridiculous=()=>{};unlock=()=>{};showModal=()=>{};closeModal=()=>{};guildIdentity=()=>{};enterHall=()=>{state.hall={index:0,x:6,y:7}};backpack=()=>{};openTab=()=>{};highlight=()=>{};}};})()`,context);
  api.quiet();return api;
 }
 test('all eighteen floors shrink, generate one exit and correct guardians',()=>{
@@ -37,4 +37,23 @@ test('campaign descent, guardian gates, class training and victory survive all 1
   a.nextFloor();assert.equal(a.snapshot().state.floor,Math.min(18,f+1));
  }
  assert.ok(a.snapshot().state.campaignWon);a.writeCampaign();assert.ok(a.load());assert.ok(a.snapshot().state.campaignWon);
+});
+
+test('advanced magic subclasses can defeat the final guardian with trained builds',()=>{
+ for(const [job,branches,sub,spell] of [
+ ['Arcanist',['Reservoir','Channeling'],0,'stormcaller'],
+ ['Arcanist',['Reservoir','Channeling'],1,'sage'],
+ ['Alchemist',['Catalyst','Elixir craft'],0,'transmuter'],
+ ['Alchemist',['Catalyst','Elixir craft'],1,'medic']]){
+  const a=engine();a.setup(18);a.generate();const {state:p,entities}=a.snapshot(),e=entities.find(e=>e.boss);
+  Object.assign(p,{guildTrained:true,identityLocked:true,character:{race:'Human'},level:18,skillPoints:17,maxHp:304,hp:304,power:42,maxMp:87,mp:87,specialization:job});
+  p.achievements.push('Management Has Been Terminated');
+  for(const id of ['cage-cleaver-5','warden-plate-5','cinder-seal-5']){const item=a.canonicalDrop(id,1);p.inventory.push(item);a.equipItem(item)}
+  p.inventory.push({id:'tonic',qty:4});a.applyClassBonus(job,1);
+  for(const branch of branches)for(let k=0;k<3;k++)a.trainBranch(branch);
+  a.chooseSubclass(sub);p.spellLoadout=[spell,...(job==='Arcanist'?['mend']:[])];p.hp=p.maxHp;p.mp=p.maxMp;a.battle(e);
+  let turns=0;
+  while(a.encounter()&&!p.dead&&turns<100){const b=a.encounter(),intent=a.bossIntent(b);const action=p.hp<p.maxHp*.35&&a.quantity('tonic')?'heal':p.mp<a.abilityCost(spell)?'focus':intent==='DEVASTATING STRIKE'&&!b.trapUsed?'trap':intent==='DEVASTATING STRIKE'?'focus':spell;a.bossTurn(action,a.techniqueDamage(action));turns++}
+  assert.equal(e.alive,false,job+' '+spell+' failed after '+turns+' turns');assert.ok(!p.dead);assert.ok(turns<100);
+ }
 });
