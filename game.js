@@ -1148,58 +1148,62 @@ function bossIntent(b){
 const techniques={
  aegis:{name:'Aegis Break',floor:8,sub:'Aegis',cost:9,guard:true,scale:'armor',desc:'Power + twice armor + 12; guard the counterattack.'},
  juggernaut:{name:'Titan Charge',floor:8,sub:'Juggernaut',cost:9,scale:'health',desc:'Power + 30% maximum HP.'},
- stormcaller:{name:'Thunderfall',floor:8,sub:'Stormcaller',cost:12,scale:'magic',desc:'30 + triple spell damage.'},
- sage:{name:'Astral Surge',floor:8,sub:'Mana Sage',cost:10,scale:'mana',desc:'20 + 40% maximum MP.'},
+ stormcaller:{name:'Thunderfall',floor:8,sub:'Stormcaller',cost:12,scale:'magic',desc:'30 + triple spell damage + level.'},
+ sage:{name:'Astral Surge',floor:8,sub:'Mana Sage',cost:10,scale:'mana',desc:'20 + 65% maximum MP.'},
  executioner:{name:'Final Verdict',floor:8,sub:'Executioner',cost:10,scale:'execution',desc:'Triple power; extra damage against weakened targets.'},
  bloodknight:{name:'Crimson Blade',floor:8,sub:'Blood Knight',cost:9,scale:'physical',heal:0.2,desc:'Twice power + 15; recover 20% of damage.'},
  deadeye:{name:'Perfect Shot',floor:8,sub:'Deadeye',cost:9,scale:'execution',desc:'Triple power; extra damage against weakened targets.'},
  pathfinder:{name:'Ambush',floor:8,sub:'Pathfinder',cost:8,scale:'physical',guard:true,desc:'Twice power + 15; guard counterattack.'},
  transmuter:{name:'Philosopher’s Fire',floor:8,sub:'Transmuter',cost:11,scale:'magic',desc:'30 + triple spell damage.'},
- medic:{name:'Restorative Burst',floor:8,sub:'Field Medic',cost:9,scale:'magic',heal:0.35,desc:'30 + triple spell damage; recover 35% of damage.'},
+ medic:{name:'Restorative Burst',floor:8,sub:'Field Medic',cost:9,scale:'magic',heal:0.35,desc:'30 + triple spell damage + level; recover 35% of damage.'},
  commander:{name:'Citadel Bash',floor:8,sub:'Bulwark Commander',cost:9,scale:'armor',guard:true,desc:'Power + twice armor + 12; guard counterattack.'},
  avenger:{name:'Retribution',floor:8,sub:'Avenger',cost:9,scale:'physical',guard:true,desc:'Twice power + 15; guard counterattack.'},
   volley:{name:'Piercing volley',floor:4,job:'Ranger',cost:6,desc:'Deal twice your power + 3.'},
-  catalyst:{name:'Catalytic burst',floor:4,job:'Alchemist',cost:7,desc:'Deal 20 damage plus twice spell bonus.'},
+  catalyst:{name:'Catalytic burst',floor:4,job:'Alchemist',cost:7,desc:'Deal 20 damage plus twice spell bonus + level.'},
   bastion:{name:'Bastion strike',floor:4,job:'Sentinel',cost:6,desc:'Strike with power and armor, then guard.'},
   racial:{name:'Racial signature',floor:4,cost:7,desc:'Your race-specific attack. Unlock the second racial skill at rank 2.'},
   mend:{name:'Mend',floor:4,job:'Arcanist',cost:8,desc:'Restore health and treat injuries.'},
   brace:{name:'Shieldbreaker',floor:4,job:'Vanguard',cost:5,desc:'Strike for power + 6 and guard the counterattack.'},
   rend:{name:'Rending blow',floor:4,job:'Reaver',cost:6,desc:'Strike for twice your power.'},
-  bell:{name:'Bell chime',floor:6,cost:6,desc:'Deal 16 damage plus your spell bonus.'},
+  bell:{name:'Bell chime',floor:6,cost:6,desc:'Deal 16 damage plus spell bonus + level.'},
   lunge:{name:'Driving lunge',floor:9,cost:8,desc:'Strike for twice your power + 4.'},
-  tide:{name:'Undertow',floor:12,cost:12,desc:'Deal 32 damage plus twice your spell bonus.'}
+  tide:{name:'Undertow',floor:12,cost:12,desc:'Deal 32 damage plus twice spell bonus + level.'}
 };
 function learned(id){if(id==='racial')return !!state.identityLocked&&(state.racialRanks?.[1]||0)>=2;const a=techniques[id];return !!a&&state.floor>=a.floor&&(!a.job||a.job===state.specialization)&&(!a.sub||a.sub===state.subclass)}
 function prepared(){return (state.spellLoadout||[]).filter(learned).slice(0,3)}
-function techniqueDamage(id){
-  const a=techniques[id];
-  if(a?.scale){switch(a.scale){
-    case 'armor':return Math.max(1,state.power+2*state.armor+12);
-    case 'health':return state.power+Math.floor(state.maxHp*.3);
-    case 'magic':return Math.max(1,30+3*(state.spellBonus||0));
-    case 'mana':return 20+Math.floor(state.maxMp*.4);
-    case 'execution':return state.power*3+(bossFight?.e?.hp<bossFight?.e?.max*.35?Math.floor(state.power*.5):0);
-    case 'physical':return state.power*2+15;
-  }}
-  switch(id){
-    case 'racial':return racialMoves[state.character?.race]?.[2]?24+2*(state.spellBonus||0):state.power*2+10;
-    case 'volley':return state.power*2+3;
-    case 'catalyst':return 20+2*(state.spellBonus||0);
-    case 'bastion':return state.power+state.armor+5;
-    case 'brace':return state.power+6;
-    case 'rend':return state.power*2;
-    case 'bell':return Math.max(1,16+(state.spellBonus||0));
-    case 'lunge':return state.power*2+4;
-    case 'tide':return Math.max(1,32+2*(state.spellBonus||0));
-    default:return 0;
-  }
+function abilityCost(id,p=state){return id==='racial'?(racialMoves[p.character?.race]?.[1]||7):techniques[id]?.cost||0}
+function racialEffect(p=state){return ({
+ Human:{guard:true},Elf:{magic:true},Dwarf:{guard:true},Cat:{},Dog:{guard:true},'Mutant Crab':{guard:true},Wizard:{magic:true},Zombie:{heal:.25}
+ })[p.character?.race]||{}}
+function techniqueDamage(id,p=state,target=bossFight?.e){
+ const a=techniques[id],power=Math.max(1,p.power||1),armor=Math.max(0,p.armor||0),magic=Math.max(0,p.spellBonus||0),hp=p.maxHp||100,mp=p.maxMp||35,level=p.level||1;
+ if(a?.scale){switch(a.scale){
+ case 'armor':return power+2*armor+12;
+ case 'health':return power+Math.floor(hp*.3);
+ case 'magic':return 30+3*magic+level;
+ case 'mana':return 20+Math.floor(mp*.65);
+ case 'execution':return power*3+(target?.hp<target?.max*.35?Math.floor(power*.5):0);
+ case 'physical':return power*2+15;
+ }}
+ switch(id){
+ case 'racial':return ({Human:power+Math.floor(hp*.15),Elf:24+2*magic+level,Dwarf:power+armor*2+8,Cat:power*2+8,Dog:power+level*2+10,'Mutant Crab':power+armor*2+14,Wizard:30+3*magic+level,Zombie:power*2+6})[p.character?.race]||power+10;
+ case 'volley':return power*2+3;
+ case 'catalyst':return 20+2*magic+level;
+ case 'bastion':return power+armor+5;
+ case 'brace':return power+6;
+ case 'rend':return power*2;
+ case 'bell':return 16+magic+level;
+ case 'lunge':return power*2+4;
+ case 'tide':return 32+2*magic+level;
+ default:return 0;
+ }
 }
 function moveName(id){return id==='racial'?(racialMoves[state.character?.race]?.[0]||'Racial signature'):techniques[id].name}
 function spellLoadoutPanel(){
   const ready=prepared();
   return '<details class="skill-limb" data-path="Spells" '+(openPaths.has('Spells')?'open':'')+'><summary>Spell menu <small>'+ready.length+'/3 prepared</small></summary><div class="skill-stem">'+Object.entries(techniques).map(([id,a])=>{
     const equipped=ready.includes(id);
-    return '<div class="skill-node"><div><b>'+moveName(id)+'</b><small>'+a.cost+' MP · '+a.desc+'</small></div>'+(learned(id)?'<button class="smallbtn" data-prepare="'+id+'" aria-pressed="'+equipped+'" '+(!equipped&&ready.length===3?'disabled':'')+'>'+(equipped?'Remove':'Prepare')+'</button>':'<small>Floor '+a.floor+(a.job?' · '+a.job:a.sub?' · '+a.sub:'')+'</small>')+'</div>';
+    return '<div class="skill-node"><div><b>'+moveName(id)+'</b><small>'+abilityCost(id)+' MP · '+a.desc+'</small></div>'+(learned(id)?'<button class="smallbtn" data-prepare="'+id+'" aria-pressed="'+equipped+'" '+(!equipped&&ready.length===3?'disabled':'')+'>'+(equipped?'Remove':'Prepare')+'</button>':'<small>Floor '+a.floor+(a.job?' · '+a.job:a.sub?' · '+a.sub:'')+'</small>')+'</div>';
   }).join('')+'</div></details>';
 }
 
@@ -1226,8 +1230,8 @@ function encounterScreen(spellMenu=false){
   if(state.maxMp>0)moves.push(['focus','Focus · restore MP']);if(!enemy.boss)moves.push(['retreat','Run away']);
   if(Object.keys(techniques).some(learned))moves.push(['spells','Spells']);
   if(enemy.boss)moves.push(['trap',battle.trapUsed?'Trap spent':'Spring trap']);
-  if(spellMenu)moves.splice(0,moves.length,...prepared().map(id=>[id,moveName(id)+' · '+techniques[id].cost+' MP']),['back','Back']);
-  showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':enemy.localBoss?'HIDDEN LOCAL BOSS':enemy.chief?'ROAMING MINIBOSS':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p>'+(battle.speech?'<div class="boss-speech"><small>'+safeAttr(enemy.name)+'</small><p>“'+safeAttr(battle.speech)+'”</p></div>':'')+'<button class="smallbtn" data-campaign-menu>Campaign saves</button><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions command-fan">'+(spellMenu&&!prepared().length?'<p>Prepare abilities in Backpack → Skills → Spell menu.</p>':'')+moves.map(([id,label])=>'<button class="duel-command" data-boss="'+id+'" '+((techniques[id]&&state.mp<techniques[id].cost)||(id==='mend'&&state.hp===state.maxHp&&!conditionText())||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!quantity('tonic'))?'disabled':'')+'><i aria-hidden="true">'+(({attack:'⚔',guard:'⬟',heal:'✚',retreat:'↗',spells:'✧',trap:'⌖',back:'‹'})[id]||'✦')+'</i><span>'+label+'</span></button>').join('')+'</div></div>');
+  if(spellMenu)moves.splice(0,moves.length,...prepared().map(id=>[id,moveName(id)+' · '+abilityCost(id)+' MP']),['back','Back']);
+  showModal('<div class="duel"><small>FLOOR '+state.floor+' · '+(enemy.boss?'GUARDIAN':enemy.localBoss?'HIDDEN LOCAL BOSS':enemy.chief?'ROAMING MINIBOSS':'ENCOUNTER')+' · TURN '+battle.turn+'</small><h2>'+safeAttr(enemy.name)+'</h2><div class="duel-stage"><div class="fighter crawler"><img id="duelHero" alt=""><canvas class="strike-pose" width="72" height="48" aria-hidden="true"></canvas></div><div class="fighter opponent '+(enemy.small?'small-mob':'')+'"><img src="'+safeAttr(enemy.sprite)+'.png" alt=""></div><span class="impact">✦</span></div><div class="duel-health"><span>You '+state.hp+'/'+state.maxHp+' HP</span><span>'+enemy.hp+'/'+enemy.max+' HP</span></div><p>'+safeAttr(battle.log)+'</p>'+(battle.speech?'<div class="boss-speech"><small>'+safeAttr(enemy.name)+'</small><p>“'+safeAttr(battle.speech)+'”</p></div>':'')+'<button class="smallbtn" data-campaign-menu>Campaign saves</button><small>'+state.mp+' MP · '+(conditionText()?conditionText()+' · ':'')+'Incoming: '+bossIntent(battle)+'</small><div class="duel-actions command-fan">'+(spellMenu&&!prepared().length?'<p>Prepare abilities in Backpack → Skills → Spell menu.</p>':'')+moves.map(([id,label])=>'<button class="duel-command" data-boss="'+id+'" '+((techniques[id]&&state.mp<abilityCost(id))||(id==='mend'&&state.hp===state.maxHp&&!conditionText())||(id==='trap'&&battle.trapUsed)||(id==='heal'&&!quantity('tonic'))?'disabled':'')+'><i aria-hidden="true">'+(({attack:'⚔',guard:'⬟',heal:'✚',retreat:'↗',spells:'✧',trap:'⌖',back:'‹'})[id]||'✦')+'</i><span>'+label+'</span></button>').join('')+'</div></div>');
   $('#duelHero').src=crawlerPose('side',0).toDataURL();if(enemy.hostileCrawler&&enemy.profile)$ ('.fighter.opponent img').src=crawlerPose('side',0,enemy.profile,enemy.profile.gear).toDataURL();
   const stage=$('.duel-stage');for(const [i,a] of recruitedCrawlers().filter(a=>a.hp>0).entries()){const img=document.createElement('img');img.className='duel-crawler-ally';img.dataset.role=a.role;img.src=crawlerPose('side',0,a.profile,allyLook(a)).toDataURL();img.alt=a.profile.name;img.style.cssText='position:absolute;left:'+(8+i*12)+'%;bottom:2%;width:42px;height:56px;image-rendering:pixelated;z-index:3;pointer-events:none';stage.appendChild(img)}const pet=readyPet();if(pet){const portrait=document.createElement('canvas');portrait.width=32;portrait.height=32;portrait.className='duel-companion';portrait.setAttribute('aria-label','Companion crawler');portrait.style.cssText='position:absolute;left:9%;bottom:9%;width:56px;height:56px;image-rendering:pixelated;pointer-events:none;z-index:3';drawAnimal(pet.p.species,0,0,true,false,portrait.getContext('2d'));stage.appendChild(portrait);const info=document.createElement('p');info.textContent=(pet.p.name||animalNames[pet.p.species])+' · '+pet.p.hp+'/'+pet.stats.maxHp+' HP · Attack '+pet.stats.power;stage.after(info)}if(allies.length){const roster=document.createElement('div');roster.className='group-roster';roster.style.cssText='display:flex;flex-wrap:wrap;gap:6px;padding:6px';for(const ally of allies){const label=document.createElement('button');label.type='button';label.textContent='Target '+ally.name+' · '+ally.hp+' HP';label.onclick=()=>{if(animatingTurn||bossFight!==battle||!ally.alive||battle.hostChoice||Object.keys(battle.partyActions||{}).length)return;battle.group=battle.group.filter(i=>entities[i]!==ally);battle.group.push(entities.indexOf(battle.e));battle.e=ally;persistCampaign();encounterScreen(spellMenu)};label.style.cssText='border:1px solid #a65b51;padding:5px;border-radius:5px';roster.appendChild(label)}stage.after(roster)}const theme=enemy.boss&&guardianThemes[state.floor];if(theme){stage.style.background='repeating-linear-gradient(45deg,'+theme.floor+' 0 18px,'+theme.color+'33 19px 20px)';stage.setAttribute('aria-label',theme.detail)}const opponent=stage.querySelector('.opponent img');if(opponent){const original=customEnemy(enemy)||nativeFloorEnemy(enemy);if(original){opponent.src=original.toDataURL();opponent.style.filter='none';opponent.style.imageRendering='pixelated'}else opponent.style.filter=enemyArtFilter(enemy);}stage.dataset.enemy=enemy.sprite;stage.dataset.weapon=gearLook().weapon||'fist';stage.style.setProperty('--fist',skinTones[state.character?.skin]||skinTones[2]);
   if(state.equipment?.weapon)stage.classList.add('armed');
@@ -1280,7 +1284,7 @@ async function animateTurn(action){
   if(window.DCKNet?.recovering)return;
   const battle=bossFight;
   if(!battle||animatingTurn||state.dead)return;
-  if(techniques[action]&&(!prepared().includes(action)||state.mp<techniques[action].cost))return;
+  if(techniques[action]&&(!prepared().includes(action)||state.mp<abilityCost(action)))return;
   if(action==='retreat'){
     if(battle.e.boss)return;
     const enemy=battle.e;
@@ -1316,7 +1320,7 @@ async function animateTurn(action){
 }
 
 function bossScreen(){encounterScreen()}
-function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(techniques[action]&&action!=='mend'){if(!prepared().includes(action)||state.mp<techniques[action].cost)return;state.mp-=techniques[action].cost;d=strike;guard=action==='brace'||action==='bastion'||!!techniques[action].guard}if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='focus'){state.mp=Math.min(state.maxMp,state.mp+Math.max(5,Math.floor(state.maxMp*.12)));guard=true}if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(tonicHealing())}if(d>0){const magical=!!techniques[action]&&(['magic','mana'].includes(techniques[action].scale)||['bell','tide','catalyst','racial'].includes(action));const armor=magical?Math.floor((e.armor||0)/3):e.armor||0;d=Math.max(1,d-armor);if(intent==='DEFENSIVE STANCE'&&!magical)d=Math.max(1,Math.floor(d*.5));if(magical&&['skeleton','bone-champion'].includes(e.sprite))d=Math.ceil(d*1.25);if(magical&&e.sprite==='wraith')d=Math.max(1,Math.floor(d*.75));}if(techniques[action]?.heal)state.hp=Math.min(state.maxHp,state.hp+Math.floor(Math.min(e.hp,d)*techniques[action].heal));d+=(b.assist||0)+resolvePartyTargets(b);b.assist=0;const companion=readyPet();let petLog='';if(companion&&e.hp>d){const {p,stats}=companion;const damage=stats.power;d+=damage;petLog=(p.name||animalNames[p.species]||'Companion')+' strikes for '+damage+'. ';}const assist=crawlerAssist(b,e,d);d+=assist.bonus;petLog+=assist.log;e.hp-=d;if(e.boss&&e.hp>0&&e.hp<=e.max*.5&&!b.spokenHalf){b.spokenHalf=true;b.speech=guardianDialogue[state.floor]?.[1]||'You will regret that.'}else if(b.turn>1)b.speech=null;if(e.hp<=0){partyRoundDamage(b,e,true);e.alive=false;broadcastKill(e);e.deathAt=performance.now();state.kills++;petVictory();crawlerAllyVictory();if(!e.boss){
+function bossTurn(action,strike){let b=bossFight;if(!b||state.dead)return;let e=b.e,intent=bossIntent(b),d=0,guard=false;if(techniques[action]&&action!=='mend'){if(!prepared().includes(action)||state.mp<abilityCost(action))return;state.mp-=abilityCost(action);d=strike;guard=action==='brace'||action==='bastion'||!!techniques[action].guard||(action==='racial'&&!!racialEffect().guard)}if(action==='guard')b.guards=(b.guards||0)+1;if(action==='attack')d=strike??(state.power+Math.floor(Math.random()*5));if(action==='trap'){if(b.trapUsed){b.log='The arena trap is spent.';bossScreen();return}b.trapUsed=true;d=25+state.level*3;guard=true}if(action==='guard')guard=true;if(action==='focus'){state.mp=Math.min(state.maxMp,state.mp+Math.max(5,Math.floor(state.maxMp*.12)));guard=true}if(action==='mend'&&!mend())return;if(action==='heal'){let i=state.inventory.find(i=>i.id==='tonic'&&i.qty>0);if(!i){b.log='No health tonics left.';bossScreen();return}i.qty--;restoreHealth(tonicHealing())}if(d>0){const magical=!!techniques[action]&&(['magic','mana'].includes(techniques[action].scale)||['bell','tide','catalyst'].includes(action)||(action==='racial'&&racialEffect().magic));const armor=magical?Math.floor((e.armor||0)/3):e.armor||0;d=Math.max(1,d-armor);if(intent==='DEFENSIVE STANCE'&&!magical)d=Math.max(1,Math.floor(d*.5));if(magical&&['skeleton','bone-champion'].includes(e.sprite))d=Math.ceil(d*1.25);if(magical&&e.sprite==='wraith')d=Math.max(1,Math.floor(d*.75));}const healRatio=action==='racial'?racialEffect().heal:techniques[action]?.heal;if(healRatio)state.hp=Math.min(state.maxHp,state.hp+Math.floor(Math.min(e.hp,d)*healRatio));d+=(b.assist||0)+resolvePartyTargets(b);b.assist=0;const companion=readyPet();let petLog='';if(companion&&e.hp>d){const {p,stats}=companion;const damage=stats.power;d+=damage;petLog=(p.name||animalNames[p.species]||'Companion')+' strikes for '+damage+'. ';}const assist=crawlerAssist(b,e,d);d+=assist.bonus;petLog+=assist.log;e.hp-=d;if(e.boss&&e.hp>0&&e.hp<=e.max*.5&&!b.spokenHalf){b.spokenHalf=true;b.speech=guardianDialogue[state.floor]?.[1]||'You will regret that.'}else if(b.turn>1)b.speech=null;if(e.hp<=0){partyRoundDamage(b,e,true);e.alive=false;broadcastKill(e);e.deathAt=performance.now();state.kills++;petVictory();crawlerAllyVictory();if(!e.boss){
 state.xp+=e.xp;state.gold+=5+Math.floor(Math.random()*12)+Math.floor(state.floor/2);if(e.localBoss){state.gold+=50+state.floor*15;awardBox(state.floor>=8?'Gold':'Silver');feed('Hidden local boss defeated. Premium loot awarded.')}const next=encounterAllies(b)[0];if(next){b.group=b.group.filter(i=>entities[i]!==next);b.e=next;b.partyActions={};b.turn++;b.log=e.name+' falls. '+next.name+' steps forward!';checkLevel();persistCampaign();bossScreen();render();return}bossFight=null;
 const milestones={10:['Unlicensed Exterminator','Silver'],30:['The Neighborhood Is Quiet Now','Gold'],100:['Population Control Department','Celestial']};
 if(milestones[state.kills])ridiculous(...milestones[state.kills]);
@@ -2652,11 +2656,11 @@ function acceptPartyAction(d){
  const index=m[4]===undefined?entities.indexOf(b.e):Number(m[4]),target=entities[index];if(!target?.alive||!(target===b.e||(b.group||[]).includes(index)))return;
  b.partyTargets??={};b.partyDamage??={};b.partyTargets[d.id]=index;
  const slot=/^cast([0-2])$/.exec(m[3]),spell=slot&&p.spells?.[Number(slot[1])],ability=spell&&Object.hasOwn(techniques,spell)?techniques[spell]:null;
- if(slot&&(!ability||p.mp<ability.cost||state.floor<ability.floor))return;
+ if(slot&&(!ability||p.mp<abilityCost(spell,p)||state.floor<ability.floor))return;
  b.partyActions[d.id]=m[3];(b.partyParticipants??={})[d.id]={...p};b.partySpellCosts??={};b.partySpellDetails??={};
- if(ability){b.partySpellCosts[d.id]=ability.cost;const power=Math.max(1,Math.min(200,p.power||1)),magic=Math.max(0,Math.min(100,p.spellBonus||0)),armor=Math.max(0,Math.min(100,p.armor||0));let damage=spell==='mend'?0:ability.scale==='magic'||['catalyst','tide','bell'].includes(spell)?20+2*magic:ability.scale==='armor'||spell==='bastion'?power+armor+6:power*2+6;damage=Math.min(400,damage);b.partyDamage[d.id]=damage;b.partySpellDetails[d.id]={spell,guard:!!ability.guard||['brace','bastion'].includes(spell),heal:spell==='mend'?25:Math.floor(damage*(ability.heal||0))};}
- if(m[3]==='strike')b.partyDamage[d.id]=8+Math.min(20,p.level||1);
- if(m[3]==='focus')b.partyDamage[d.id]=4+Math.floor(Math.min(20,p.level||1)/2);
+ if(ability){b.partySpellCosts[d.id]=abilityCost(spell,p);const damage=Math.min(1000,techniqueDamage(spell,p,target)),racial=spell==='racial'?racialEffect(p):{};b.partyDamage[d.id]=damage;b.partySpellDetails[d.id]={spell,magic:!!racial.magic,guard:!!ability.guard||!!racial.guard||['brace','bastion'].includes(spell),heal:spell==='mend'?30+(p.spellBonus||0):Math.floor(Math.min(target.hp,damage)*(racial.heal||ability.heal||0))};}
+ if(m[3]==='strike')b.partyDamage[d.id]=Math.max(1,p.power||8)+2;
+ if(m[3]==='focus')b.partyDamage[d.id]=0;
  b.log='Ally action locked: '+Object.keys(b.partyActions).length+' ready.';
  persistCampaign();bossScreen();sendPartyWorld();
  if(b.hostChoice&&!pendingRoundGuests(b).length){const action=b.hostChoice;b.hostChoice=null;animateTurn(action)}
@@ -2668,7 +2672,7 @@ function resolvePartyTargets(b){
  const p=netPlayers[id]||b.partyParticipants?.[id];if(!p||p.hp<=0||p.floor!==state.floor||p.hall||Math.hypot(p.x-b.e.x,p.y-b.e.y)>3)continue;
  const index=b.partyTargets?.[id],target=entities[index];
  if(!target?.alive||!(target===b.e||(b.group||[]).includes(index)))continue;
- const spell=b.partySpellDetails?.[id]?.spell,magic=spell&&(techniques[spell]?.scale==='magic'||['bell','tide','catalyst'].includes(spell));const damage=rawDamage>0?Math.max(1,rawDamage-(magic?Math.floor((target.armor||0)/3):(target.armor||0))):0;
+ const spell=b.partySpellDetails?.[id]?.spell,magic=spell&&(['magic','mana'].includes(techniques[spell]?.scale)||b.partySpellDetails?.[id]?.magic||['bell','tide','catalyst'].includes(spell));const damage=rawDamage>0?Math.max(1,rawDamage-(magic?Math.floor((target.armor||0)/3):(target.armor||0))):0;
  if(target===b.e){primary+=damage;continue}
  target.hp=Math.max(0,target.hp-damage);
  if(target.hp===0){target.alive=false;target.deathAt=performance.now();broadcastKill(target);state.kills++;state.xp+=target.xp||0;window.DCKNet.sendReward(id,8,target.xp||0,null);feed(target.name+' defeated by an ally.')}
@@ -2682,7 +2686,7 @@ function partyRoundDamage(b,e,won=false){
  for(const [id,choice] of Object.entries(b.partyActions||{})){
  const p=netPlayers[id]||b.partyParticipants?.[id];if(!p||p.hp<=0||p.floor!==state.floor||p.hall||Math.hypot(p.x-e.x,p.y-e.y)>3)continue;
  const spell=b.partySpellDetails?.[id],cost=b.partySpellCosts?.[id]||0;
- const survivors=(b.group||[]).map(i=>entities[i]).filter(v=>v?.alive&&v!==e);const threat=won?survivors[0]:e;const damage=threat?Math.max(1,Math.floor(threat.atk*((choice==='guard'||spell?.guard)?0.2:0.65))-Math.floor((p.armor||0)*.3)):0;
+ const survivors=(b.group||[]).map(i=>entities[i]).filter(v=>v?.alive&&v!==e);const threat=won?survivors[0]:e;const damage=threat?Math.max(1,Math.floor(threat.atk*((choice==='guard'||choice==='focus'||spell?.guard)?0.2:0.65))-Math.floor((p.armor||0)*.3)):0;
  const key=id+'/'+b.roundId+'/'+b.turn;(state.pendingPartyRounds??={})[key]={room:window.DCKNet.roomCode,target:id,roundId:b.roundId,turn:b.turn,damage,mana:choice==='focus'?4:-cost,heal:spell?.heal||0};
  }
  b.partyActions={};b.partySpellCosts={};b.partySpellDetails={};b.partyTargets={};b.partyDamage={};b.partyParticipants={};
@@ -2702,7 +2706,7 @@ function partyActionControls(h){
  const choice=t.actions?.[window.DCKNet.playerId];
  const targets=(t.targets||[]).filter(v=>v.hp>0);const select=document.createElement('select');select.setAttribute('aria-label','Enemy target');for(const v of targets){const opt=document.createElement('option');opt.value=String(v.index);opt.textContent=v.name+' · '+v.hp+'/'+v.max+' HP';select.appendChild(opt)}if(targets.some(v=>v.index===partySelectedTarget))select.value=String(partySelectedTarget);select.onchange=()=>{partySelectedTarget=Number(select.value)};if(!choice&&targets.length>1)row.appendChild(select);
  if(choice)row.textContent='Action locked: '+(/^cast[0-2]$/.test(choice)?moveName(prepared()[Number(choice.slice(-1))]||'bell'):choice);
- else for(const a of ['strike','guard','focus',...prepared().map((_,i)=>'cast'+i)]){const b=document.createElement('button');b.className='smallbtn';const spell=/^cast[0-2]$/.test(a)?prepared()[Number(a.slice(-1))]:null;b.textContent=spell?moveName(spell)+' · '+techniques[spell].cost+' MP':a==='focus'?'Focus + MP':a;b.disabled=!!t.busy||!!(spell&&state.mp<techniques[spell].cost);b.onclick=()=>{window.DCKNet.sendIntent('round_'+t.roundId+'_'+t.turn+'_'+a+(targets.length?'_'+select.value:''));for(const child of row.querySelectorAll('button'))child.disabled=true};row.appendChild(b)}
+ else for(const a of ['strike','guard','focus',...prepared().map((_,i)=>'cast'+i)]){const b=document.createElement('button');b.className='smallbtn';const spell=/^cast[0-2]$/.test(a)?prepared()[Number(a.slice(-1))]:null;b.textContent=spell?moveName(spell)+' · '+abilityCost(spell)+' MP':a==='focus'?'Focus + MP':a;b.disabled=!!t.busy||!!(spell&&state.mp<abilityCost(spell));b.onclick=()=>{window.DCKNet.sendIntent('round_'+t.roundId+'_'+t.turn+'_'+a+(targets.length?'_'+select.value:''));for(const child of row.querySelectorAll('button'))child.disabled=true};row.appendChild(b)}
  h.appendChild(row);
 }
 function updatePartyRoster(){const el=$('#netRoster');if(el){el.textContent='Party members connected: '+(window.DCKNet?.inRoom?Object.keys(netPlayers).length+1:0)+' / 4';if(window.DCKNet?.inRoom){const b=document.createElement('button');b.className='smallbtn';b.textContent='Player trade';b.onclick=tradeMenu;el.appendChild(b)}}}
@@ -2723,7 +2727,7 @@ if(step){
   visualX=step.x+(step.nx-step.x)*progress;
   visualY=step.y+(step.ny-step.y)*progress;
 }
-}}if(!partyGuest())advanceEnemySimulation(dt);worldClock+=dt;if(worldClock>(entities.length>=350?.8:.5)){worldClock=0;sendPartyWorld()}attackCooldown=Math.max(0,attackCooldown-dt);particles.forEach(p=>p.t+=dt);particles=particles.filter(p=>p.t<.65);if(Math.random()<dt*.025)persistCampaign();netSyncClock+=dt;if(netSyncClock>.18&&window.DCKNet?.inRoom){netSyncClock=0;window.DCKNet.sendState({hall:state.hall?{index:state.hall.index,x:state.hall.x,y:state.hall.y}:null,gear:gearLook(),character:state.character,floor:state.floor,x:state.x,y:state.y,level:state.level,hp:state.hp,maxHp:state.maxHp,mp:state.mp,power:state.power,armor:state.armor,spellBonus:state.spellBonus||0,spells:prepared(),name:localStorage.getItem('dck-net-name')||'Crawler'});}}if(!state.dead&&Math.floor(ts/200)!==Math.floor((ts-dt*1000)/200))render();else draw();requestAnimationFrame(tick)}
+}}if(!partyGuest())advanceEnemySimulation(dt);worldClock+=dt;if(worldClock>(entities.length>=350?.8:.5)){worldClock=0;sendPartyWorld()}attackCooldown=Math.max(0,attackCooldown-dt);particles.forEach(p=>p.t+=dt);particles=particles.filter(p=>p.t<.65);if(Math.random()<dt*.025)persistCampaign();netSyncClock+=dt;if(netSyncClock>.18&&window.DCKNet?.inRoom){netSyncClock=0;window.DCKNet.sendState({hall:state.hall?{index:state.hall.index,x:state.hall.x,y:state.hall.y}:null,gear:gearLook(),character:state.character,floor:state.floor,x:state.x,y:state.y,level:state.level,hp:state.hp,maxHp:state.maxHp,mp:state.mp,maxMp:state.maxMp,power:state.power,armor:state.armor,spellBonus:state.spellBonus||0,spells:prepared(),name:localStorage.getItem('dck-net-name')||'Crawler'});}}if(!state.dead&&Math.floor(ts/200)!==Math.floor((ts-dt*1000)/200))render();else draw();requestAnimationFrame(tick)}
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 if(!load()){startStory()}else{if(!state.sanctuaries?.length&&state.safe)state.sanctuaries=[state.safe];if(state.hall&&!state.sanctuaries?.[state.hall.index]?.door)state.hall=null;
   if(!state.hall&&!state.dead){const q=sanctuaryAt(state.x,state.y);if(q?.door)enterHall(q)}
