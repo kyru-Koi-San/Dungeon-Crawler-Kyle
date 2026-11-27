@@ -1,0 +1,22 @@
+# Optional paid hosting. Review pricing before applying this Blueprint.
+services:
+  - type: web
+    name: dungeon-crawler-kyle-relay
+    runtime: node
+    plan: starter
+    numInstances: 1
+    buildCommand: npm install --ignore-scripts --no-audit --no-fund && npm test
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ALLOWED_ORIGIN
+        value: https://kyru-koi-san.github.io
+      - key: DCK_STORAGE_FILE
+        value: /var/data/relay.json
+    disk:
+      name: crawler-relay-data
+      mountPath: /var/data
+      sizeGB: 1
