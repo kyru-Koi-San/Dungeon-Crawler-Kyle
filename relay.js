@@ -29,6 +29,16 @@ wss.on('connection',(ws,req)=>{
   if(m.type==='leave_room'){leave(ws);return}
   if(raw.length>8192&&m.type!=='world_snapshot')return ws.close(1009,'Message too large');
   if(m.type==='world_snapshot'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const world=m.world;if(!world||!Number.isInteger(world.floor)||world.floor<1||world.floor>999||!Array.isArray(world.enemies)||world.enemies.length>5000)return;room.world=world;room.revision++;broadcast(room,{type:'world_snapshot',revision:room.revision,world},id);return;}
+  if(m.type==='drop_request'){
+   const room=rooms.get(client.room);if(!room||room.host===id)return;
+   const p=room.players.get(id),host=room.players.get(room.host);
+   if(!p||!host||typeof m.id!=='string'||!/^[a-zA-Z][a-zA-Z0-9-]{0,63}$/.test(m.id)||!Number.isSafeInteger(m.qty)||m.qty<1||m.qty>9999||!/^[a-f0-9]{32}$/.test(m.nonce||''))return;
+   send(host.ws,{type:'drop_request',id,nonce:m.nonce,item:m.id,qty:m.qty,player:p.state});return;
+  }
+  if(m.type==='drop_result'){
+   const room=rooms.get(client.room);if(!room||room.host!==id||!/^[a-f0-9]{32}$/.test(m.nonce||''))return;
+   const target=room.players.get(m.target);if(target)send(target.ws,{type:'drop_result',nonce:m.nonce,ok:m.ok===true});return;
+  }
   if(m.type==='loot_bundle'){
    const room=rooms.get(client.room);if(!room||room.host!==id)return;
    const target=room.players.get(m.target);if(!target)return;
