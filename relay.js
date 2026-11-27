@@ -13,7 +13,7 @@ let dirty=false,storageError=null;
 function persistNow(){
  if(!STORAGE_FILE)return true;
  try{
- const data={version:1,rooms:[...rooms.values()].map(r=>({code:r.code,host:r.host,revision:r.revision,world:r.world,lootDeliveries:[...(r.lootDeliveries||new Map())],players:[...r.players].map(([id,p])=>[id,{name:p.name,token:p.token,state:p.state,expires:p.ws?Date.now()+RESTART_TTL:p.expires}]),trades:[...(r.trades||new Map()).values()]})),receipts:[...tradeReceipts].map(([id,r])=>[id,{expires:r.expires,results:[...r.results]}])};
+ const data={version:1,rooms:[...rooms.values()].map(r=>({code:r.code,host:r.host,revision:r.revision,world:r.world,lootDeliveries:[...(r.lootDeliveries||new Map())],roundResults:[...(r.roundResults||new Map())],players:[...r.players].map(([id,p])=>[id,{name:p.name,token:p.token,state:p.state,expires:p.ws?Date.now()+RESTART_TTL:p.expires}]),trades:[...(r.trades||new Map()).values()]})),receipts:[...tradeReceipts].map(([id,r])=>[id,{expires:r.expires,results:[...r.results]}])};
  fs.mkdirSync(path.dirname(STORAGE_FILE),{recursive:true,mode:0o700});
  const tmp=STORAGE_FILE+'.tmp';const fd=fs.openSync(tmp,'w',0o600);
  try{fs.writeFileSync(fd,JSON.stringify(data));fs.fsyncSync(fd)}finally{fs.closeSync(fd)}
@@ -30,7 +30,7 @@ function restoreStorage(){
  const players=new Map(row.players.filter(([,p])=>p.expires>now).map(([id,p])=>[id,{...p,ws:null}]));
  // Cancel unfinished reservations on restart; retain completed receipts unchanged.
  for(const t of row.trades||[]){const results=new Map();for(const who of [t.a,t.b])if(t.tokens?.[who])results.set(t.tokens[who],{type:'trade_end',id:t.id,ok:false});if(results.size&&!tradeReceipts.has(t.id))tradeReceipts.set(t.id,{results,expires:now+RECEIPT_TTL})}
- if(players.has(row.host))rooms.set(row.code,{code:row.code,host:row.host,revision:row.revision,world:row.world,players,trades:new Map(),lootDeliveries:new Map(row.lootDeliveries||[])});
+ if(players.has(row.host))rooms.set(row.code,{code:row.code,host:row.host,revision:row.revision,world:row.world,players,trades:new Map(),lootDeliveries:new Map(row.lootDeliveries||[]),roundResults:new Map(row.roundResults||[])});
  }
  if(!persistNow())throw Error('Unable to persist restored relay state');
 }
@@ -55,7 +55,7 @@ wss.on('connection',(ws,req)=>{
   if(!m||typeof m!=='object'||Array.isArray(m))return;
   if(raw.length>8192&&m.type!=='world_snapshot')return ws.close(1009,'Message too large');
   if(m.type==='trade_recover'){const receipt=tradeReceipts.get(m.id);const token=String(m.token||'');if(receipt&&/^[a-f0-9]{32}$/.test(token)&&receipt.results.has(token)){send(ws,receipt.results.get(token));return}send(ws,{type:'trade_recovery_unknown',id:String(m.id||'').slice(0,36)});return}
-  if(m.type==='resume_room'){const room=rooms.get(String(m.code||''));const token=String(m.token||'');const found=room&&/^[a-f0-9]{64}$/.test(token)&&[...room.players].find(([key,p])=>p.token===token&&!p.ws&&p.expires>Date.now());if(!found)return send(ws,{type:'resume_failed'});leave(ws);id=client.id=found[0];const p=found[1];p.ws=ws;p.expires=0;client.room=room.code;client.name=p.name;send(ws,{type:'hello',id});send(ws,{type:'room_joined',code:room.code,host:room.host,players:publicPlayers(room),resumeToken:p.token,resumed:true});if(room.world)send(ws,{type:'world_snapshot',revision:room.revision,world:room.world});broadcast(room,{type:'room_update',players:publicPlayers(room)});replayLoot(room,id);if(room.host===id)broadcast(room,{type:'host_resumed'});else if(!room.players.get(room.host)?.ws)send(ws,{type:'host_paused'});dirty=true;persistNow();return}
+  if(m.type==='resume_room'){const room=rooms.get(String(m.code||''));const token=String(m.token||'');const found=room&&/^[a-f0-9]{64}$/.test(token)&&[...room.players].find(([key,p])=>p.token===token&&!p.ws&&p.expires>Date.now());if(!found)return send(ws,{type:'resume_failed'});leave(ws);id=client.id=found[0];const p=found[1];p.ws=ws;p.expires=0;client.room=room.code;client.name=p.name;send(ws,{type:'hello',id});send(ws,{type:'room_joined',code:room.code,host:room.host,players:publicPlayers(room),resumeToken:p.token,resumed:true});if(room.world)send(ws,{type:'world_snapshot',revision:room.revision,world:room.world});broadcast(room,{type:'room_update',players:publicPlayers(room)});replayLoot(room,id);replayRounds(room,id);if(room.host===id)broadcast(room,{type:'host_resumed'});else if(!room.players.get(room.host)?.ws)send(ws,{type:'host_paused'});dirty=true;persistNow();return}
   if(m.type==='create_room'){
    leave(ws);let roomCode;do{roomCode=code()}while(rooms.has(roomCode));const room={code:roomCode,host:id,players:new Map(),world:null,revision:0};rooms.set(roomCode,room);client.room=roomCode;client.name=cleanName(m.name);room.players.set(id,{ws,token:crypto.randomBytes(32).toString('hex'),name:client.name,state:{name:client.name,floor:1,x:15,y:9,level:1,hp:100,maxHp:100}});send(ws,{type:'room_joined',code:roomCode,players:publicPlayers(room),host:room.host,resumeToken:room.players.get(id).token});dirty=true;persistNow();return;
   }
@@ -90,7 +90,13 @@ wss.on('connection',(ws,req)=>{
   }
   if(m.type==='loot_ack'){const room=rooms.get(client.room),entry=room?.lootDeliveries?.get(m.delivery);if(!entry||entry.target!==id)return;entry.acked=true;dirty=true;persistNow();return}
   if(m.type==='reward'){const room=rooms.get(client.room);if(!room||room.host!==id)return;const target=room.players.get(m.target);if(target)send(target.ws,{type:'reward',guardian:m.guardian?{floor:clampInt(m.guardian.floor,1,999),name:String(m.guardian.name||'Guardian').slice(0,60)}:null,gold:clampInt(m.gold,0,100),xp:clampInt(m.xp,0,500),item:['tonic','torch','shard'].includes(m.item)?m.item:null});return;}
-  if(m.type==='round_result'){const room=rooms.get(client.room);if(!room||room.host!==id||!/^[a-f0-9]{32}$/.test(m.roundId||'')||!Number.isInteger(m.turn)||m.turn<1||m.turn>99999)return;const target=room.players.get(m.target);if(target)send(target.ws,{type:'round_result',roundId:m.roundId,turn:m.turn,damage:clampInt(m.damage,0,9999),mana:clampInt(m.mana,-20,4),heal:clampInt(m.heal,0,140)});return;}
+  if(m.type==='round_result'){
+ const room=rooms.get(client.room);if(!room||room.host!==id||!/^[a-f0-9]{32}$/.test(m.roundId||'')||!Number.isInteger(m.turn)||m.turn<1||m.turn>99999||!room.players.has(m.target))return;
+ room.roundResults??=new Map();const key=m.target+'/'+m.roundId+'/'+m.turn;let entry=room.roundResults.get(key);
+ if(!entry){if(room.roundResults.size>=20000)return;entry={target:m.target,acked:false,result:{type:'round_result',roundId:m.roundId,turn:m.turn,damage:clampInt(m.damage,0,9999),mana:clampInt(m.mana,-20,4),heal:clampInt(m.heal,0,140)}};room.roundResults.set(key,entry);dirty=true;if(!persistNow()){room.roundResults.delete(key);return}}
+ send(ws,{type:'round_stored',key});if(!entry.acked)send(room.players.get(entry.target)?.ws,entry.result);return;
+ }
+ if(m.type==='round_ack'){const room=rooms.get(client.room),entry=room?.roundResults?.get(id+'/'+m.roundId+'/'+m.turn);if(entry){entry.acked=true;dirty=true;persistNow()}return}
   if(m.type==='combat_intent'){const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p||!['attack','spell','loot','loot_close','take_gold','take_torch','take_tonic','take_all'].includes(m.action)&&!/^take_(?:[a-z0-9]{1,8}_)?(?:all|[0-9]{1,4})$/.test(m.action)&&!/^round_[a-f0-9]{32}_[0-9]{1,5}_(strike|guard|focus|cast[0-2])(?:_[0-9]{1,5})?$/.test(m.action))return;const host=room.players.get(room.host);if(host)send(host.ws,{type:'combat_intent',id,action:m.action,player:p.state});return;}
   if(m.type==='player_state'){
    const room=rooms.get(client.room);if(!room)return;const p=room.players.get(id);if(!p)return;
@@ -110,6 +116,7 @@ wss.on('connection',(ws,req)=>{
  });
  ws.on('close',()=>{suspend(ws);clients.delete(ws)});ws.on('error',()=>{ws.terminate()});
 });
+function replayRounds(room,id){for(const e of (room.roundResults||new Map()).values())if(e.target===id&&!e.acked)send(room.players.get(id)?.ws,e.result)}
 function replayLoot(room,id){for(const [delivery,e] of room.lootDeliveries||[])if(e.target===id&&!e.acked)send(room.players.get(id)?.ws,{type:'loot_bundle',delivery,items:e.items})}
 function recordTradeResult(room,t,ok){const results=new Map();for(const who of [t.a,t.b]){const token=t.tokens?.[who];if(token)results.set(token,{type:'trade_end',id:t.id,ok,received:ok?t.offers[who===t.a?t.b:t.a]:undefined})}tradeReceipts.set(t.id,{results,expires:Date.now()+RECEIPT_TTL});dirty=true;if(!persistNow()){tradeReceipts.delete(t.id);room.trades.set(t.id,t);return false}for(const who of [t.a,t.b]){const p=room.players.get(who);if(p)send(p.ws,results.get(t.tokens?.[who])||{type:'trade_end',id:t.id,ok})}return true}
 function tradeView(room,t){
