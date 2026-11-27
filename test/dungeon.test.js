@@ -5,7 +5,7 @@ function engine(){
  const el={getContext:()=>({}),classList:{add(){},remove(){},toggle(){}},style:{},dataset:{}};
  let stored=null;
  const context={window:{matchMedia:()=>({matches:false}),addEventListener(){}},document:{querySelector:()=>el,querySelectorAll:()=>[],addEventListener(){}},Image:class{},localStorage:{getItem:()=>stored,setItem:(k,v)=>stored=v},performance:{now:()=>0}};
- const api=vm.runInNewContext(source.slice(0,i)+`return {floorEnemy,fresh,generate,hatchGrub,moveStack,canonicalDrop,writeCampaign,load,snapshot:()=>({state,tiles,seen,entities,W,H}),setup:floor=>{state={...fresh(),floor,chapter:'mine'};bossFight=null;},quiet:()=>{render=()=>{};ai=()=>{};feed=()=>{};notify=()=>{};}};})()`,context);
+ const api=vm.runInNewContext(source.slice(0,i)+`return {floorEnemy,fresh,generate,hatchGrub,moveStack,canonicalDrop,writeCampaign,load,solid,sanctuaryAt,snapshot:()=>({state,tiles,seen,entities,W,H}),setup:floor=>{state={...fresh(),floor,chapter:'mine'};bossFight=null;},quiet:()=>{render=()=>{};ai=()=>{};feed=()=>{};notify=()=>{};}};})()`,context);
  api.quiet();return api;
 }
 test('all eighteen floors shrink, generate one exit and correct guardians',()=>{
@@ -19,4 +19,8 @@ test('corpse hatch is single-use and caps living grubs at 500',()=>{
 });
 test('inventory stack transfer and campaign save round trip',()=>{
  const a=engine();a.setup(4);a.generate();const q=a.snapshot(),item=a.canonicalDrop('cage-cleaver-3',3),sale=[];assert.equal(item.rank,3);q.state.inventory.push(item);assert.equal(a.moveStack(q.state.inventory,sale,item,2),true);assert.equal(item.qty,1);assert.equal(sale[0].qty,2);assert.equal(a.moveStack(q.state.inventory,sale,item,2),false);q.state.tradeInventory=sale;a.writeCampaign();a.setup(1);assert.equal(a.load(),true);const restored=a.snapshot();assert.equal(restored.state.floor,4);assert.equal(restored.state.inventory[0].qty,1);assert.equal(restored.state.tradeInventory[0].rank,3);assert.equal(restored.state.tradeInventory[0].qty,2);
+});
+
+test('all floor exits and guardian arenas are reachable through walkable terrain',()=>{
+ const a=engine();for(let f=1;f<=18;f++){a.setup(f);a.generate();const q=a.snapshot(),queue=[[q.state.x,q.state.y]],visited=new Set([q.state.y*q.W+q.state.x]);for(let j=0;j<queue.length;j++){const [x,y]=queue[j];for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]){const nx=x+dx,ny=y+dy,k=ny*q.W+nx;if(nx<0||nx>=q.W||ny<0||ny>=q.H||visited.has(k)||a.solid(nx,ny)||a.sanctuaryAt(nx,ny))continue;visited.add(k);queue.push([nx,ny])}}assert.ok(queue.some(([x,y])=>q.tiles[y][x]===3),'Floor '+f+' exit');const boss=q.entities.find(e=>e.boss);if(boss)assert.ok(visited.has(boss.y*q.W+boss.x),'Floor '+f+' guardian');}
 });
