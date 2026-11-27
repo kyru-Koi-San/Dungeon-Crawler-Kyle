@@ -1277,7 +1277,7 @@ function inspectOwned(item,duplicate=false){
   if(available>0&&state.inventory.includes(item)){
     const add=(label,fn)=>{const b=document.createElement('button');b.className='widebtn';b.textContent=label;b.onclick=()=>{$('#inspectBack').click();fn()};controls.appendChild(b)};
     add('Move '+available+' to For sale',()=>{moveStack(state.inventory,state.tradeInventory??=[],item,available);persistCampaign();render();backpack()});
-    if(!state.hall&&state.chapter==='mine'&&!partyGuest())add('Drop '+available+' in a bag',()=>{const dropped=[];if(!moveStack(state.inventory,dropped,item,available))return;entities.push({type:'loot',name:'Dropped backpack',x:state.x,y:state.y,alive:true,droppedBag:true,contents:dropped});persistCampaign();sendPartyWorld();render();backpack()});
+    if(!state.hall&&state.chapter==='mine')add('Drop '+available+' in a bag',()=>{if(partyGuest()){requestGuestDrop(item,available);return}const dropped=[];if(!moveStack(state.inventory,dropped,item,available))return;entities.push({type:'loot',name:'Dropped backpack',x:state.x,y:state.y,alive:true,droppedBag:true,contents:dropped});persistCampaign();sendPartyWorld();render();backpack()});
   }
   $('#inspectAction').after(controls);
 }
@@ -1852,6 +1852,7 @@ mini.fillStyle='#f2d36e';mini.beginPath();mini.arc(ox+(state.x+.5)*s,oy+(state.y
 function drawFieldMap(){let m=$('#fieldMini');if(m){let c=m.getContext('2d');c.clearRect(0,0,m.width,m.height);c.drawImage($('#minimap'),0,0,m.width,m.height)}}function drawPortrait(){portrait.fillStyle='#0b1117';portrait.fillRect(0,0,96,96);if(state.character){portrait.imageSmoothingEnabled=false;portrait.drawImage(crawlerPose('down',0),12,0,72,96);return}const im=sprites['hero-front'];if(im?.complete&&im.naturalWidth){let h=88,w=h*im.naturalWidth/im.naturalHeight;portrait.drawImage(im,(96-w)/2,4,w,h)}else{portrait.fillStyle='#1c2b36';portrait.fillRect(18,16,60,65)}portrait.strokeStyle='#a98852';portrait.strokeRect(1,1,94,94)}
 function renderFeed(){let el=$('#feed');if(!el)return;el.innerHTML=(state.feed||[]).slice(0,9).map(x=>`<div class="feed-line"><span class="time">${x.tm}</span>${x.s}</div>`).join('')||'<div class="feed-line">The dungeon is quiet. For now.</div>'}
 function render(){if(!state)return;const hotLabel=$('[data-action="hot"] small');if(hotLabel)hotLabel.textContent=supplies[state.hotItem]?.short||'Hot list';let hud=$('#fieldHud');if(hud)hud.innerHTML=`<div class="field-stat crawler-hud-name">${safeAttr(crawlerTitle())}</div><div class="field-stat">HP ${state.hp}/${state.maxHp} ${conditionText()}<div class="bar hp"><i style="width:${100*state.hp/state.maxHp}%"></i></div></div><div class="field-stat">MP ${state.mp}/${state.maxMp}<div class="bar mp"><i style="width:${100*state.mp/Math.max(1,state.maxMp)}%"></i></div></div><div class="field-stat">LV ${state.level} · XP ${state.xp}/${state.nextXp}</div>`;$('#hpBar').style.width=100*state.hp/state.maxHp+'%';$('#mpBar').style.width=100*state.mp/Math.max(1,state.maxMp)+'%';$('#xpBar').style.width=100*state.xp/state.nextXp+'%';$('#hpText').textContent=`${state.hp}/${state.maxHp}`;$('#mpText').textContent=`${state.mp}/${state.maxMp}`;$('#xpText').textContent=`${state.xp}/${state.nextXp}`;$('#heroLevel').textContent=`LEVEL ${state.level} • ${state.level<4?'NOVICE':state.level<8?'DELVER':'VETERAN'}`;$('#powerStat').textContent=state.power;$('#armorStat').textContent=state.armor;$('#goldStat').textContent=state.gold;$('#depthStat').textContent=state.floor;$('#floorTag').textContent='FLOOR '+String(state.floor).padStart(2,'0');$('#roomName').textContent=names[(state.floor-1)%names.length].toUpperCase();$('#coords').textContent=`X: ${String(state.x).padStart(2,'0')} / Y: ${String(state.y).padStart(2,'0')}`;$('#quickItems').innerHTML=state.inventory.slice(0,4).map(i=>`<button class="quick-slot" data-item="${i.id}" title="${i.name}">${i.icon}<small>${i.qty}</small></button>`).join('');const awardList=$('#achievements'),signature=JSON.stringify([state.achievements,state.achievementPrizes]);if(awardList.dataset.signature!==signature){awardList.dataset.signature=signature;awardList.innerHTML=state.achievements.map(achievementEntry).join('')||'<span class="muted">No accolades yet.</span>';}$('#goals').innerHTML=`<div class="goal"><em>◈</em> Explore the chamber and find the gold stairs.</div><div class="goal"><em>⚔</em> Enemies defeated: ${state.kills}</div><div class="goal"><em>✧</em> Reach floor ${Math.floor(state.floor/3+1)*3} to face the next guardian.</div>`;let b=bossFight?.e;if(partyGuest()&&partyEncounter&&entities[partyEncounter.index]?.boss){b={...partyEncounter,boss:true,alive:partyEncounter.hp>0}}if(b?.boss&&b.alive){$('#bossName').textContent=b.name;$('#bossbar').classList.remove('hidden');$('#bossHp').style.width=100*b.hp/b.max+'%';$('#bossHpText').textContent=`${Math.max(0,b.hp)} / ${b.max}`}else $('#bossbar').classList.add('hidden');const target=interactionTarget();
+if(state.pendingPartyDrop){const h=$('#fieldHud');if(h){const line=document.createElement('div');line.className='field-stat';line.textContent='Drop pending · rejoin original party to retry';h.appendChild(line)}}
 if(partyGuest()&&partyEncounter){const h=$('#fieldHud');if(h){const line=document.createElement('div');line.className='field-stat';line.textContent='Party encounter · '+partyEncounter.name+' · '+partyEncounter.hp+'/'+partyEncounter.max+' HP · Turn '+partyEncounter.turn+' · Assist '+partyEncounter.assist;h.appendChild(line)}}
 for(const button of $$('[data-action="interact"]')){
 button.classList.toggle('available',!!target&&!state.dead);
@@ -2201,6 +2202,43 @@ function finishLoot(){
   activeLoot=null;remoteLoot=null;lootSignature='';last=0;
   $('#modal').classList.add('hidden');persistCampaign();sendPartyWorld();render();
 }
+function canonicalDrop(id,qty){
+ if(typeof id!=='string'||!Number.isSafeInteger(qty)||qty<1||qty>9999)return null;
+ if(Object.hasOwn(supplies,id))return {id,...supplies[id],qty};
+ if(id==='shard')return {id,name:'Mana shard',icon:'✦',qty};
+ if(/^box-(Bronze|Silver|Gold|Legendary|Celestial|Pet)$/.test(id))return {id,name:id.slice(4)+' loot box',icon:'🎁',qty,desc:'Open for randomized dungeon rewards.'};
+ const match=/^(.+)-([1-5])$/.exec(id),base=match&&rewardCatalog.find(i=>i.id===match[1]);if(!base)return null;
+ const rank=Number(match[2]),mods=Object.fromEntries(Object.entries(base.mods||{}).map(([k,n])=>[k,n>0?n+rank-1:n]));
+ return {...base,id,rank,mods,qty};
+}
+function requestGuestDrop(item,qty){
+ if(state.pendingPartyDrop){notify('An earlier drop is awaiting confirmation.');return}
+ if(!canonicalDrop(item.id,qty)){notify('This item cannot be dropped in a party yet.');return}
+ const held=[];if(!moveStack(state.inventory,held,item,qty))return;
+ const nonce=crypto.randomUUID().replace(/-/g,'');
+ state.pendingPartyDrop={nonce,room:window.DCKNet.roomCode,held};
+ try{writeCampaign()}catch{state.pendingPartyDrop=null;restoreReservedDrop(held);notify('Save unavailable; drop cancelled.');return}
+ window.DCKNet.sendDrop({nonce,id:item.id,qty});
+ notify('Waiting for host to place your bag.');render();backpack();
+}
+function restoreReservedDrop(held){for(const piece of held||[]){const old=state.inventory.find(i=>i.id===piece.id);if(old)old.qty+=piece.qty;else state.inventory.push(piece)}}
+function resolveGuestDrop(d){
+ const pending=state.pendingPartyDrop;if(!pending||d.nonce!==pending.nonce)return;
+ if(!d.ok)restoreReservedDrop(pending.held);
+ state.pendingPartyDrop=null;persistCampaign();notify(d.ok?'Your bag is on the dungeon floor.':'Drop rejected; items returned.');render();
+}
+function processGuestDrop(d){
+ if(!window.DCKNet?.isHost)return;
+ const nonce=d.nonce;if(!/^[a-f0-9]{32}$/.test(nonce||''))return;
+ state.partyDropReceipts??={};
+ const prior=state.partyDropReceipts[nonce];if(prior){window.DCKNet.sendDropResult(d.id,nonce,prior.ok);return}
+ const p=d.player,piece=canonicalDrop(d.item,d.qty);
+ const ok=!!(piece&&p&&p.floor===state.floor&&!p.hall&&p.hp>0&&!state.dead&&!bossFight&&!activeLoot&&Number.isInteger(p.x)&&Number.isInteger(p.y)&&tile(p.x,p.y)===1&&!sanctuaryAt(p.x,p.y));
+ if(ok)entities.push({type:'loot',name:'Dropped backpack',x:p.x,y:p.y,alive:true,droppedBag:true,contents:[piece],dropNonce:nonce});
+ state.partyDropReceipts[nonce]={ok};
+ try{writeCampaign()}catch{delete state.partyDropReceipts[nonce];if(ok)entities.pop();window.DCKNet.sendDropResult(d.id,nonce,false);return}
+ window.DCKNet.sendDropResult(d.id,nonce,ok);sendPartyWorld();render();
+}
 function recoverRankedGear(id,qty){
  const match=/^(.+)-([1-5])$/.exec(id);if(!match)return false;
  const base=rewardCatalog.find(i=>i.id===match[1]);if(!base)return false;
@@ -2271,7 +2309,7 @@ function updatePartyRoster(){const el=$('#netRoster');if(el)el.textContent='Part
 window.addEventListener('dcknet',e=>{const d=e.detail||{};if(remoteLoot&&!partyGuest())syncLoot(null);
 if(activeLoot?.owner&&d.type==='player_left'&&activeLoot.owner===d.id)finishLoot();
 if(activeLoot?.owner&&!window.DCKNet?.inRoom)finishLoot();
-if(d.type==='loot_bundle'){if(partyGuest()){receiveLoot(d.items);persistCampaign();render()}}else if(d.type==='reward'){if(partyGuest()){petVictory();if(d.guardian)recordGuardian(d.guardian.floor,d.guardian.name);state.gold+=d.gold||0;state.xp+=d.xp||0;if(d.item)giveItem(d.item,1);checkLevel();save();render();notify('PARTY REWARD RECEIVED')}}else if(d.type==='world'){applyPartyWorld(d.world)}else if(d.type==='combat_intent'){partyIntent(d)}else if(d.type==='players'){netPlayers=d.players||{};render();updatePartyRoster()}else if(d.type==='player_state'){netPlayers[d.id]=d.player;render();updatePartyRoster()}else if(d.type==='player_left'){delete netPlayers[d.id];render();updatePartyRoster()}else if(d.type==='room'){notify('PRIVATE ROOM '+d.code);render()}else if(d.type==='status'){const el=$('#netStatus');if(el)el.textContent=d.text;const room=$('#netRoom');if(room)room.textContent=d.code?'ROOM '+d.code:'No active room';updatePartyRoster()}else if(d.type==='error'){notify('CO-OP: '+d.message)}});
+if(d.type==='drop_request'){processGuestDrop(d)}else if(d.type==='drop_result'){resolveGuestDrop(d)}else if(d.type==='loot_bundle'){if(partyGuest()){receiveLoot(d.items);persistCampaign();render()}}else if(d.type==='reward'){if(partyGuest()){petVictory();if(d.guardian)recordGuardian(d.guardian.floor,d.guardian.name);state.gold+=d.gold||0;state.xp+=d.xp||0;if(d.item)giveItem(d.item,1);checkLevel();save();render();notify('PARTY REWARD RECEIVED')}}else if(d.type==='world'){applyPartyWorld(d.world)}else if(d.type==='combat_intent'){partyIntent(d)}else if(d.type==='players'){netPlayers=d.players||{};render();updatePartyRoster()}else if(d.type==='player_state'){netPlayers[d.id]=d.player;render();updatePartyRoster()}else if(d.type==='player_left'){delete netPlayers[d.id];render();updatePartyRoster()}else if(d.type==='room'){notify('PRIVATE ROOM '+d.code);const p=state.pendingPartyDrop;if(p&&p.room===d.code&&partyGuest())window.DCKNet.sendDrop({nonce:p.nonce,id:p.held[0].id,qty:p.held[0].qty});render()}else if(d.type==='status'){const el=$('#netStatus');if(el)el.textContent=d.text;const room=$('#netRoom');if(room)room.textContent=d.code?'ROOM '+d.code:'No active room';updatePartyRoster()}else if(d.type==='error'){notify('CO-OP: '+d.message)}});
 function collapseTick(dt){if(state.campaignWon)return;if(state.hall&&!window.DCKNet?.inRoom)return;if(bossFight&&!window.DCKNet?.inRoom)return;if(state.chapter==='surface'||state.chapter==='create'||state.dead)return;state.collapseLeft=Math.max(0,(state.collapseLeft??900)-dt);if(state.floor===2&&state.relay&&!state.relay.used){const high=highWater();if(high!==!!state.relay.high){state.relay.high=high;
    if(high){beep(480,.12);setTimeout(()=>beep(480,.12),220);notify('Two bells · blue crossings submerged')}else notify('Water recedes · crossings open')}}
  if(state.relay?.race==='live'&&state.relay.raceStart-state.collapseLeft>75){state.relay.race='lost';highlight('Night Shift reached the station first and took the purse.',4)}
