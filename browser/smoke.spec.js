@@ -89,3 +89,42 @@ test('offline reload retains the created crawler',async({page,context})=>{
   await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('dck-final-save-v1')).state.character.name)).toBe('Offline Crawler');
  }finally{await context.setOffline(false)}
 });
+
+test('guardian battle controls, victory and corpse loot',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:8000/');
+ await page.getByRole('button',{name:'Begin on the surface'}).click();
+ await page.evaluate(()=>{
+  const key='dck-final-save-v1',o=JSON.parse(localStorage.getItem(key));
+  Object.assign(o.state,{floor:3,chapter:'mine',guildTrained:true,hall:null,x:5,y:5,hp:100,maxHp:100,power:22,armor:12,collapseLeft:900,arena:{x:6,y:3,w:6,h:6,gates:[]},sanctuaries:[],safe:null,scenery:[],rivals:[],patrolFloor:3,rivalFloor:3,hazardFloor:3,discoveryFloor:3,secretFloor:3,achievements:['Management Has Been Terminated','Getting stronger','Scavenger'],inventory:[]});
+  o.tiles=Array.from({length:16},(_,y)=>Array.from({length:16},(_,x)=>x>0&&y>0&&x<15&&y<15?1:2));
+  o.seen=o.tiles.map(row=>row.map(()=>true));
+  o.entities=[{type:'enemy',name:'Pip, Keeper of the Cage',sprite:'goblin',small:true,boss:true,alive:true,x:7,y:5,hp:45,max:45,atk:12,armor:2,xp:100,balanceVersion:1,contents:[{id:'gold',qty:9}]}];
+  o.encounter=null;localStorage.setItem(key,JSON.stringify(o));
+ });
+ await page.reload();
+ await expect(page.locator('#bossbar')).toHaveClass(/hidden/);
+ await page.keyboard.press('ArrowRight');
+ await expect(page.locator('#guardianWarning')).toBeVisible();
+ await expect(page.locator('.duel')).toBeVisible();
+ await expect(page.locator('#bossbar')).not.toHaveClass(/hidden/);
+ await page.locator('[data-boss="attack"]').click();
+ await expect(page.locator('.duel small').first()).toContainText('TURN 2');
+ await expect(page.locator('.resolved-hit.enemy-hit')).toBeVisible();
+ for(let i=0;i<3;i++){
+  if(await page.locator('#bossDone').isVisible())break;
+  await page.locator('[data-boss="attack"]').click();
+  await expect.poll(async()=>await page.locator('#bossDone').isVisible()||await page.locator('[data-boss="attack"]').isEnabled()).toBe(true);
+ }
+ await expect(page.locator('#bossDone')).toBeVisible();
+ await page.locator('#bossDone').click();
+ await expect(page.locator('#bossbar')).toHaveClass(/hidden/);
+ await page.locator('[data-action="loot"]').click();
+ await expect(page.locator('#takeAll')).toBeVisible();
+ await page.locator('#takeAll').click();
+ const result=await page.evaluate(()=>JSON.parse(localStorage.getItem('dck-final-save-v1')));
+ expect(result.entities[0].alive).toBe(false);
+ expect(result.entities[0].looted).toBe(true);
+ expect(result.state.inventory.filter(i=>i.id==='box-Gold').reduce((n,i)=>n+i.qty,0)).toBeGreaterThanOrEqual(2);
+ expect(errors).toEqual([]);
+});
