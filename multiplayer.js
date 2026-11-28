@@ -18,7 +18,10 @@
   get inRoom(){return this.connected&&!!roomCode},
   get playerId(){return clientId},get roomCode(){return roomCode},get isHost(){return this.inRoom&&hostId===clientId},
   connect(url,name,recovery=false){
-   if(!/^wss?:\/\//i.test(url))return Promise.reject(new Error('Use a ws:// or wss:// server URL.'));
+   let endpoint;try{endpoint=new URL(url)}catch{return Promise.reject(Error('Enter a valid relay URL.'))}
+   if(!['ws:','wss:'].includes(endpoint.protocol)||endpoint.username||endpoint.password||endpoint.hash)return Promise.reject(Error('Use a WebSocket URL without credentials or fragments.'));
+   if(window.location.protocol==='https:'&&endpoint.protocol!=='wss:')return Promise.reject(Error('Secure games require a wss:// relay URL.'));
+   url=endpoint.href;
    if(!recovery){stopRetry();finishResume(Error('Recovery cancelled.'));resumeCode=resumeToken=null;storeResume();hostPaused=false;if(pendingRoom){pendingRoom.reject(Error('Connection replaced.'));pendingRoom=null}}relayUrl=url;if(socket)socket.close();roomCode=null;players={};playerName=(name||'Crawler').replace(/[^\w -]/g,'').slice(0,16)||'Crawler';
    return new Promise((resolve,reject)=>{
     let settled=false;try{socket=new WebSocket(url)}catch(e){reject(e);return}const activeSocket=socket;
