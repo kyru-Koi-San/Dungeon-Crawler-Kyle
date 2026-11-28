@@ -11,6 +11,8 @@ self.addEventListener('fetch',e=>{
  // Await cache writes so mobile suspension cannot interrupt an otherwise successful refresh.
  e.respondWith((async()=>{
   const cache=await caches.open(CACHE);
+  // Versioned assets belong to the installed shell; avoid mixing releases.
+  if(url.searchParams.get('v')==='0410'){const installed=await cache.match(e.request);if(installed)return installed}
   try{
    const response=await fetch(e.request,{cache:'no-store'});
    if(response.ok&&response.type!=='opaque'){
