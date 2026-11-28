@@ -1378,19 +1378,19 @@ let enemyAccumulator=0,enemySimulationFloor=0,enemyScanOffset=0;
 function advanceEnemySimulation(dt){if(enemySimulationFloor!==state.floor){enemyAccumulator=0;enemySimulationFloor=state.floor}if(state.hall||state.dead||bossFight||modalOpen()){enemyAccumulator=0;return}enemyAccumulator+=dt;const interval=entities.length>=350?.125:.075;if(enemyAccumulator>=interval){const elapsed=Math.min(.2,enemyAccumulator);enemyAccumulator=0;enemyTick(elapsed)}}
 function enemyTick(dt){if(state.hall||state.dead||bossFight||partyGuest()||state.chapter!=='mine')return;let guardian=entities.find(e=>e.boss&&e.alive&&Math.hypot(e.x-state.x,e.y-state.y)<=3);if(guardian&&!sanctuaryAt(state.x,state.y)&&(!state.arena||inArena(state.x,state.y))){beginBoss(guardian);return}moveScout(dt);if(sanctuaryAt(state.x,state.y))return;tickRivals(dt);if(modalOpen())return;state.retreatGrace=Math.max(0,(state.retreatGrace||0)-dt);enemyOccupancy=new Map();for(const e of entities)if(e.alive){const k=e.y*W+e.x;enemyOccupancy.set(k,(enemyOccupancy.get(k)||0)+1)}
 const release=e=>{const k=e.y*W+e.x,n=enemyOccupancy.get(k)||0;if(n<=1)enemyOccupancy.delete(k);else enemyOccupancy.set(k,n-1)};const occupy=e=>{const k=e.y*W+e.x;enemyOccupancy.set(k,(enemyOccupancy.get(k)||0)+1)};
-let pursuitBudget=entities.length>=350?12:32;const count=entities.length;const start=enemyScanOffset%Math.max(1,count);enemyScanOffset=(start+37)%Math.max(1,count);
+const chaseRadius=(state.floor===1?7:9+Math.floor(state.floor/5))+(state.season?.contract==='live'?5:0),chaseRadiusSq=chaseRadius*chaseRadius,patrolChance=1-Math.exp(-dt*(state.floor===1?.72:1+Math.min(state.floor,12)*.035));let pursuitBudget=entities.length>=350?12:32;const count=entities.length;const start=enemyScanOffset%Math.max(1,count);enemyScanOffset=(start+37)%Math.max(1,count);
 for(let j=0;j<count;j++){const e=entities[(start+j)%count];if(!e.alive||e.type!=='enemy'||e.boss)continue;e.cool-=dt;
-if(e.lured>0)e.lured-=dt;
+let distanceSq=(e.x-state.x)**2+(e.y-state.y)**2;if(e.lured>0)e.lured-=dt;
 if(e.avoid>0){e.avoid-=dt;continue}
 if(e.pursuit>0){
   e.pursuit-=dt;e.pursuitDelay-=dt;
-  if(e.pursuitDelay<=0&&Math.hypot(e.x-state.x,e.y-state.y)>=1.4&&pursuitBudget>0){pursuitBudget--;release(e);pursueCrawler(e);occupy(e);e.pursuitDelay=.48}
-  if(state.retreatGrace||Math.hypot(e.x-state.x,e.y-state.y)>=1.4)continue;
+  if(e.pursuitDelay<=0&&distanceSq>=1.96&&pursuitBudget>0){pursuitBudget--;release(e);pursueCrawler(e);occupy(e);distanceSq=(e.x-state.x)**2+(e.y-state.y)**2;e.pursuitDelay=.48}
+  if(state.retreatGrace||distanceSq>=1.96)continue;
 }
-if(state.retreatGrace&&Math.hypot(e.x-state.x,e.y-state.y)<1.4)continue;
-if(Math.hypot(e.x-state.x,e.y-state.y)<1.4){if(!partyGuest()&&!modalOpen()){enemyOccupancy=null;beginBoss(e);return}if(e.cool<=0){e.attackAt=performance.now();
- {if(e.sprite==='mire-leprechaun'&&Math.random()<.4){mistCloud(e);(state.wounds??={}).sick=true}takeDamage(e.atk,e)}e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<1-Math.exp(-dt*(state.floor===1?.72:1+Math.min(state.floor,12)*.035))){
-const chasing=!(e.lured>0)&&Math.hypot(e.x-state.x,e.y-state.y)<(state.floor===1?7:9+Math.floor(state.floor/5))+(state.season?.contract==='live'?5:0);
+if(state.retreatGrace&&distanceSq<1.96)continue;
+if(distanceSq<1.96){if(!partyGuest()&&!modalOpen()){enemyOccupancy=null;beginBoss(e);return}if(e.cool<=0){e.attackAt=performance.now();
+ {if(e.sprite==='mire-leprechaun'&&Math.random()<.4){mistCloud(e);(state.wounds??={}).sick=true}takeDamage(e.atk,e)}e.cool=1.2+Math.random()*.45;if(state.dead)break}}else if(Math.random()<patrolChance){
+const chasing=!(e.lured>0)&&distanceSq<chaseRadiusSq;
 const target=chasing?state:e.den;if(!target)continue;
 let dx=Math.sign(target.x-e.x),dy=Math.sign(target.y-e.y);let opts=Math.random()<.5?[[dx,0],[0,dy]]:[[0,dy],[dx,0]];for(let [ax,ay] of opts)if((ax||ay)&&!(step&&e.x+ax===step.nx&&e.y+ay===step.ny)&&!solid(e.x+ax,e.y+ay)&&!sanctuaryAt(e.x+ax,e.y+ay)&&!enemyOccupancy.has((e.y+ay)*W+e.x+ax)){release(e);e.x+=ax;e.y+=ay;occupy(e);break}}}enemyOccupancy=null}
 function checkLevel(){while(state.xp>=state.nextXp){state.xp-=state.nextXp;state.level++;state.nextXp=progressionXp(state.level);state.maxHp+=12;restoreHealth(state.maxHp);if(state.floor>=4){state.maxMp+=4;state.mp=state.maxMp}state.power+=2;state.skillPoints++;feed('<b>LEVEL UP!</b> You reached level '+state.level+'. Stats increased.');notify('LEVEL UP — LEVEL '+state.level);unlock('Getting stronger');beep(660,.2,'sine')}}
