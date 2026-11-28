@@ -2120,11 +2120,15 @@ const ambientColors=['#c6b08a','#80c5b9','#c1a477','#8fbce1','#a69ac9','#e2a86b'
 function paintTileDepth(x,y){
  if(tile(x,y)!==1)return;
  const px=x*TILE,py=y*TILE;
- ctx.fillStyle='#00000038';
- if(tile(x,y-1)===2)ctx.fillRect(px,py,TILE,5);
- if(tile(x-1,y)===2)ctx.fillRect(px,py,4,TILE);
- ctx.fillStyle='#ffffff0a';
- if(tile(x,y+1)===2)ctx.fillRect(px,py+TILE-2,TILE,2);
+ const north=tile(x,y-1)===2,west=tile(x-1,y)===2,east=tile(x+1,y)===2,south=tile(x,y+1)===2;
+ // Stepped contact shadows retain the pixel grid without extra gradients.
+ if(north){ctx.fillStyle='#00000055';ctx.fillRect(px,py,TILE,3);ctx.fillStyle='#00000030';ctx.fillRect(px,py+3,TILE,3);ctx.fillStyle='#00000016';ctx.fillRect(px,py+6,TILE,3)}
+ if(west){ctx.fillStyle='#00000044';ctx.fillRect(px,py,3,TILE);ctx.fillStyle='#00000020';ctx.fillRect(px+3,py,3,TILE)}
+ if(east){ctx.fillStyle='#00000028';ctx.fillRect(px+TILE-3,py,3,TILE)}
+ if(!north&&!west&&tile(x-1,y-1)===2){ctx.fillStyle='#00000026';ctx.fillRect(px,py,5,3);ctx.fillRect(px,py+3,3,2)}
+ if(!north&&!east&&tile(x+1,y-1)===2){ctx.fillStyle='#00000022';ctx.fillRect(px+TILE-5,py,5,3);ctx.fillRect(px+TILE-3,py+3,3,2)}
+ ctx.fillStyle='#ffffff0b';
+ if(south)ctx.fillRect(px,py+TILE-2,TILE,1);
 }
 function drawAmbient(camX,camY,zoom,now){
  if(state.chapter!=='mine')return;
@@ -2190,7 +2194,7 @@ if(state.chapter==='mine'){
  const torch=state.torchTurns>0, flicker=ambientMotion.matches?1:1+.025*Math.sin(now/103)+.012*Math.sin(now/47);
  const radius=Math.max(65,Math.min(canvas.width,canvas.height)*(torch?.83:.58)*flicker);
  const shade=ctx.createRadialGradient(sx,sy,Math.min(32,radius*.2),sx,sy,radius);
- shade.addColorStop(0,torch?'rgba(24,13,5,0)':'rgba(5,9,16,0)');shade.addColorStop(.55,'rgba(4,8,15,.12)');shade.addColorStop(1,'rgba(2,5,12,.79)');
+ shade.addColorStop(0,torch?'rgba(24,13,5,0)':'rgba(5,9,16,0)');shade.addColorStop(.42,'rgba(4,8,15,.04)');shade.addColorStop(.72,'rgba(4,8,15,.30)');shade.addColorStop(1,'rgba(2,5,12,.76)');
  ctx.fillStyle=shade;ctx.fillRect(0,0,canvas.width,canvas.height);
  if(torch){const warm=ctx.createRadialGradient(sx,sy,0,sx,sy,radius*.72);warm.addColorStop(0,'rgba(255,175,72,.12)');warm.addColorStop(1,'rgba(255,175,72,0)');ctx.fillStyle=warm;ctx.fillRect(0,0,canvas.width,canvas.height)}
 }
