@@ -220,3 +220,20 @@ body:has(#modal:not(.hidden)){overflow:hidden}.modal,.modal-card{overscroll-beha
 @media(prefers-reduced-motion:reduce){.duel-stage .fighter,.duel-stage .fighter img,.duel-stage .impact{animation:none!important}}
 
 .resolved-hit{position:absolute;top:28%;z-index:8;pointer-events:none;font:bold 20px monospace;color:#ffe3a9;text-shadow:2px 2px #151019;animation:resolvedHit .85s ease-out both}.resolved-hit.enemy-hit{left:72%}.resolved-hit.hero-hit{left:18%;color:#ff9c90}@keyframes resolvedHit{0%{transform:translateY(8px);opacity:1}65%{opacity:1}100%{transform:translateY(-18px);opacity:0}}@media(prefers-reduced-motion:reduce){.resolved-hit{animation:none}}
+
+/* Release polish: readable touch menus and clear selection feedback. */
+.rpg-pack .bag-slot:not(.empty):focus-visible,.gear-socket:focus-visible,.conversation-choices button:focus-visible,.bag-sections button:focus-visible{outline:2px solid #ffe1a2;outline-offset:-3px}
+.rpg-pack .bag-slot:not(.empty):active,.gear-socket:active{background:#455048}
+.rpg-pack .bag-slot span{overflow-wrap:anywhere;color:#f6eddf}
+.rpg-pack .bag-slot small{background:#141b21e6;border-radius:3px;padding:1px 3px;font-variant-numeric:tabular-nums}
+.bag-sections button{min-height:44px;line-height:1.15;overflow-wrap:anywhere}
+.conversation-choices button{position:relative;padding-left:22px;border-left:2px solid #a58b60;background:linear-gradient(100deg,#303a3d,#202830);color:#f3e6ce}
+.conversation-choices button:not(:disabled)::before{content:'›';position:absolute;left:7px;color:#e8c58a}
+.conversation-choices button:disabled{opacity:.55;cursor:not-allowed}
+.conversation-choices button:not(:disabled):active{background:#4b4435}
+#conversationLine{overflow-wrap:anywhere;font-size:clamp(14px,3.5vw,17px)}
+#itemCompare th,#itemCompare td{font-variant-numeric:tabular-nums}
+#itemCompare tbody tr:nth-child(odd){background:#ffffff06}
+.gear-socket b{overflow-wrap:anywhere}
+@media(pointer:coarse){.campaign-dialog button,.bag-nav button,#conversationSkip,.skill-node button{min-height:44px}}
+@media(max-width:360px){.bag-sections button{font-size:11px}.rpg-pack .bag-slot span{font-size:10px}.gear-board{grid-template-columns:minmax(80px,.8fr) minmax(0,1.4fr)}}
