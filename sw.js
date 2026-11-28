@@ -1,4 +1,4 @@
-const CACHE='dck-shell-v413';const FILES=['./','./index.html','./style.css?v=0413','./music.js?v=0413','./game.js?v=0413','./multiplayer.js?v=0413','./manifest.webmanifest','./icon.svg','./item-art.svg','./hero-front.png','./hero-back.png','./hero-side.png','./hero-slash.png','./hero-strike.png','./skeleton.png','./goblin.png','./spider.png','./wraith.png','./archer.png','./shaman.png','./sewer-rat.png','./pack-llama.png','./flood-grub.png','./mire-leprechaun.png','./mob-walk.png','./scenery.png','./guild-hall.png','./spider-boss.png','./bone-champion.png'];
+const CACHE='dck-shell-v414';const FILES=['./','./index.html','./style.css?v=0414','./music.js?v=0414','./game.js?v=0414','./multiplayer.js?v=0414','./manifest.webmanifest','./icon.svg','./item-art.svg','./hero-front.png','./hero-back.png','./hero-side.png','./hero-slash.png','./hero-strike.png','./skeleton.png','./goblin.png','./spider.png','./wraith.png','./archer.png','./shaman.png','./sewer-rat.png','./pack-llama.png','./flood-grub.png','./mire-leprechaun.png','./mob-walk.png','./scenery.png','./guild-hall.png','./spider-boss.png','./bone-champion.png'];
 // Keep a complete offline shell. A failed update must not discard the previous cache.
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('dck-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
@@ -12,7 +12,7 @@ self.addEventListener('fetch',e=>{
  e.respondWith((async()=>{
   const cache=await caches.open(CACHE);
   // Versioned assets belong to the installed shell; avoid mixing releases.
-  if(url.searchParams.get('v')==='0413'){const installed=await cache.match(e.request);if(installed)return installed}
+  if(url.searchParams.get('v')==='0414'){const installed=await cache.match(e.request);if(installed)return installed}
   try{
    const response=await fetch(e.request,{cache:'no-store'});
    if(response.ok&&response.type!=='opaque'){
