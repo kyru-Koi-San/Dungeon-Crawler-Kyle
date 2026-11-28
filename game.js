@@ -1172,27 +1172,38 @@ function populatePatrols(upgrading=false){
  }
  state.patrolFloor=state.floor;
 }
+function grubSpawnLocations(count,random=Math.random){
+ const occupied=new Set(entities.map(e=>e.y*W+e.x));
+ const crawlers=[state,...Object.values(netPlayers).filter(p=>p.floor===state.floor&&!p.hall)];
+ const candidates=[];
+ for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){
+  if(tile(x,y)!==1||solid(x,y)||occupied.has(y*W+x)||sanctuaryAt(x,y)||inArena(x,y)||submerged(x,y))continue;
+  if(crawlers.some(p=>(x-p.x)**2+(y-p.y)**2<144))continue;
+  if(state.npc?.x===x&&state.npc?.y===y||state.relay?.x===x&&state.relay?.y===y||state.rivals?.some(p=>!p.gone&&p.x===x&&p.y===y))continue;
+  candidates.push({x,y});
+ }
+ const chosen=[];
+ while(candidates.length&&chosen.length<count){
+  const i=Math.floor(random()*candidates.length),p=candidates[i];
+  candidates[i]=candidates[candidates.length-1];candidates.pop();
+  if(chosen.some(q=>(q.x-p.x)**2+(q.y-p.y)**2<36))continue;
+  chosen.push(p);
+ }
+ return chosen;
+}
 function hatchGrub(parent){
  if(state.floor!==2||parent.alive||parent.corpseHatched)return false;
  parent.corpseHatched=true;
- let living=0;for(const e of entities)if(e.alive&&e.sprite==='flood-grub')living++;let remaining=Math.min(3,500-living),spawned=0;if(remaining<=0)return false;
- const occupied=new Set();for(const e of entities)if(e.alive)occupied.add(e.y*W+e.x);
- const queue=[[parent.x,parent.y]],visited=new Set([parent.y*W+parent.x]);
- for(let i=0;i<queue.length&&remaining>0&&i<200;i++){
-   const [x,y]=queue[i];
-   if(tile(x,y)===1&&!solid(x,y)&&!sanctuaryAt(x,y)&&!(x===state.x&&y===state.y)&&!occupied.has(y*W+x)){
-     const larva=floorEnemy(2,0,x,y);
-     Object.assign(larva,{name:'Grub hatchling',hp:5,max:5,xp:2,budded:true,hatchling:true,den:{x,y}});
-     entities.push(larva);occupied.add(y*W+x);remaining--;spawned++;
-   }
-   for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
-     const a=x+dx,b=y+dy,k=b*W+a;
-     if(visited.has(k)||tile(a,b)!==1||solid(a,b)||sanctuaryAt(a,b))continue;
-     visited.add(k);queue.push([a,b]);
-   }
+ let living=0;for(const e of entities)if(e.alive&&e.sprite==='flood-grub')living++;
+ const remaining=Math.min(3,500-living);if(remaining<=0)return false;
+ const locations=grubSpawnLocations(remaining);
+ for(const {x,y} of locations){
+  const larva=floorEnemy(2,0,x,y);
+  Object.assign(larva,{name:'Grub hatchling',hp:5,max:5,xp:2,budded:true,hatchling:true,den:{x,y}});
+  entities.push(larva);
  }
- if(spawned){state.grubHatches=(state.grubHatches||0)+spawned;notify(spawned+' grubs emerge from the corpse.');}
- return spawned>0;
+ if(locations.length){state.grubHatches=(state.grubHatches||0)+locations.length;notify(locations.length+' grubs hatch elsewhere on the floor.');}
+ return locations.length>0;
 }
 function marketResale(item,floor){
  if(item.id==='meth-cargo')return floor*5;
