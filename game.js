@@ -307,7 +307,7 @@ function crawlerAssist(b,e,d){
  }
  return {bonus,shield,log}
 }
-function crawlerAllyVictory(){for(const a of recruitedCrawlers()){if(a.hp<=0)continue;a.wins++;changeAllyLoyalty(a,allyPersonality(a)==='Mercenary'?2:1,'We survived another encounter.');if(a.wins%5===0){a.level++;a.maxHp+=3;a.hp=Math.min(a.maxHp,a.hp+3)}}}
+function crawlerAllyVictory(){for(const a of recruitedCrawlers()){if(a.hp<=0)continue;a.wins++;changeAllyLoyalty(a,allyPersonality(a)==='Mercenary'?2:1,'We survived another encounter.');if(a.wins%5===0){a.level++;a.maxHp+=3;a.hp=Math.min(a.maxHp,a.hp+3)}a.hp=Math.min(a.maxHp,a.hp+Math.max(1,Math.ceil(a.maxHp*.04)))}}
 function renderCrawlerAllies(body){
  const area=document.createElement('section');area.innerHTML='<h3>Recruited crawlers · '+recruitedCrawlers().length+'/2</h3>';
  if(!recruitedCrawlers().length)area.append('Build trust with friendly crawlers to invite them into your party.');
@@ -762,7 +762,7 @@ function petStats(){
 function readyPet(){const p=state.pet,stats=petStats();if(!stats||orphanedPet())return null;p.hp=Math.min(stats.maxHp,p.hp??stats.maxHp);return p.hp>0?{p,stats}:null}
 function petVictory(){
   const pet=state.pet;if(!pet||orphanedPet())return;
-  pet.wins=(pet.wins||0)+1;if(pet.crawler){pet.level=Math.min(30,1+Math.floor(pet.wins/5));const stats=petStats();pet.hp=Math.min(stats.maxHp,(pet.hp??stats.maxHp)+4)}
+  pet.wins=(pet.wins||0)+1;if(pet.crawler){pet.level=Math.max(pet.level||1,Math.min(30,1+Math.floor(pet.wins/5)));const stats=petStats();if(pet.hp!==0)pet.hp=Math.min(stats.maxHp,(pet.hp??stats.maxHp)+Math.max(4,Math.ceil(stats.maxHp*.05)))}
   if(pet.wins%5===0)awardBox('Pet');
 }
 function setPetTile(pos){
