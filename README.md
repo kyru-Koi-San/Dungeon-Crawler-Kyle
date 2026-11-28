@@ -40,3 +40,15 @@ This is host-trusted private co-op, not an authoritative commercial multiplayer 
 ## 0.41.0 single-player release candidate
 
 Includes mobile suspension checkpoints, regular autosaves, cached inventory and map rendering, dense-floor enemy optimization, offline fallback, snapshot validation, revival and reward fixes, and corrected expedition goals. Targeted headless checks covered base layout reachability on 18 floors and six guardian locations, progression gates and victory, inventory stacking and strike damage. Full campaign playthrough, physical iPhone validation and this version's live Pages deployment are not yet verified. Existing save keys are unchanged.
+
+## Single-player acceptance checklist
+
+Development scope is frozen for the 0.41.0 candidate. Before labeling a build 1.0 stable:
+
+- [ ] Verify the public Pages URL displays BUILD 0.41.0 and loads all art without errors.
+- [ ] On iPhone Safari, start a fresh campaign, complete guild induction, walk/run, enter combat, loot and equip a reward.
+- [ ] Save to a manual slot, reload, background/resume and verify position and inventory.
+- [ ] Add to Home Screen, load once online, then relaunch offline and verify a saved campaign opens.
+- [ ] Complete a single-player campaign through floor 18, including floor-four identity registration and all six guardians.
+
+Do not clear website data when refreshing the build. Private co-op is not a blocker for single-player acceptance. These manual checks have not been performed by the development assistant; 0.41.0 remains a release candidate rather than a certified stable release.
