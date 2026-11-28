@@ -1985,6 +1985,19 @@ function battleBackdrop(floor,boss=false){
  case 5:for(let x=36;x<240;x+=84){R(x+8,10,20,4,accent);R(x+5,14,26,29,pal[1]);R(x,43,36,5,accent);R(x+14,48,8,5,accent)}break;
  }
  }
+ if(theme){
+  // Low-resolution, cached arena framing; keep the combatant silhouettes readable.
+  for(const x of [3,222]){R(x,0,15,70,'#11151b');R(x+2,4,11,61,pal[0]);R(x+2,4,2,61,pal[1]);R(x-2,65,19,6,pal[2]);R(x,1,15,3,accent)}
+  const sigil=(x,y)=>{R(x-9,y,18,2,pal[2]);R(x-6,y+2,12,2,accent);R(x-3,y+4,6,2,pal[2])};
+  for(const x of [43,197])sigil(x,83);
+  if(theme.kind===0){for(const x of [45,185]){R(x,48,10,12,pal[2]);R(x+2,50,6,7,accent);R(x+4,52,2,4,pal[2])}}
+  if(theme.kind===1){for(const x of [25,205]){L(x,15,x+10,33,accent);L(x+10,33,x+20,15,accent);L(x+10,33,x+10,54,pal[1])}}
+  if(theme.kind===2){for(const x of [29,202]){L(x,77,x+7,86,accent);L(x+7,86,x+2,91,pal[1]);R(x+8,89,3,1,accent)}}
+  if(theme.kind===3){for(const x of [30,200]){R(x,68,10,3,'#21171a');R(x+2,66,6,2,'#b35736');R(x+4,64,2,2,accent)}}
+  if(theme.kind===4){for(const x of [49,190]){R(x,24,5,34,pal[2]);R(x+1,27,3,28,accent);R(x-4,55,13,3,pal[1])}}
+  if(theme.kind===5){for(const x of [28,198]){R(x,17,14,2,accent);R(x+2,21,10,2,pal[1]);R(x+5,25,4,17,accent)}}
+  const shade=g.createLinearGradient(0,0,0,70);shade.addColorStop(0,'#00000050');shade.addColorStop(1,'#00000000');g.fillStyle=shade;g.fillRect(0,0,240,70);
+ }
  for(let x=30;x<240;x+=90){R(x,26,4,12,pal[2]);R(x+1,21,2,7,accent)}
  R(0,0,240,6,'#00000055');R(0,114,240,6,'#00000044');return retainArt(arenaArt,key,c,8)
 }
