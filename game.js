@@ -1024,6 +1024,11 @@ function spawnEnemy(x,y,r=Math.random){
  entities.push(floorEnemy(state.floor,entities.length,x,y));
 }
 // Distribute patrols by walking distance so both the approach and the far rooms see traffic.
+function patrolBudget(floor,eligible){
+ const nominal=42+2*(floor-2);
+ const cap=Math.max(18,Math.floor(eligible*(.045+.0025*(floor-2))));
+ return Math.min(nominal,cap);
+}
 function populatePatrols(upgrading=false){
  if(state.chapter!=='mine'||state.dead||state.campaignWon||state.patrolFloor===state.floor)return;
  const random=rng(19391*state.floor),key=(x,y)=>y*W+x;
@@ -1046,7 +1051,8 @@ function populatePatrols(upgrading=false){
    }
  }
  const existing=entities.filter(e=>e.type==='enemy'&&!e.boss).length;
- const target=state.floor===1?existing+2:42+2*(state.floor-2);
+ // Shrinking floors already increase density; taper the headcount on deeper floors.
+ const target=state.floor===1?existing+2:patrolBudget(state.floor,spots.length+existing);
  const count=Math.min(spots.length,Math.max(0,target-existing));
  for(let i=0;i<count;i++){
    const first=Math.floor(i*spots.length/count),end=Math.floor((i+1)*spots.length/count);
