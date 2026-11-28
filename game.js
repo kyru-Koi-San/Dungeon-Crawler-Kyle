@@ -30,7 +30,7 @@ function dialogueFrame(speaker,line,profile,choices,tag='CONVERSATION'){
  const target=$('#conversationLine'),skip=$('#conversationSkip');let i=0;
  const finish=()=>{clearInterval(dialogueTimer);dialogueTimer=null;target.textContent=line;skip.hidden=true};
  skip.onclick=finish;if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else dialogueTimer=setInterval(()=>{if(!target.isConnected){clearInterval(dialogueTimer);dialogueTimer=null;return}i+=3;target.textContent=line.slice(0,i);if(i>=line.length)finish()},22);
- $('[data-conversation]').forEach(b=>b.onclick=()=>{clearInterval(dialogueTimer);dialogueTimer=null;const choice=choices[Number(b.dataset.conversation)];if(!choice||choice.disabled)return;choice.run()});
+ $$('[data-conversation]').forEach(b=>b.onclick=()=>{clearInterval(dialogueTimer);dialogueTimer=null;const choice=choices[Number(b.dataset.conversation)];if(!choice||choice.disabled)return;choice.run()});
 }
 function caption(speaker,line,story=false){
   if(!story && performance.now()<captionUntil)return;
