@@ -2148,6 +2148,24 @@ function drawAmbient(camX,camY,zoom,now){
  ctx.restore();
 }
 let cameraX=null,cameraY=null,cameraTime=0;
+function drawFieldLoot(e){
+ const x=e.x*TILE,y=e.y*TILE;
+ ctx.save();ctx.translate(x,y);
+ ctx.fillStyle='#00000066';ctx.fillRect(7,25,19,3);ctx.fillRect(10,28,13,1);
+ if(e.droppedBag){
+   ctx.fillStyle='#30231d';ctx.fillRect(10,13,13,13);ctx.fillRect(12,10,9,5);
+   ctx.fillStyle='#765037';ctx.fillRect(11,15,11,10);ctx.fillStyle='#a77b50';ctx.fillRect(12,15,3,8);
+   ctx.fillStyle='#503424';ctx.fillRect(20,16,2,9);ctx.fillRect(14,23,6,2);
+   ctx.fillStyle='#d2ad75';ctx.fillRect(12,13,9,2);ctx.fillRect(16,11,2,5);
+   ctx.fillStyle='#e4c68e';ctx.fillRect(16,17,1,4);
+ }else{
+   ctx.fillStyle='#30271e';ctx.fillRect(7,14,19,12);
+   ctx.fillStyle='#775133';ctx.fillRect(8,18,17,7);ctx.fillStyle='#a77b49';ctx.fillRect(9,14,15,4);
+   ctx.fillStyle='#c7a15e';ctx.fillRect(9,13,15,2);ctx.fillRect(9,17,2,8);ctx.fillRect(22,17,2,8);
+   ctx.fillStyle='#ebc77a';ctx.fillRect(15,17,4,5);ctx.fillStyle='#3d2b20';ctx.fillRect(16,19,2,2);
+ }
+ ctx.restore();
+}
 function draw(){if(state.hall){drawHall();return}ctx.clearRect(0,0,canvas.width,canvas.height);if(visualFloor!==state.floor||visualX===null){visualX=state.x;visualY=state.y;visualFloor=state.floor;cameraX=null}let zoom=fieldZoom;const now=performance.now(),blend=1-Math.exp(-Math.max(0,now-cameraTime)/48);
 if(cameraX===null||Math.hypot(visualX-cameraX,visualY-cameraY)>2.5){cameraX=visualX;cameraY=visualY}
 else{cameraX+=(visualX-cameraX)*blend;cameraY+=(visualY-cameraY)*blend}
@@ -2163,7 +2181,7 @@ if(sceneryArt.complete&&sceneryArt.naturalWidth)for(const p of state.scenery||[]
 }
 for(const p of state.secrets||[])if(visible(p.x,p.y)&&seen[p.y]?.[p.x])paintSecret(p);for(const p of state.breakables||[])if(visible(p.x,p.y)&&seen[p.y]?.[p.x])paintBreakable(p);
 for(const d of state.discoveries||[])if(visible(d.x,d.y)&&seen[d.y]?.[d.x])paintDiscovery(d);
-for(let e of entities){if(!visible(e.x,e.y)||!seen[e.y]?.[e.x])continue;if(e.type==='loot'&&e.alive){ctx.fillStyle=e.droppedBag?'#875b38':'#e4c16a';ctx.fillRect(e.x*TILE+11,e.y*TILE+12,11,10);ctx.fillStyle=e.droppedBag?'#d2ad75':'#fff0b3';ctx.fillRect(e.x*TILE+14,e.y*TILE+10,5,3)}else if(e.type==='enemy'&&e.alive)drawEnemy(e);else if(e.type==='enemy'&&!e.alive&&!e.looted)drawRemains(e)}for(const q of state.sanctuaries||[state.safe].filter(Boolean))drawGuildEntrance(q);if(state.npc&&seen[state.npc.y]?.[state.npc.x]){const n=state.npc,t=Math.min(1,Math.max(0,(performance.now()-(n.walkAt??-1000))/320)),px=(n.fromX??n.x)*(1-t)+n.x*t,py=(n.fromY??n.y)*(1-t)+n.y*t;
+for(let e of entities){if(!visible(e.x,e.y)||!seen[e.y]?.[e.x])continue;if(e.type==='loot'&&e.alive){drawFieldLoot(e)}else if(e.type==='enemy'&&e.alive)drawEnemy(e);else if(e.type==='enemy'&&!e.alive&&!e.looted)drawRemains(e)}for(const q of state.sanctuaries||[state.safe].filter(Boolean))drawGuildEntrance(q);if(state.npc&&seen[state.npc.y]?.[state.npc.x]){const n=state.npc,t=Math.min(1,Math.max(0,(performance.now()-(n.walkAt??-1000))/320)),px=(n.fromX??n.x)*(1-t)+n.x*t,py=(n.fromY??n.y)*(1-t)+n.y*t;
  const profile=n.profile??=crawlerProfile(state.floor);const pose=crawlerPose(n.facing==='side'?'side':n.facing==='back'?'up':'down',t<1?Math.floor(t*16)%16:0,profile,profile.gear);ctx.drawImage(pose,px*TILE+4,py*TILE-8-Math.sin(t*Math.PI)*2,24,32);ctx.fillStyle='#7ce4df';ctx.font='10px monospace';ctx.fillText(state.floor===1?'ROPE KEEPER':profile.name.split(' ')[0].toUpperCase(),state.npc.x*TILE-8,state.npc.y*TILE-24)}for(const n of state.rivals||[]){if(n.gone||!visible(n.x,n.y)||!seen[n.y]?.[n.x])continue;ctx.drawImage(crawlerPose('down',0,n.profile,n.profile.gear),n.x*TILE+4,n.y*TILE-5,24,32);ctx.fillStyle=n.profile.temper==='hostile'?'#e07a65':'#bcdcc4';ctx.font='9px monospace';ctx.fillText(n.profile.name.split(' ')[0],n.x*TILE,n.y*TILE-8)}if(state.wildAnimal&&seen[state.wildAnimal.y]?.[state.wildAnimal.x])drawAnimal(state.wildAnimal.species,state.wildAnimal.x,state.wildAnimal.y,false);drawHero(visualX,visualY);for(const [id,p] of Object.entries(netPlayers)){if(p.floor!==state.floor||p.hall)continue;const px=p.x*TILE+16,py=p.y*TILE+25;ctx.save();ctx.globalAlpha=.82;ctx.strokeStyle='#65c9d5';ctx.lineWidth=2;ctx.beginPath();ctx.arc(px,py-18,15,0,Math.PI*2);ctx.stroke();ctx.drawImage(crawlerPose('down',0,p.character||{},p.gear||{}),px-12,py-30,24,32);ctx.fillStyle='#a7e6ee';ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText((p.name||'ALLY').slice(0,10),px,py-51);ctx.restore();}
 for(let p of particles){let x=p.x*TILE+16,y=p.y*TILE+16;if(p.kind==='pulse'){ctx.strokeStyle='#60c9e2';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,15+p.t*100,0,Math.PI*2);ctx.stroke()}if(p.kind==='magic'||p.kind==='hit'||p.kind==='hurt'){ctx.fillStyle=p.kind==='magic'?'#77d9ee':'#f0a18b';ctx.font='bold 15px monospace';ctx.fillText(p.text||'',x,y-p.t*24)}if(p.kind==='death'||p.kind==='dodge'){ctx.fillStyle=p.kind==='death'?'#d6d8d4':'#9fdbe2';ctx.globalAlpha=Math.max(0,1-p.t*2);ctx.fillRect(x-7,y-7,14,14);ctx.globalAlpha=1}}
 ctx.restore();
