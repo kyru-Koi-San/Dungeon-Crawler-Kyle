@@ -108,6 +108,9 @@ wss.on('connection',(ws,req)=>{
    const hair=['Signature','Crop','Pixie','Bob','Curls','Ponytail','Braid','Shaved'].includes(s.character?.hair)?s.character.hair:'Signature';
    const gender=['Woman','Man','Nonbinary'].includes(s.character?.gender)?s.character.gender:'Nonbinary';
    const character={hair,gender,skin:clampInt(s.character?.skin??2,0,5),race:['Human','Elf','Dwarf','Cat','Dog','Mutant Crab','Wizard','Zombie'].includes(s.character?.race)?s.character.race:'Human'};
+   const colors=['#667565','#414454','#37485a','#a64b49','#d3b68a','#eeeeee','#25252c','#78568c','#397f89'];
+   const choice=(value,allowed,fallback)=>allowed.includes(value)?value:fallback;
+   Object.assign(character,{shirt:choice(s.character?.shirt,['T-shirt','Long sleeve','Tank top','None'],'T-shirt'),pants:choice(s.character?.pants,['Trousers','Shorts','Underwear','Pixelated nude'],'Trousers'),shoes:choice(s.character?.shoes,['Boots','Sneakers','Barefoot'],'Boots'),shirtColor:choice(s.character?.shirtColor,colors,colors[0]),pantsColor:choice(s.character?.pantsColor,colors,colors[1]),shoeColor:choice(s.character?.shoeColor,colors,colors[6])});
    const hall=s.hall?{index:clampInt(s.hall.index,0,5),x:clampInt(s.hall.x,1,11),y:clampInt(s.hall.y,2,8)}:null;
    p.state={hall,gear,character,name:client.name,floor,x,y,level:clampInt(s.level,1,100),hp:clampInt(s.hp,0,9999),maxHp:clampInt(s.maxHp,1,9999),mp:clampInt(s.mp,0,clampInt(s.maxMp??s.mp,0,9999)),maxMp:clampInt(s.maxMp??s.mp,0,9999),power:clampInt(s.power,1,200),armor:clampInt(s.armor,0,100),spellBonus:clampInt(s.spellBonus,0,100),spells:Array.isArray(s.spells)?s.spells.filter(v=>typeof v==='string'&&/^[a-z]{1,24}$/.test(v)).slice(0,3):[]};
    dirty=true;broadcast(room,{type:'player_state',id,player:p.state},id);return;
