@@ -487,7 +487,7 @@ function enterHall(q){
   visualX=6;visualY=7;
   if(!q.visitedGuild){q.visitedGuild=true;ridiculous('Even Cowards Need a Break')}
   caption('Guild Master Rowan',personalMenusLocked()?'Welcome to the Seattle guild. Walk up the rug and tap Interact for your induction.':'Back under our roof. Come by the hearth if you want to review a guardian fight.',true);
-  persistCampaign();render();
+  persistCampaign();render();if(personalMenusLocked()||(state.floor>=4&&!state.identityLocked))guildMaster();
 }
 function leaveHall(){
   if(state.floor>=4&&!state.identityLocked){guildIdentity();return}
@@ -502,12 +502,11 @@ function hallTutorial(page=state.guildLesson||0,review=false){
   if(!state.hall)return;
   page=Math.max(0,Math.min(3,page));
   const [heading,line]=guildLessons[page];
-  showModal('<small>GUILD MASTER ROWAN · '+(page+1)+' / 4</small><h2>'+heading+'</h2><p>'+line+'</p><button id="guildNext" class="widebtn">'+(page<3?'Continue':review?'Done':'Finish induction & unlock menu')+'</button>');
-  $('#guildNext').onclick=()=>{
+  dialogueFrame('Guild Master Rowan',heading+' — '+line,rowanProfile(),[{label:page<3?'Continue':review?'Done':'Finish induction & unlock menu',run:()=>{
     if(page<3){if(!review){state.guildLesson=page+1;persistCampaign()}hallTutorial(page+1,review);return}
     if(!review){state.guildTrained=true;giveItem("food",2);delete state.guildLesson;unlock('Guild inductee');persistCampaign();openTab('journal')}
     closeModal();caption('Guild Master Rowan',review?'My door is always open.':'You’re on the guild register. Your backpack, map, skills and party menu are ready.',true);render();persistCampaign();
-  };
+  }}],'INDUCTION · '+(page+1)+' / 4');
 }
 function recordGuardian(floor,name,turns,guards){
   state.guardianRecord??=[];
@@ -534,14 +533,15 @@ function guildIdentity(){
  $('#ascRace').value=races.includes(state.character?.race)?state.character.race:'Human';$('#ascClass').value=classes.includes(state.specialization)?state.specialization:'Vanguard';$('#ascRace').onchange=preview;$('#ascClass').onchange=preview;preview();
  $('#ascConfirm').onclick=()=>{const r=$('#ascRace').value,c=$('#ascClass').value;showModal('<h2>Confirm permanent identity</h2><p>'+r+' · '+c+'</p><p>'+perkText(r)+' · '+skillPaths[c].bonus+'</p><button class="widebtn" id="ascLock">Confirm for this campaign</button><button class="widebtn" id="ascBack">Change selection</button>');$('#ascBack').onclick=guildIdentity;$('#ascLock').onclick=()=>{if(state.identityLocked)return;state.character={...state.character,race:r};for(const [k,v] of Object.entries(racePerks[r])){state[k]=(state[k]||0)+v;if(k==='maxHp')state.hp+=v;if(k==='maxMp')state.mp+=v}if(state.specialization!==c){if(state.specialization)removeClass();state.specialization=c;applyClassBonus(c,1)}state.identityLocked=true;state.guildTrained=true;state.hp=Math.min(state.hp,state.maxHp);state.mp=Math.min(state.mp,state.maxMp);persistCampaign();closeModal();render();caption('Guild Master Rowan','Your identity is sealed. Make it count.',true);persistCampaign()}};
 }
+function rowanProfile(){return {skin:3,race:'Human',job:'Guild master',hair:'Crop',shirt:'Tunic',shirtColor:'#725b43',pants:'Trousers',pantsColor:'#383b47',shoes:'Boots',gear:{}}}
 function guildMaster(){
   if(!state.hall)return;
-  if(state.floor>=4&&!state.identityLocked){guildIdentity();return}
+  if(state.floor>=4&&!state.identityLocked){dialogueFrame('Guild Master Rowan','Welcome to the Guild of Ascension. It is time to choose your permanent race and class.',rowanProfile(),[{label:'Begin identity registration',run:guildIdentity}],'GUILD OF ASCENSION');return}
   if(personalMenusLocked()){hallTutorial();return}
-  showModal('<small>SEATTLE CRAWLERS’ GUILD</small><h2>Guild Master Rowan</h2><p>'+['Take a seat by the hearth. What shall we go over?','I put the kettle on. Tell me what you saw down there.','Boots by the stove, crawler. There’s news on the shortwave.'][Math.floor(Math.random()*3)]+'</p><button class="widebtn" id="guildNotes">Review defeated guardians</button><button class="widebtn" id="guildBasics">Revisit the tutorial</button><button class="widebtn" id="guildCounter">Guild services</button><button class="widebtn" id="guildAir">Audience terminal</button><button class="widebtn" id="guildManual">Field manual</button>'+(state.floor%6===0?'<button class="widebtn" id="cityExchange">City exchange</button>':''));
-  $('#guildAir').onclick=onAir;$('#guildManual').onclick=fieldManual;
-  if($('#cityExchange'))$('#cityExchange').onclick=cityMarket;
-  $('#guildNotes').onclick=guildReview;$('#guildBasics').onclick=()=>hallTutorial(0,true);$('#guildCounter').onclick=()=>sanctuaryMenu(state.sanctuaries[state.hall.index]);
+  const choices=[{label:'Review defeated guardians',run:guildReview},{label:'Revisit the tutorial',run:()=>hallTutorial(0,true)},{label:'Guild services',run:()=>sanctuaryMenu(state.sanctuaries[state.hall.index])},{label:'Audience terminal',run:onAir},{label:'Field manual',run:fieldManual}];
+  if(state.floor%6===0)choices.push({label:'City exchange',run:cityMarket});
+  choices.push({label:'End conversation',run:closeModal});
+  dialogueFrame('Guild Master Rowan','Take a seat by the hearth, crawler. What shall we go over?',rowanProfile(),choices,'SEATTLE CRAWLERS’ GUILD');
 }
 function hallInteract(){
   const station=guildStation(),q=state.sanctuaries[state.hall.index];
