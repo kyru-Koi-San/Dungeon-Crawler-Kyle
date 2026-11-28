@@ -69,3 +69,28 @@ test('four-player capacity and host-only world synchronization',{timeout:30000},
  extra.send({type:'join_room',code:room.code,name:'Extra'});await extra.next('room_joined');
  assert.equal((await extra.next('world_snapshot')).world.floor,5);
 });
+
+test('combat and loot retries retain original payload and acknowledge only intended guest',{timeout:30000},async t=>{
+ const p=await port(),url='ws://127.0.0.1:'+p;
+ const child=spawn(process.execPath,['relay.js'],{env:{...process.env,PORT:String(p),ALLOWED_ORIGIN:'',DCK_STORAGE_FILE:''},stdio:['ignore','pipe','pipe']});
+ t.after(()=>child.kill());
+ await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('relay startup timeout')),5000);child.stdout.on('data',d=>{if(String(d).includes('listening')){clearTimeout(timer);resolve()}});child.once('exit',()=>{clearTimeout(timer);reject(Error('relay exited'))})});
+ const host=await peer(url,t),guest=await peer(url,t),other=await peer(url,t);
+ await host.next('hello');const target=(await guest.next('hello')).id;await other.next('hello');
+ host.send({type:'create_room',name:'Host'});const room=await host.next('room_joined');
+ for(const g of [guest,other]){g.send({type:'join_room',code:room.code});await g.next('room_joined')}
+ const roundId='a'.repeat(32),delivery='b'.repeat(32);
+ const round={type:'round_result',target,roundId,turn:1,damage:12,mana:-5,heal:0};
+ host.send(round);await host.next('round_stored');assert.equal((await guest.next('round_result')).damage,12);
+ const loot={type:'loot_bundle',target,delivery,items:{gold:20,tonic:1}};
+ host.send(loot);await host.next('loot_stored');assert.equal((await guest.next('loot_bundle')).items.gold,20);
+ other.send({type:'round_ack',roundId,turn:1});other.send({type:'loot_ack',delivery});
+ other.send({type:'player_state',player:{floor:7,x:15,y:9,hp:100,maxHp:100}});
+ await host.next('player_state',m=>m.player.floor===7);
+ host.send({...round,damage:999});await host.next('round_stored');assert.equal((await guest.next('round_result')).damage,12);
+ host.send({...loot,items:{gold:999}});await host.next('loot_stored');assert.equal((await guest.next('loot_bundle')).items.gold,20);
+ guest.send({type:'round_ack',roundId,turn:1});guest.send({type:'loot_ack',delivery});
+ guest.send({type:'player_state',player:{floor:8,x:15,y:9,hp:100,maxHp:100}});
+ await host.next('player_state',m=>m.player.floor===8);
+ // Acknowledgements are sent after verifying immutable retry payloads.
+});
