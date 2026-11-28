@@ -1,9 +1,9 @@
-# Dungeon Crawler Kyle — 0.40.0
+# Dungeon Crawler Kyle — 0.41.0
 
-Mobile-first pixel-art dungeon RPG, installable as a browser app. Release candidate for solo play and host-trusted private co-op.
+Mobile-first pixel-art dungeon RPG, installable as a browser app. Single-player release candidate; private co-op remains experimental and its deployment is deferred.
 
 ## Play
-Open https://kyru-koi-san.github.io/Dungeon-Crawler-Kyle/ in Safari. Confirm BUILD 0.40.0 in the header. Use Share → Add to Home Screen for standalone play. Existing campaign saves remain in browser storage; do not clear site data merely to refresh the build.
+Open https://kyru-koi-san.github.io/Dungeon-Crawler-Kyle/ in Safari. Confirm BUILD 0.41.0 in the header. Use Share → Add to Home Screen for standalone play. Existing campaign saves remain in browser storage; do not clear site data merely to refresh the build.
 
 ## Gameplay
 - Eighteen progressively smaller dungeon floors, six guardians, distinct floor themes, roaming enemies, hidden bosses, hazards, discoveries and physical safe rooms.
@@ -36,3 +36,7 @@ Persistent storage checkpoints room state and preserves completed trade receipts
 
 ## Release limitations
 This is host-trusted private co-op, not an authoritative commercial multiplayer service. Do not expose it as an unrestricted public service. Account authentication, authoritative simulation, anti-cheat, abuse controls, device testing, privacy/security review and store compliance remain necessary for commercial release. No hosted relay or physical-device verification is claimed by this release.
+
+## 0.41.0 single-player release candidate
+
+Includes mobile suspension checkpoints, regular autosaves, cached inventory and map rendering, dense-floor enemy optimization, offline fallback, snapshot validation, revival and reward fixes, and corrected expedition goals. Targeted headless checks covered base layout reachability on 18 floors and six guardian locations, progression gates and victory, inventory stacking and strike damage. Full campaign playthrough, physical iPhone validation and this version's live Pages deployment are not yet verified. Existing save keys are unchanged.
