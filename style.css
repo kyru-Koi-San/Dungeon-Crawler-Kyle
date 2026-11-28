@@ -237,3 +237,19 @@ body:has(#modal:not(.hidden)){overflow:hidden}.modal,.modal-card{overscroll-beha
 .gear-socket b{overflow-wrap:anywhere}
 @media(pointer:coarse){.campaign-dialog button,.bag-nav button,#conversationSkip,.skill-node button{min-height:44px}}
 @media(max-width:360px){.bag-sections button{font-size:11px}.rpg-pack .bag-slot span{font-size:10px}.gear-board{grid-template-columns:minmax(80px,.8fr) minmax(0,1.4fr)}}
+
+/* Cinematic anime-inspired conversation UI — original pixel-art cast. */
+.modal-card:has(.conversation){width:min(680px,94vw);max-height:88dvh;overflow:auto;background:#0c111c;border:1px solid #ad8b63;box-shadow:0 0 0 4px #0a0b13,0 18px 75px #000c;}
+.conversation{gap:10px;isolation:isolate;}
+.conversation-head{position:relative;overflow:hidden;min-height:154px;align-items:center;padding:12px 16px;background:radial-gradient(ellipse at 18% 50%,#9b5b46 0%,transparent 55%),repeating-conic-gradient(from 15deg at 19% 50%,#f8cb8c0c 0deg 2deg,transparent 2deg 19deg),linear-gradient(115deg,#45313e,#182434 60%,#0d1321);border:1px solid #9b785b;border-bottom:3px solid #e2b47c;}
+.conversation-head canvas{position:relative;width:108px;height:144px;flex:none;border:0;background:transparent;filter:drop-shadow(5px 5px 0 #090912aa);animation:dialogue-arrival .25s ease-out both;}
+.conversation-head>div{position:relative;min-width:0;}
+.conversation-head h2{font:italic 800 clamp(24px,5.6vw,40px)/1.05 Georgia,serif;color:#fff1d6;text-shadow:3px 3px #281a23;overflow-wrap:anywhere;}
+.conversation-head small:first-child{display:inline-block;background:#f0ca90;color:#35242d;padding:4px 7px;letter-spacing:.1em;font-weight:900;font-size:10px;}
+#conversationLine{position:relative;background:linear-gradient(115deg,#202738,#101723);border:1px solid #645b67;border-left:4px solid #e6bd85;padding:16px;font:500 clamp(16px,4vw,19px)/1.5 Georgia,serif;color:#fff1dc;min-height:4em;}
+#conversationSkip{color:#f2c78c;min-height:44px;}
+.conversation-choices button{border:1px solid #6f6266;border-left:4px solid #bd946d;border-radius:2px;background:linear-gradient(105deg,#403442,#1c2636);min-height:48px;font-weight:650;transition:background .15s;}
+.conversation-choices button:not(:disabled):active{background:#735042;}
+@keyframes dialogue-arrival{from{transform:translateX(-20px);opacity:0}to{transform:translateX(0);opacity:1}}
+@media(max-width:480px){.conversation-head{padding:8px;min-height:120px;gap:10px}.conversation-head canvas{width:81px;height:108px}.conversation-head h2{font-size:clamp(21px,6vw,30px)}#conversationLine{padding:12px}}
+@media(prefers-reduced-motion:reduce){.conversation-head canvas{animation:none}.conversation-choices button{transition:none}}
