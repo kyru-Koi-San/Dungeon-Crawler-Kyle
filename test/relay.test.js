@@ -7,6 +7,10 @@ const p=await port(),url='ws://127.0.0.1:'+p,child=spawn(process.execPath,['rela
 await new Promise((r,j)=>{const timer=setTimeout(()=>j(Error('relay startup timeout')),5000);child.stdout.on('data',d=>{if(String(d).includes('listening')){clearTimeout(timer);r()}});child.once('exit',()=>{clearTimeout(timer);j(Error('relay exited'))})});
 const a=await peer(url,t),b=await peer(url,t);const aid=(await a.next('hello')).id,bid=(await b.next('hello')).id;
 a.send({type:'create_room',name:'Alpha'});const room=await a.next('room_joined');b.send({type:'join_room',code:room.code,name:'Beta'});await b.next('room_joined');
+// Invalid and redundant join attempts must not silently abandon the active party.
+a.send({type:'join_room',code:'!',name:'Alpha'});await a.next('error',m=>m.message.includes('Room not found'));
+a.send({type:'join_room',code:room.code,name:'Alpha'});await a.next('error',m=>m.message.includes('already in'));
+a.send({type:'world_snapshot',world:{floor:1,enemies:[]}});assert.equal((await b.next('world_snapshot')).world.floor,1);
 a.send({type:'trade_open',target:bid});const id=(await a.next('trade_state')).trade.id;await b.next('trade_state');
 const tokenA='a'.repeat(32),tokenB='b'.repeat(32),offerA=[{item:'gold',qty:20},{item:'tonic',qty:2}],offerB=[{item:'torch',qty:3}];
 a.send({type:'trade_offer',id,token:tokenA,offer:offerA});await a.next('trade_state',m=>m.trade.version===1);
