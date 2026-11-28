@@ -1163,12 +1163,12 @@ const techniques={
  aegis:{name:'Aegis Break',floor:8,sub:'Aegis',cost:9,guard:true,scale:'armor',desc:'Power + twice armor + 12; guard the counterattack.'},
  juggernaut:{name:'Titan Charge',floor:8,sub:'Juggernaut',cost:9,scale:'health',desc:'Power + 30% maximum HP.'},
  stormcaller:{name:'Thunderfall',floor:8,sub:'Stormcaller',cost:12,scale:'magic',desc:'30 + triple spell damage + level.'},
- sage:{name:'Astral Surge',floor:8,sub:'Mana Sage',cost:10,scale:'mana',desc:'20 + 65% maximum MP.'},
+ sage:{name:'Astral Surge',floor:8,sub:'Mana Sage',cost:10,scale:'mana',desc:'20 + 65% maximum MP + level.'},
  executioner:{name:'Final Verdict',floor:8,sub:'Executioner',cost:10,scale:'execution',desc:'Triple power; extra damage against weakened targets.'},
  bloodknight:{name:'Crimson Blade',floor:8,sub:'Blood Knight',cost:9,scale:'physical',heal:0.2,desc:'Twice power + 15; recover 20% of damage.'},
  deadeye:{name:'Perfect Shot',floor:8,sub:'Deadeye',cost:9,scale:'execution',desc:'Triple power; extra damage against weakened targets.'},
  pathfinder:{name:'Ambush',floor:8,sub:'Pathfinder',cost:8,scale:'physical',guard:true,desc:'Twice power + 15; guard counterattack.'},
- transmuter:{name:'Philosopher’s Fire',floor:8,sub:'Transmuter',cost:11,scale:'magic',desc:'30 + triple spell damage.'},
+ transmuter:{name:'Philosopher’s Fire',floor:8,sub:'Transmuter',cost:11,scale:'magic',desc:'30 + triple spell damage + level.'},
  medic:{name:'Restorative Burst',floor:8,sub:'Field Medic',cost:9,scale:'magic',heal:0.35,desc:'30 + triple spell damage + level; recover 35% of damage.'},
  commander:{name:'Citadel Bash',floor:8,sub:'Bulwark Commander',cost:9,scale:'armor',guard:true,desc:'Power + twice armor + 12; guard counterattack.'},
  avenger:{name:'Retribution',floor:8,sub:'Avenger',cost:9,scale:'physical',guard:true,desc:'Twice power + 15; guard counterattack.'},
@@ -1177,7 +1177,7 @@ const techniques={
   bastion:{name:'Bastion strike',floor:4,job:'Sentinel',cost:6,desc:'Strike with power and armor, then guard.'},
   racial:{name:'Racial signature',floor:4,cost:7,desc:'Your race-specific attack. Unlock the second racial skill at rank 2.'},
   mend:{name:'Mend',floor:4,job:'Arcanist',cost:8,desc:'Restore health and treat injuries.'},
-  brace:{name:'Shieldbreaker',floor:4,job:'Vanguard',cost:5,desc:'Strike for power + 6 and guard the counterattack.'},
+  brace:{name:'Shieldbreaker',floor:4,job:'Vanguard',cost:5,desc:'Strike for power + 6 + half your armor and guard the counterattack.'},
   rend:{name:'Rending blow',floor:4,job:'Reaver',cost:6,desc:'Strike for twice your power.'},
   bell:{name:'Bell chime',floor:6,cost:6,desc:'Deal 16 damage plus spell bonus + level.'},
   lunge:{name:'Driving lunge',floor:9,cost:8,desc:'Strike for twice your power + 4.'},
@@ -1195,7 +1195,7 @@ function techniqueDamage(id,p=state,target=bossFight?.e){
  case 'armor':return power+2*armor+12;
  case 'health':return power+Math.floor(hp*.3);
  case 'magic':return 30+3*magic+level;
- case 'mana':return 20+Math.floor(mp*.65);
+ case 'mana':return 20+Math.floor(mp*.65)+level;
  case 'execution':return power*3+(target?.hp<target?.max*.35?Math.floor(power*.5):0);
  case 'physical':return power*2+15;
  }}
@@ -1204,7 +1204,7 @@ function techniqueDamage(id,p=state,target=bossFight?.e){
  case 'volley':return power*2+3;
  case 'catalyst':return 20+2*magic+level;
  case 'bastion':return power+armor+5;
- case 'brace':return power+6;
+ case 'brace':return power+6+Math.floor(armor*.5);
  case 'rend':return power*2;
  case 'bell':return 16+magic+level;
  case 'lunge':return power*2+4;
