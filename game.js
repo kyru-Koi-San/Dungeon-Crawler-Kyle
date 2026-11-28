@@ -55,6 +55,20 @@ function hostPortrait(){
  for(let i=0;i<6;i++){r(12+i*4,39,2,2+(i%3)*3,'#6debd7');r(3,8+i*8,2,3,'#79e3dc');r(43,8+i*8,2,3,'#79e3dc')}
  r(19,53,10,5,'#a6eed6');r(15,59,18,2,'#327b8e');return c;
 }
+function outfitAwards(character){
+ const a=[];
+ if(character.pants==='Underwear')a.push(['Underwear Is Not Armor','Your underwear is not armor. The monsters have been notified.']);
+ if(character.shoes==='Barefoot')a.push(['No Shoes, No Service, No Survival Instinct','Bare feet? Wonderful. Every sharp rock is now a potential plot twist.']);
+ if(character.pants==='Pixelated nude')a.push(['Censored for Your Protection','Our censorship department is working overtime. Thank you for creating jobs.']);
+ if(character.shirt==='None'&&character.pants==='Pixelated nude'&&character.shoes==='Barefoot')a.push(['The Complete Lack of Equipment','You have successfully eliminated the entire wardrobe budget. Unfortunately, the dungeon has not eliminated its teeth.']);
+ return a;
+}
+function awardOutfitChoices(character){
+ for(const [name,line] of outfitAwards(character)){
+ if(state.achievements.includes(name))continue;
+ unlock(name,awardBox('Bronze'));ai(line);
+ }
+}
 function crawlerIntro(page=state.introPage??0){
  if(state.chapter!=='surface'||state.introComplete)return;
  const lines=[
@@ -65,8 +79,8 @@ function crawlerIntro(page=state.introPage??0){
  ['THE FIRST MOVE','Follow the lamps south to the rescue shaft and descend. Your timer starts underground. Try to give our viewers a reason to remember your name. Welcome to the Underfloor.']
  ];
  page=Math.max(0,Math.min(lines.length-1,page));state.introPage=page;persistCampaign();
- const [tag,line]=lines[page];
- const finish=()=>{state.introComplete=true;delete state.introPage;persistCampaign();closeModal();caption('The Underfloor AI','Follow the lamps south. Your broadcast is about to begin.',true);render();persistCampaign()};
+ const [tag,baseLine]=lines[page];const line=page===0?baseLine+' '+outfitAwards(state.character||{}).map(a=>a[1]).join(' '):baseLine;
+ const finish=()=>{state.introComplete=true;delete state.introPage;persistCampaign();closeModal();caption('The Underfloor AI','Follow the lamps south. Your broadcast is about to begin.',true);awardOutfitChoices(state.character||{});render();persistCampaign()};
  dialogueFrame('The Underfloor AI',line,{aiHost:true,job:'Broadcast controller'},[{label:page===lines.length-1?'Enter the crawl':'Continue transmission',run:()=>page===lines.length-1?finish():crawlerIntro(page+1)},{label:'Skip introduction',run:finish}],tag+' · '+(page+1)+' / '+lines.length);
 }
 function showCreator(){if(state.chapter!=='create'&&personalMenusLocked()){lockHint();return}
@@ -90,7 +104,7 @@ function showCreator(){if(state.chapter!=='create'&&personalMenusLocked()){lockH
     if(state.chapter==='create'){
       state.chapter='surface';state.introPage=0;state.introComplete=false;persistCampaign();render();crawlerIntro(0);return;
     }
-    closeModal();render();persistCampaign();
+    closeModal();awardOutfitChoices(state.character||{});render();persistCampaign();
   };
 }
 const guildArt=new Image();guildArt.src='guild-hall.png';
@@ -1485,6 +1499,11 @@ const target=chasing?state:e.den;if(!target)continue;
 let dx=Math.sign(target.x-e.x),dy=Math.sign(target.y-e.y);let opts=Math.random()<.5?[[dx,0],[0,dy]]:[[0,dy],[dx,0]];for(let [ax,ay] of opts)if((ax||ay)&&!(step&&e.x+ax===step.nx&&e.y+ay===step.ny)&&!solid(e.x+ax,e.y+ay)&&!sanctuaryAt(e.x+ax,e.y+ay)&&!enemyOccupancy.has((e.y+ay)*W+e.x+ax)){release(e);e.x+=ax;e.y+=ay;occupy(e);break}}}enemyOccupancy=null}
 function checkLevel(){while(state.xp>=state.nextXp){state.xp-=state.nextXp;state.level++;state.nextXp=progressionXp(state.level);state.maxHp+=12;restoreHealth(state.maxHp);if(state.floor>=4){state.maxMp+=4;state.mp=state.maxMp}state.power+=2;state.skillPoints++;feed('<b>LEVEL UP!</b> You reached level '+state.level+'. Stats increased.');notify('LEVEL UP — LEVEL '+state.level);unlock('Getting stronger');beep(660,.2,'sine')}}
 const achievementNotes={
+ 'Underwear Is Not Armor':'Enter the broadcast wearing underwear. Congratulations on your outstanding commitment to ventilation.',
+ 'No Shoes, No Service, No Survival Instinct':'Enter the broadcast barefoot. The dungeon regrets to inform you that the floor is not carpeted.',
+ 'Censored for Your Protection':'Choose the pixelated nude outfit. Our censorship department has finally found a purpose.',
+ 'The Complete Lack of Equipment':'Choose no shirt, pixelated nude bottoms and bare feet. The wardrobe budget has been successfully eliminated.',
+
   'Guild inductee':'Finished Rowan’s induction and earned access to the crawler menus.',
   'Not alone':'Found another crawler and spoke to them in the dungeon.',
   'Even Cowards Need a Break':'Discovered a guild sanctuary. Even the audience needs an intermission.',
