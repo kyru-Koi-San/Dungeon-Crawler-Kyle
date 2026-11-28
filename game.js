@@ -2570,8 +2570,12 @@ function requestGuestDrop(item,qty){
 function restoreReservedDrop(held){for(const piece of held||[]){const old=state.inventory.find(i=>i.id===piece.id);if(old)old.qty+=piece.qty;else state.inventory.push(piece)}}
 function resolveGuestDrop(d){
  const pending=state.pendingPartyDrop;if(!pending||d.nonce!==pending.nonce)return;
+ if(!partyGuest()||pending.room!==window.DCKNet.roomCode)return;
+ const priorInventory=JSON.parse(JSON.stringify(state.inventory));
  if(!d.ok)restoreReservedDrop(pending.held);
- state.pendingPartyDrop=null;persistCampaign();notify(d.ok?'Your bag is on the dungeon floor.':'Drop rejected; items returned.');render();
+ state.pendingPartyDrop=null;
+ try{writeCampaign()}catch{state.inventory=priorInventory;state.pendingPartyDrop=pending;notify('Drop confirmation awaiting a successful save.');return}
+ notify(d.ok?'Your bag is on the dungeon floor.':'Drop rejected; items returned.');render();
 }
 function processGuestDrop(d){
  if(!window.DCKNet?.isHost)return;
