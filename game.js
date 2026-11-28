@@ -26,7 +26,7 @@ function dialogueFrame(speaker,line,profile,choices,tag='CONVERSATION'){
  clearInterval(dialogueTimer);
  showModal('<section class="conversation"><div class="conversation-head"><canvas id="conversationPortrait" width="72" height="96"></canvas><div><small>'+safeAttr(tag)+'</small><h2>'+safeAttr(speaker)+'</h2><small>'+safeAttr(profile?.race||'')+(profile?.job?' · '+safeAttr(profile.job):'')+'</small></div></div><p id="conversationLine" aria-live="polite"></p><button id="conversationSkip" class="smallbtn">Reveal dialogue</button><div class="conversation-choices">'+choices.map((v,i)=>'<button class="widebtn" data-conversation="'+i+'" '+(v.disabled?'disabled':'')+'>'+safeAttr(v.label)+'</button>').join('')+'</div></section>');
  const portrait=$('#conversationPortrait'),g=portrait.getContext('2d');g.imageSmoothingEnabled=false;
- const p=profile||crawlerProfile(state.floor,9);g.drawImage(crawlerPose('down',0,p,p.gear||{}),0,0,72,96);
+ const p=profile||crawlerProfile(state.floor,9);g.drawImage(p.ratMaster?ratMasterArt():crawlerPose('down',0,p,p.gear||{}),0,0,72,96);
  const target=$('#conversationLine'),skip=$('#conversationSkip');let i=0;
  const finish=()=>{clearInterval(dialogueTimer);dialogueTimer=null;target.textContent=line;skip.hidden=true};
  skip.onclick=finish;if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else dialogueTimer=setInterval(()=>{if(!target.isConnected){clearInterval(dialogueTimer);dialogueTimer=null;return}i+=3;target.textContent=line.slice(0,i);if(i>=line.length)finish()},22);
@@ -533,7 +533,29 @@ function guildIdentity(){
  $('#ascRace').value=races.includes(state.character?.race)?state.character.race:'Human';$('#ascClass').value=classes.includes(state.specialization)?state.specialization:'Vanguard';$('#ascRace').onchange=preview;$('#ascClass').onchange=preview;preview();
  $('#ascConfirm').onclick=()=>{const r=$('#ascRace').value,c=$('#ascClass').value;showModal('<h2>Confirm permanent identity</h2><p>'+r+' · '+c+'</p><p>'+perkText(r)+' · '+skillPaths[c].bonus+'</p><button class="widebtn" id="ascLock">Confirm for this campaign</button><button class="widebtn" id="ascBack">Change selection</button>');$('#ascBack').onclick=guildIdentity;$('#ascLock').onclick=()=>{if(state.identityLocked)return;state.character={...state.character,race:r};for(const [k,v] of Object.entries(racePerks[r])){state[k]=(state[k]||0)+v;if(k==='maxHp')state.hp+=v;if(k==='maxMp')state.mp+=v}if(state.specialization!==c){if(state.specialization)removeClass();state.specialization=c;applyClassBonus(c,1)}state.identityLocked=true;state.guildTrained=true;state.hp=Math.min(state.hp,state.maxHp);state.mp=Math.min(state.mp,state.maxMp);persistCampaign();closeModal();render();caption('Guild Master Rowan','Your identity is sealed. Make it count.',true);persistCampaign()}};
 }
-function rowanProfile(){return {skin:3,race:'Human',job:'Guild master',hair:'Crop',shirt:'Tunic',shirtColor:'#725b43',pants:'Trousers',pantsColor:'#383b47',shoes:'Boots',gear:{}}}
+let rowanArt;
+function ratMasterArt(){
+ if(rowanArt)return rowanArt;
+ const canvas=document.createElement('canvas');canvas.width=48;canvas.height=64;const g=canvas.getContext('2d');
+ const rect=(x,y,w,h,color)=>{g.fillStyle=color;g.fillRect(x,y,w,h)};
+ const poly=(color,points)=>{g.fillStyle=color;g.beginPath();points.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fill()};
+ poly('#17151c',[[5,63],[8,39],[15,30],[9,19],[6,9],[10,3],[18,5],[23,12],[30,8],[37,4],[43,8],[41,20],[35,29],[40,38],[45,63]]);
+ poly('#9a574b',[[9,9],[12,6],[18,9],[20,17],[13,21],[9,16]]);poly('#d59289',[[11,10],[14,9],[17,15],[13,17]]);
+ poly('#9a574b',[[32,11],[37,7],[40,10],[39,17],[34,20]]);rect(35,10,4,6,'#d59289');
+ poly('#78665e',[[15,16],[21,11],[30,11],[35,16],[36,23],[29,33],[20,33],[12,25]]);
+ poly('#ad9682',[[16,16],[22,13],[27,14],[23,20],[16,24],[13,21]]);
+ poly('#51434a',[[27,14],[33,17],[35,24],[29,29],[26,22]]);
+ rect(16,21,7,3,'#291f24');rect(28,21,6,3,'#291f24');rect(19,22,2,1,'#ffd28c');rect(29,22,2,1,'#ffd28c');
+ poly('#c0aa98',[[20,24],[29,24],[33,29],[29,35],[21,35],[17,30]]);rect(23,27,6,3,'#392a32');rect(24,32,4,1,'#59454a');
+ rect(8,28,10,1,'#c4b9ad');rect(7,31,11,1,'#c4b9ad');rect(32,28,10,1,'#c4b9ad');rect(33,31,10,1,'#c4b9ad');
+ poly('#6b2837',[[14,34],[20,37],[26,40],[33,34],[39,40],[42,59],[34,63],[10,63],[8,50]]);
+ poly('#a84c4c',[[14,36],[20,38],[26,46],[19,53],[11,51]]);poly('#492333',[[33,36],[38,42],[40,58],[31,63],[26,52]]);
+ poly('#d2b78e',[[17,34],[24,38],[31,34],[34,37],[25,47],[13,37]]);
+ rect(12,51,26,5,'#c09b62');rect(23,51,5,5,'#eee0ad');rect(15,57,3,7,'#481f2c');rect(32,57,3,7,'#481f2c');
+ rect(43,28,3,36,'#4c3027');rect(44,28,1,36,'#c39c62');rect(42,27,5,3,'#e2bc79');rect(38,44,7,5,'#9e8272');
+ rowanArt=canvas;return canvas;
+}
+function rowanProfile(){return {skin:3,race:'Ratfolk',job:'Guild master',ratMaster:true,hair:'Crop',shirt:'Tunic',shirtColor:'#725b43',pants:'Trousers',pantsColor:'#383b47',shoes:'Boots',gear:{}}}
 function guildMaster(){
   if(!state.hall)return;
   if(state.floor>=4&&!state.identityLocked){dialogueFrame('Guild Master Rowan','Welcome to the Guild of Ascension. It is time to choose your permanent race and class.',rowanProfile(),[{label:'Begin identity registration',run:guildIdentity}],'GUILD OF ASCENSION');return}
@@ -573,10 +595,8 @@ function drawHall(){
   const scale=Math.min(cw/416,ch/320),sx=scale*canvas.width/cw,sy=scale*canvas.height/ch;
   g.save();g.translate((canvas.width-416*sx)/2,(canvas.height-320*sy)/2);g.scale(sx,sy);g.imageSmoothingEnabled=false;
   const backdrop=hallBackdrop(h);if(backdrop)g.drawImage(backdrop,0,0);else{g.fillStyle='#584638';g.fillRect(0,0,416,320)}
-  const look={armor:'coat',charm:'bell'};
-  g.drawImage(crawlerPose('down',0,{skin:3,race:'Human'},look),193,85,30,40);
-  g.fillStyle='#d3d1c4';g.fillRect(204,93,7,2);g.fillRect(205,98,6,4);
-  g.font='bold 11px monospace';g.textAlign='center';g.fillStyle='#161b1e';g.fillRect(149,71,118,14);g.fillStyle='#eed19a';g.fillText('Guild Master Rowan',208,81);
+  g.drawImage(ratMasterArt(),184,61,48,64);
+  g.font='bold 11px monospace';g.textAlign='center';g.fillStyle='#161b1e';g.fillRect(149,46,118,14);g.fillStyle='#eed19a';g.fillText('Guild Master Rowan',208,56);
   g.font='bold 12px monospace';g.textAlign='center';g.fillStyle='#19212a';g.fillRect(91,265,234,16);g.fillStyle=hallStyles[hallTheme()].color;g.fillText(hallStyles[hallTheme()].name+' · '+state.floor+'-'+(h.index+1),208,277);
   drawHero(x,y);
   for(const ally of Object.values(netPlayers))if(ally.floor===state.floor&&ally.hall?.index===h.index)g.drawImage(crawlerPose('down',0,ally.character||{},ally.gear||{}),ally.hall.x*32+4,ally.hall.y*32-4,24,32);
