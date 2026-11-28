@@ -7,7 +7,7 @@ const names=['Pioneer Square • Bell Vault','Elliott Bay • Floodworks','SoDo 
 const FINAL_FLOOR=18;
 const quips=['Welcome, crawler. Try not to die before the opening credits.','Your posture suggests a lack of confidence. And armor.','The audience loves a comeback. They love a dismemberment more.','I have seen rats with better tactical instincts.','Excellent footwork. Shame about the rest of you.','A new floor! The same questionable life choices.','Remember: pain is temporary. The highlight reel is forever.','That corpse had a family. Probably.','Your odds are improving. They were dreadful, so this is relative.','Do keep moving. The walls are not decorative.'];
 let state,tiles=[],seen=[],entities=[],particles=[],keys={},last=0,acc=0,walkUntil=0,attackStarted=0,sound=true,audio=null,toastTimer=0,attackCooldown=0,spawnedFloor=0,tab='journal',touchMove=null,netPlayers={},netSyncClock=0;
-let step=null,stepCount=0;const WALK_MS=275,RUN_MS=160;
+let autosaveElapsed=0;let step=null,stepCount=0;const WALK_MS=275,RUN_MS=160;
 let runPointer=null,stickPointer=null;
 let joystickAxis=null;let visualX=null,visualY=null,visualFloor=0,joyX=0,joyY=0,hurtAt=0;const sprites={};
 const spriteNames=['pack-llama','flood-grub','mire-leprechaun','hero-front','hero-side','hero-back','hero-slash','hero-strike','sewer-rat','skeleton','goblin','spider','wraith','archer','shaman','spider-boss','bone-champion'];
@@ -2417,9 +2417,15 @@ bindMovementControls();
 const status=$('#mobileStatus');status.onclick=()=>{if(personalMenusLocked()){lockHint();return}clearMovement();document.body.classList.add('status-open')};
 $('#statusClose').onclick=()=>document.body.classList.remove('status-open');
 let field=document.createElement('div');field.className='field-map';field.innerHTML='<canvas width="240" height="180" id="fieldMini"></canvas>';$('.canvas-wrap').appendChild(field);window.addEventListener('blur',clearMovement);
-window.addEventListener('pagehide',clearMovement);
+function suspendSoloSession(){
+ clearMovement();
+ if(window.DCKNet?.inRoom||window.DCKNet?.recovering)return;
+ step=null;last=0;visualX=(state.hall||state).x;visualY=(state.hall||state).y;
+ persistCampaign();
+}
+window.addEventListener('pagehide',suspendSoloSession);
 $('#soundBtn').addEventListener('click',clearMovement);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)clearMovement()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendSoloSession();else last=0});window.addEventListener('pageshow',()=>{last=0});
 document.addEventListener('keydown',e=>{
 if($('#audioPanel').open||pauseStarted!==null||modalOpen()||document.body.classList.contains('status-open')||e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable]'))return;
 if(e.target instanceof Element&&e.target.closest('button')&&[' ','Enter'].includes(e.key))return;
@@ -2851,6 +2857,7 @@ function collapseTick(dt){if(state.campaignWon)return;if(state.hall&&!window.DCK
    if(high){beep(480,.12);setTimeout(()=>beep(480,.12),220);notify('Two bells · blue crossings submerged')}else notify('Water recedes · crossings open')}}
  if(state.relay?.race==='live'&&state.relay.raceStart-state.collapseLeft>75){state.relay.race='lost';highlight('Night Shift reached the station first and took the purse.',4)}
  let n=Math.ceil(state.collapseLeft),el=$('#collapseClock');if(el){el.textContent='COLLAPSE '+Math.floor(n/60)+':'+String(n%60).padStart(2,'0');el.style.color=n<=60?'#ff7766':'#e6c47d'}for(let t of [300,60,10])if(n<=t&&!state.warned.includes(t)){state.warned.push(t);ai('Floor collapse in '+t+' seconds. Find the stairs, crawler.');notify('COLLAPSE WARNING: '+t+'s')}if(n===0){bossFight=null;state.collapsed=true;state.dead=true;state.hp=0;save();showModal('<h2>FLOOR COLLAPSED</h2><p>You failed to reach the stairs in time.</p><button class="widebtn" id="collapseRestart">NEW RUN</button>');$('#collapseRestart').onclick=campaignMenu}}document.addEventListener('click',e=>{let b=e.target.closest('[data-class]');if(b)chooseClass(b.dataset.class);let t=e.target.closest('[data-branch]');if(t)trainBranch(t.dataset.branch)});function tick(ts){
+if(document.hidden){last=0;requestAnimationFrame(tick);return}
 if(window.DCKNet?.recovering){last=ts;requestAnimationFrame(tick);return}
 if(pauseStarted!==null){last=ts;requestAnimationFrame(tick);return}
 if(bossFight&&!window.DCKNet?.inRoom){last=ts;requestAnimationFrame(tick);return}
@@ -2860,7 +2867,7 @@ if(step){
   visualX=step.x+(step.nx-step.x)*progress;
   visualY=step.y+(step.ny-step.y)*progress;
 }
-}}if(!partyGuest())advanceEnemySimulation(dt);worldClock+=dt;if(worldClock>(entities.length>=350?.8:.5)){worldClock=0;sendPartyWorld()}attackCooldown=Math.max(0,attackCooldown-dt);particles.forEach(p=>p.t+=dt);particles=particles.filter(p=>p.t<.65);if(Math.random()<dt*.025)persistCampaign();netSyncClock+=dt;if(netSyncClock>.18&&window.DCKNet?.inRoom){netSyncClock=0;window.DCKNet.sendState({hall:state.hall?{index:state.hall.index,x:state.hall.x,y:state.hall.y}:null,gear:gearLook(),character:state.character,floor:state.floor,x:state.x,y:state.y,level:state.level,hp:state.hp,maxHp:state.maxHp,mp:state.mp,maxMp:state.maxMp,power:state.power,armor:state.armor,spellBonus:state.spellBonus||0,spells:prepared(),name:localStorage.getItem('dck-net-name')||'Crawler'});}}if(!state.dead&&Math.floor(ts/200)!==Math.floor((ts-dt*1000)/200))render();else draw();requestAnimationFrame(tick)}
+}}if(!partyGuest())advanceEnemySimulation(dt);worldClock+=dt;if(worldClock>(entities.length>=350?.8:.5)){worldClock=0;sendPartyWorld()}attackCooldown=Math.max(0,attackCooldown-dt);particles.forEach(p=>p.t+=dt);particles=particles.filter(p=>p.t<.65);autosaveElapsed+=dt;if(autosaveElapsed>=15){autosaveElapsed=0;persistCampaign()}netSyncClock+=dt;if(netSyncClock>.18&&window.DCKNet?.inRoom){netSyncClock=0;window.DCKNet.sendState({hall:state.hall?{index:state.hall.index,x:state.hall.x,y:state.hall.y}:null,gear:gearLook(),character:state.character,floor:state.floor,x:state.x,y:state.y,level:state.level,hp:state.hp,maxHp:state.maxHp,mp:state.mp,maxMp:state.maxMp,power:state.power,armor:state.armor,spellBonus:state.spellBonus||0,spells:prepared(),name:localStorage.getItem('dck-net-name')||'Crawler'});}}if(!state.dead&&Math.floor(ts/200)!==Math.floor((ts-dt*1000)/200))render();else draw();requestAnimationFrame(tick)}
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 if(!load()){startStory()}else{if(!state.sanctuaries?.length&&state.safe)state.sanctuaries=[state.safe];if(state.hall&&!state.sanctuaries?.[state.hall.index]?.door)state.hall=null;
   if(!state.hall&&!state.dead){const q=sanctuaryAt(state.x,state.y);if(q?.door)enterHall(q)}
