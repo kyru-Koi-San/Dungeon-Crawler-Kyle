@@ -1716,16 +1716,19 @@ function companionMenu(){
 function writeCampaign(key=saveKey){
 if(switchingCampaign)throw Error('Campaign is switching');
 const encounter=bossFight?{...bossFight,e:entities.indexOf(bossFight.e)}:null;
-localStorage.setItem(key,JSON.stringify({state,tiles,seen,entities,encounter,savedAt:Date.now()}));
+const snapshot={state,tiles,seen,entities,encounter,savedAt:Date.now()};
+if(!validCampaign(snapshot))throw Error('Invalid campaign snapshot');
+localStorage.setItem(key,JSON.stringify(snapshot));
 }
 function persistCampaign(){try{writeCampaign();flushPartyRounds()}catch{}}
 function save(){try{writeCampaign();notify('CAMPAIGN SAVED');}catch(e){notify('Save unavailable on this browser.')}}function validCampaign(o){if(!o?.state||!Number.isInteger(o.state.floor)||o.state.floor<1||o.state.floor>FINAL_FLOOR||!Number.isFinite(o.state.hp)||!Number.isFinite(o.state.maxHp)||o.state.maxHp<=0||!Number.isInteger(o.state.level)||o.state.level<1||!Array.isArray(o.state.inventory)||!Array.isArray(o.tiles)||!o.tiles.length||o.tiles.length>80||!Array.isArray(o.tiles[0])||!o.tiles[0].length||o.tiles[0].length>118||!Array.isArray(o.seen)||o.seen.length!==o.tiles.length||!Array.isArray(o.entities))return false;const width=o.tiles[0].length;return o.tiles.every(row=>Array.isArray(row)&&row.length===width&&row.every(t=>Number.isInteger(t)&&t>=0&&t<=3))&&o.seen.every(row=>Array.isArray(row)&&row.length===width)&&o.entities.every(e=>e&&Number.isFinite(e.x)&&Number.isFinite(e.y))}
-function load(){try{let o=JSON.parse(localStorage.getItem(saveKey));if(validCampaign(o)){bossFight=null;state=o.state;tiles=o.tiles;W=tiles[0].length;H=tiles.length;state.collapseLeft??=900;state.warned??=[];seen=o.seen;entities=o.entities||[];
+function readCampaign(raw){try{const data=JSON.parse(raw);return validCampaign(data)?data:null}catch{return null}}
+function load(){try{let o=readCampaign(localStorage.getItem(saveKey));if(validCampaign(o)){bossFight=null;state=o.state;tiles=o.tiles;W=tiles[0].length;H=tiles.length;state.collapseLeft??=900;state.warned??=[];seen=o.seen;entities=o.entities||[];
 if(state.floor<4){
  if(state.character)state.character.race='Human';
  if(state.specialization)removeClass();
  entities.forEach((e,i)=>{
- if(e.type!=='enemy'||e.small)return;
+ if(e.type!=='enemy'||e.small||e.rosterVersion>=2||e.hatchling||e.localBoss||e.hostileCrawler||e.balanceVersion>=1)return;
  const rat=!e.boss&&i%2===0;
  const max=e.boss?48:(rat?7:13)+state.floor*2;
  e.hp=e.alive?Math.max(1,Math.round(max*e.hp/e.max)):0;
