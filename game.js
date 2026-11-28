@@ -26,7 +26,7 @@ function dialogueFrame(speaker,line,profile,choices,tag='CONVERSATION'){
  clearInterval(dialogueTimer);
  showModal('<section class="conversation"><div class="conversation-head"><canvas id="conversationPortrait" width="72" height="96"></canvas><div><small>'+safeAttr(tag)+'</small><h2>'+safeAttr(speaker)+'</h2><small>'+safeAttr(profile?.race||'')+(profile?.job?' · '+safeAttr(profile.job):'')+'</small></div></div><p id="conversationLine" aria-live="polite"></p><button id="conversationSkip" class="smallbtn">Reveal dialogue</button><div class="conversation-choices">'+choices.map((v,i)=>'<button class="widebtn" data-conversation="'+i+'" '+(v.disabled?'disabled':'')+'>'+safeAttr(v.label)+'</button>').join('')+'</div></section>');
  const portrait=$('#conversationPortrait'),g=portrait.getContext('2d');g.imageSmoothingEnabled=false;
- const p=profile||crawlerProfile(state.floor,9);g.drawImage(p.ratMaster?ratMasterArt():crawlerPose('down',0,p,p.gear||{}),0,0,72,96);
+ const p=profile||crawlerProfile(state.floor,9);g.drawImage(p.aiHost?hostPortrait():p.ratMaster?ratMasterArt():crawlerPose('down',0,p,p.gear||{}),0,0,72,96);
  const target=$('#conversationLine'),skip=$('#conversationSkip');let i=0;
  const finish=()=>{clearInterval(dialogueTimer);dialogueTimer=null;target.textContent=line;skip.hidden=true};
  skip.onclick=finish;if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else dialogueTimer=setInterval(()=>{if(!target.isConnected){clearInterval(dialogueTimer);dialogueTimer=null;return}i+=3;target.textContent=line.slice(0,i);if(i>=line.length)finish()},22);
@@ -47,6 +47,28 @@ function crawlerTitle(){
   const wins=state.guardianRecord?.length||0;
   return (state.character?.name||'Crawler')+(wins?' '+ '★'.repeat(wins):'');
 }
+function hostPortrait(){
+ const c=document.createElement('canvas');c.width=48;c.height=64;const g=c.getContext('2d');
+ const r=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)};
+ r(8,10,32,42,'#152e42');r(5,19,38,24,'#28546c');r(10,7,28,49,'#347d8e');r(13,12,22,40,'#102333');
+ r(16,20,16,14,'#296a80');r(20,22,8,10,'#b9fff0');r(23,24,3,6,'#12384f');
+ for(let i=0;i<6;i++){r(12+i*4,39,2,2+(i%3)*3,'#6debd7');r(3,8+i*8,2,3,'#79e3dc');r(43,8+i*8,2,3,'#79e3dc')}
+ r(19,53,10,5,'#a6eed6');r(15,59,18,2,'#327b8e');return c;
+}
+function crawlerIntro(page=state.introPage??0){
+ if(state.chapter!=='surface'||state.introComplete)return;
+ const lines=[
+ ['SIGNAL ACQUIRED','Congratulations, '+(state.character?.name||'crawler')+'. Your registration is complete. Seattle has gone dark, the stairs have opened, and you have been selected for our subterranean survival broadcast. The selection process was wonderfully democratic: nobody voted.'],
+ ['THE RULES','Eighteen floors stand between you and freedom. Each floor has a collapse timer. Find the stairs before time expires. Every third floor has a guardian that must be defeated. Yes, the larger ones are supposed to look unfair.'],
+ ['THE AUDIENCE','Fight monsters, search rooms, loot equipment and earn achievements. Exceptional accomplishments may earn reward boxes. Other crawlers can become allies or enemies. Our viewers appreciate both outcomes.'],
+ ['SURVIVAL ADVICE','Safe rooms protect you from monsters. Find Guild Master Rowan and complete induction to unlock your menus. On floor four, choose your permanent race and class. Spend skill points wisely. Your starting outfit is not a strategy.'],
+ ['THE FIRST MOVE','Follow the lamps south to the rescue shaft and descend. Your timer starts underground. Try to give our viewers a reason to remember your name. Welcome to the Underfloor.']
+ ];
+ page=Math.max(0,Math.min(lines.length-1,page));state.introPage=page;persistCampaign();
+ const [tag,line]=lines[page];
+ const finish=()=>{state.introComplete=true;delete state.introPage;persistCampaign();closeModal();caption('The Underfloor AI','Follow the lamps south. Your broadcast is about to begin.',true);render();persistCampaign()};
+ dialogueFrame('The Underfloor AI',line,{aiHost:true,job:'Broadcast controller'},[{label:page===lines.length-1?'Enter the crawl':'Continue transmission',run:()=>page===lines.length-1?finish():crawlerIntro(page+1)},{label:'Skip introduction',run:finish}],tag+' · '+(page+1)+' / '+lines.length);
+}
 function showCreator(){if(state.chapter!=='create'&&personalMenusLocked()){lockHint();return}
   const current=state.character||{race:'Human',skin:2,gender:'Nonbinary'};
   const choices=(list,value)=>list.map((name,i)=>'<option value="'+i+'" '+(i===value?'selected':'')+'>'+name+'</option>').join('');
@@ -66,8 +88,7 @@ function showCreator(){if(state.chapter!=='create'&&personalMenusLocked()){lockH
   form.onsubmit=e=>{
     e.preventDefault();state.character=selection();
     if(state.chapter==='create'){
-      state.chapter='surface';
-      caption('Mara, bell keeper','Seattle lost power at dusk. Then a fourth bell rang beneath Pioneer Square. Follow the lamps to the rescue shaft.',true);
+      state.chapter='surface';state.introPage=0;state.introComplete=false;persistCampaign();render();crawlerIntro(0);return;
     }
     closeModal();render();persistCampaign();
   };
@@ -459,7 +480,29 @@ function drawRelay(){
  if(state.floor===2&&state.season?.crew==='following'&&r.trail&&!state.hall)spriteDraw('hero-back',r.trail.x*32+16,r.trail.y*32+24,25,36);
 }
 
-function guildStation(){const h=state.hall;if(!h)return;const t=hallStyles[hallTheme(h)];return [...guildStations,{x:t.x,y:t.y,kind:"discovery",label:t.object}].filter(s=>Math.hypot(s.x-h.x,s.y-h.y)<=1.6).sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0]}
+const rowanRoute=[[6,3],[7,3],[7,4],[7,5],[6,5],[5,5],[5,4],[5,3]];
+let rowanWalk=null;
+function rowanPosition(){
+ const h=state.hall;if(!h)return null;
+ if(!rowanWalk||rowanWalk.hall!==h)rowanWalk={hall:h,index:0,next:0,progress:0,rest:1.5};
+ const r=rowanWalk,[x,y]=rowanRoute[r.index],[nx,ny]=rowanRoute[r.next];
+ return {x:x+(nx-x)*r.progress,y:y+(ny-y)*r.progress,moving:r.index!==r.next,dx:nx-x};
+}
+function rowanBlocks(x,y){
+ if(!state.hall)return false;rowanPosition();
+ return [rowanWalk.index,rowanWalk.next].some(i=>rowanRoute[i][0]===x&&rowanRoute[i][1]===y);
+}
+function advanceRowan(dt){
+ if(!state.hall)return;const p=rowanPosition(),r=rowanWalk,h=state.hall;
+ if(modalOpen()||state.dead)return;
+ if(r.index!==r.next){r.progress=Math.min(1,r.progress+dt*2);if(r.progress===1){r.index=r.next;r.progress=0;r.rest=1.1}return}
+ if(Math.hypot(p.x-h.x,p.y-h.y)<=1.6){r.rest=.8;return}
+ r.rest-=dt;if(r.rest>0)return;
+ const next=(r.index+1)%rowanRoute.length,[x,y]=rowanRoute[next];
+ if((x===h.x&&y===h.y)||(step&&step.nx===x&&step.ny===y)){r.rest=.4;return}
+ r.next=next;r.progress=0;
+}
+function guildStation(){const h=state.hall;if(!h)return;const t=hallStyles[hallTheme(h)],rowan=rowanPosition();return [...guildStations.filter(s=>s.kind!=='master'),{...rowan,kind:'master',label:'Talk'},{x:t.x,y:t.y,kind:"discovery",label:t.object}].filter(s=>Math.hypot(s.x-h.x,s.y-h.y)<=1.6).sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0]}
 function personalMenusLocked(){return state.guildTrained!==true}
 function lockHint(){
   if(state.hall||state.chapter==='surface'||state.chapter==='create'){notify(state.hall?'Walk up the rug and tap Interact beside Rowan.':'Descend into the mine to meet Guild Master Rowan.');return}
@@ -467,9 +510,9 @@ function lockHint(){
   const q=doors[0];notify(q?'Guild induction: nearest sanctuary at X '+q.x+', Y '+q.y+' (green on map).':'Speak to Guild Master Rowan in a sanctuary.');
 }
 function hallWalkable(x,y){
-  if(hallFurniture[hallTheme()].some(([a,b])=>a===x&&b===y))return false;
+  if(rowanBlocks(x,y)||hallFurniture[hallTheme()].some(([a,b])=>a===x&&b===y))return false;
   const t=hallStyles[hallTheme()];if(x===t.x&&y===t.y)return false;
-  return (x===6&&y===8)||(x>=1&&x<=11&&y>=2&&y<=7&&!guildStations.some(s=>s.x===x&&s.y===y));
+  return (x===6&&y===8)||(x>=1&&x<=11&&y>=2&&y<=7&&!guildStations.some(s=>s.kind!=='master'&&s.x===x&&s.y===y));
 }
 function enterHall(q){
   const index=state.sanctuaries.indexOf(q);
@@ -595,8 +638,10 @@ function drawHall(){
   const scale=Math.min(cw/416,ch/320),sx=scale*canvas.width/cw,sy=scale*canvas.height/ch;
   g.save();g.translate((canvas.width-416*sx)/2,(canvas.height-320*sy)/2);g.scale(sx,sy);g.imageSmoothingEnabled=false;
   const backdrop=hallBackdrop(h);if(backdrop)g.drawImage(backdrop,0,0);else{g.fillStyle='#584638';g.fillRect(0,0,416,320)}
-  g.drawImage(ratMasterArt(),184,61,48,64);
-  g.font='bold 11px monospace';g.textAlign='center';g.fillStyle='#161b1e';g.fillRect(149,46,118,14);g.fillStyle='#eed19a';g.fillText('Guild Master Rowan',208,56);
+  const rp=rowanPosition(),rx=rp.x*32+16,ry=rp.y*32+29,bob=rp.moving&&!ambientMotion.matches?Math.sin(rowanWalk.progress*Math.PI*4)*1.5:0;
+  g.fillStyle='#0007';g.beginPath();g.ellipse(rx,ry,15,4,0,0,Math.PI*2);g.fill();
+  g.save();g.translate(rx,ry-bob);if(rp.dx<0)g.scale(-1,1);g.drawImage(ratMasterArt(),-24,-64,48,64);g.restore();
+  g.font='bold 11px monospace';g.textAlign='center';g.fillStyle='#161b1e';g.fillRect(rx-59,ry-79,118,14);g.fillStyle='#eed19a';g.fillText('Guild Master Rowan',rx,ry-69);
   g.font='bold 12px monospace';g.textAlign='center';g.fillStyle='#19212a';g.fillRect(91,265,234,16);g.fillStyle=hallStyles[hallTheme()].color;g.fillText(hallStyles[hallTheme()].name+' · '+state.floor+'-'+(h.index+1),208,277);
   drawHero(x,y);
   for(const ally of Object.values(netPlayers))if(ally.floor===state.floor&&ally.hall?.index===h.index)g.drawImage(crawlerPose('down',0,ally.character||{},ally.gear||{}),ally.hall.x*32+4,ally.hall.y*32-4,24,32);
@@ -2426,7 +2471,7 @@ function showModal(html){clearInterval(dialogueTimer);dialogueTimer=null;clearMo
 clearInterval(dialogueTimer);dialogueTimer=null;
 if(activeLoot){if(!activeLoot.owner)finishLoot();return}
 if(remoteLoot){if(remoteLoot.owner===window.DCKNet.playerId)window.DCKNet.sendIntent('loot_close');return}
-if(state.chapter==='create')return;if(state.floor>=4&&state.hall&&!state.identityLocked&&!state.dead){guildIdentity();return}if(bossFight&&!state.dead)return;$('#modal').classList.add('hidden');$('#modalBody').replaceChildren()}
+if(state.chapter==='create')return;if(state.chapter==='surface'&&state.introPage!==undefined&&!state.introComplete)return;if(state.floor>=4&&state.hall&&!state.identityLocked&&!state.dead){guildIdentity();return}if(bossFight&&!state.dead)return;$('#modal').classList.add('hidden');$('#modalBody').replaceChildren()}
 let fieldZoom=2;
 function sizePlayfield(){
   if(window.matchMedia('(max-width:1100px)').matches){
@@ -2902,10 +2947,10 @@ if(step){
   visualX=step.x+(step.nx-step.x)*progress;
   visualY=step.y+(step.ny-step.y)*progress;
 }
-}}if(!partyGuest())advanceEnemySimulation(dt);worldClock+=dt;if(worldClock>(entities.length>=350?.8:.5)){worldClock=0;sendPartyWorld()}attackCooldown=Math.max(0,attackCooldown-dt);particles.forEach(p=>p.t+=dt);particles=particles.filter(p=>p.t<.65);autosaveElapsed+=dt;if(autosaveElapsed>=15){autosaveElapsed=0;persistCampaign()}netSyncClock+=dt;if(netSyncClock>.18&&window.DCKNet?.inRoom){netSyncClock=0;window.DCKNet.sendState({hall:state.hall?{index:state.hall.index,x:state.hall.x,y:state.hall.y}:null,gear:gearLook(),character:state.character,floor:state.floor,x:state.x,y:state.y,level:state.level,hp:state.hp,maxHp:state.maxHp,mp:state.mp,maxMp:state.maxMp,power:state.power,armor:state.armor,spellBonus:state.spellBonus||0,spells:prepared(),name:localStorage.getItem('dck-net-name')||'Crawler'});}}if(!state.dead&&Math.floor(ts/200)!==Math.floor((ts-dt*1000)/200))render();else draw();requestAnimationFrame(tick)}
+}}if(state.hall)advanceRowan(dt);if(!partyGuest())advanceEnemySimulation(dt);worldClock+=dt;if(worldClock>(entities.length>=350?.8:.5)){worldClock=0;sendPartyWorld()}attackCooldown=Math.max(0,attackCooldown-dt);particles.forEach(p=>p.t+=dt);particles=particles.filter(p=>p.t<.65);autosaveElapsed+=dt;if(autosaveElapsed>=15){autosaveElapsed=0;persistCampaign()}netSyncClock+=dt;if(netSyncClock>.18&&window.DCKNet?.inRoom){netSyncClock=0;window.DCKNet.sendState({hall:state.hall?{index:state.hall.index,x:state.hall.x,y:state.hall.y}:null,gear:gearLook(),character:state.character,floor:state.floor,x:state.x,y:state.y,level:state.level,hp:state.hp,maxHp:state.maxHp,mp:state.mp,maxMp:state.maxMp,power:state.power,armor:state.armor,spellBonus:state.spellBonus||0,spells:prepared(),name:localStorage.getItem('dck-net-name')||'Crawler'});}}if(!state.dead&&Math.floor(ts/200)!==Math.floor((ts-dt*1000)/200))render();else draw();requestAnimationFrame(tick)}
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 if(!load()){startStory()}else{if(!state.sanctuaries?.length&&state.safe)state.sanctuaries=[state.safe];if(state.hall&&!state.sanctuaries?.[state.hall.index]?.door)state.hall=null;
   if(!state.hall&&!state.dead){const q=sanctuaryAt(state.x,state.y);if(q?.door)enterHall(q)}
-  if(!Array.isArray(state.scenery))furnishFloor();if(!state.hall&&!bossFight&&!state.dead&&state.chapter==='mine'&&(solid(state.x,state.y)||sanctuaryAt(state.x,state.y)||[[1,0],[-1,0],[0,-1],[0,1]].every(([dx,dy])=>solid(state.x+dx,state.y+dy))))chooseLanding();if(state.chapter==='mine'&&state.wildAnimal===undefined)placeAnimal();populatePatrols(true);initialiseRelay();populateRivals();populateHazards();populateDiscoveries();populateSecrets();reveal();render();if(state.chapter==='create')showCreator()}bind();render();if(state.dead)openDeath();else if(bossFight)bossScreen();if(!personalMenusLocked())openTab('journal');if(state.storyLine)caption(state.storyLine.speaker,state.storyLine.line);else if(!state.chapter)ai(quips[0]);$('#packBtn').onclick=backpack;$('#editCrawler').onclick=()=>{if(!state.dead&&!bossFight)showCreator()};requestAnimationFrame(tick);
+  if(!Array.isArray(state.scenery))furnishFloor();if(!state.hall&&!bossFight&&!state.dead&&state.chapter==='mine'&&(solid(state.x,state.y)||sanctuaryAt(state.x,state.y)||[[1,0],[-1,0],[0,-1],[0,1]].every(([dx,dy])=>solid(state.x+dx,state.y+dy))))chooseLanding();if(state.chapter==='mine'&&state.wildAnimal===undefined)placeAnimal();populatePatrols(true);initialiseRelay();populateRivals();populateHazards();populateDiscoveries();populateSecrets();reveal();render();if(state.chapter==='create')showCreator()}bind();render();if(state.dead)openDeath();else if(bossFight)bossScreen();else if(state.chapter==='surface'&&state.introPage!==undefined&&!state.introComplete)crawlerIntro();if(!personalMenusLocked()&&!(state.chapter==='surface'&&state.introPage!==undefined&&!state.introComplete))openTab('journal');if(state.storyLine)caption(state.storyLine.speaker,state.storyLine.line);else if(!state.chapter)ai(quips[0]);$('#packBtn').onclick=backpack;$('#editCrawler').onclick=()=>{if(!state.dead&&!bossFight)showCreator()};requestAnimationFrame(tick);
 })();
 
