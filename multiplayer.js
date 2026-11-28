@@ -19,7 +19,7 @@
   get playerId(){return clientId},get roomCode(){return roomCode},get isHost(){return this.inRoom&&hostId===clientId},
   connect(url,name,recovery=false){
    if(!/^wss?:\/\//i.test(url))return Promise.reject(new Error('Use a ws:// or wss:// server URL.'));
-   if(!recovery){stopRetry();finishResume(Error('Recovery cancelled.'));resumeCode=resumeToken=null;hostPaused=false}relayUrl=url;if(socket)socket.close();roomCode=null;players={};playerName=(name||'Crawler').replace(/[^\w -]/g,'').slice(0,16)||'Crawler';
+   if(!recovery){stopRetry();finishResume(Error('Recovery cancelled.'));resumeCode=resumeToken=null;storeResume();hostPaused=false;if(pendingRoom){pendingRoom.reject(Error('Connection replaced.'));pendingRoom=null}}relayUrl=url;if(socket)socket.close();roomCode=null;players={};playerName=(name||'Crawler').replace(/[^\w -]/g,'').slice(0,16)||'Crawler';
    return new Promise((resolve,reject)=>{
     let settled=false;try{socket=new WebSocket(url)}catch(e){reject(e);return}const activeSocket=socket;
     const timeout=setTimeout(()=>{if(!settled){settled=true;activeSocket.close();reject(new Error('Connection timed out.'))}},9000);
