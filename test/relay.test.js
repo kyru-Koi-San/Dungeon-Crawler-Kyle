@@ -40,8 +40,17 @@ test('persistent relay restart restores world and completed trade receipts',{tim
  a.send({type:'trade_offer',id,token:ta,offer:oa});await a.next('trade_state',m=>m.trade.version===1);
  b.send({type:'trade_offer',id,token:tb,offer:ob});await a.next('trade_state',m=>m.trade.version===2);
  a.send({type:'trade_accept',id,version:2});b.send({type:'trade_accept',id,version:2});assert.deepEqual((await a.next('trade_end')).received,ob);
+ const delivery='d'.repeat(32),roundId='e'.repeat(32);
+ a.send({type:'loot_bundle',target:bid,delivery,items:{gold:35,tonic:2}});
+ await a.next('loot_stored');assert.equal((await b.next('loot_bundle')).items.gold,35);
+ a.send({type:'round_result',target:bid,roundId,turn:2,damage:17,mana:-6,heal:0});
+ await a.next('round_stored');assert.equal((await b.next('round_result')).damage,17);
+ // Kill the relay before the guest acknowledges either durable delivery.
  const done=new Promise(r=>child.once('exit',r));child.kill('SIGKILL');await done;await start();
  const c=await peer(url,t);await c.next('hello');c.send({type:'resume_room',code:ra.code,token:rb.resumeToken});assert.equal((await c.next('room_joined')).host,aid);assert.equal((await c.next('world_snapshot')).world.floor,8);await c.next('host_paused');
+ const replayLoot=await c.next('loot_bundle');assert.equal(replayLoot.delivery,delivery);assert.deepEqual(replayLoot.items,{gold:35,tonic:2});
+ const replayRound=await c.next('round_result');assert.equal(replayRound.roundId,roundId);assert.equal(replayRound.turn,2);assert.equal(replayRound.damage,17);
+ c.send({type:'loot_ack',delivery});c.send({type:'round_ack',roundId,turn:2});
  c.send({type:'trade_recover',id,token:tb});assert.deepEqual((await c.next('trade_end')).received,oa);
  const d=await peer(url,t);await d.next('hello');d.send({type:'resume_room',code:ra.code,token:ra.resumeToken});assert.equal((await d.next('room_joined')).resumed,true);await c.next('host_resumed');
 });
