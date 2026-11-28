@@ -1944,7 +1944,7 @@ function drawHero(x,y){drawCrawlerFollowers(x,y);
   const now=performance.now(),px=x*TILE+16,ground=y*TILE+27;
   const p=step?Math.min(1,Math.max(0,(now-step.start)/step.duration)):0;
   const phase=step?((stepCount-1+p)*.5)%1:0;
-  const bob=step?Math.sin(p*Math.PI)*1.15:0;
+  const bob=step&&!ambientMotion.matches?Math.sin(p*Math.PI)*1.15:0;
 
   const dir=state.facing==='up'?'up':state.facing==='down'?'down':'side';
   ctx.fillStyle='#0008';ctx.beginPath();ctx.ellipse(px,ground,9,3,0,0,Math.PI*2);ctx.fill();
@@ -2106,12 +2106,12 @@ function drawEnemy(e){
   ctx.fillStyle='#0009';ctx.beginPath();ctx.ellipse(x,y,w*.26,rat?2:4,0,0,Math.PI*2);ctx.fill();
   ctx.save();ctx.translate(x+(state.x-e.x)*5*strike,y+(state.y-e.y)*5*strike);
   const progress=Math.max(0,Math.min(1,(now-m.start)/m.duration));
-  if(!rat)ctx.rotate(.065*Math.sign(m.x-m.fromX)*Math.sin(Math.PI*progress));
+  if(!rat&&!ambientMotion.matches)ctx.rotate(.065*Math.sign(m.x-m.fromX)*Math.sin(Math.PI*progress));
   if(rat)ctx.scale(m.facing,1);
   if(now-m.hit<120)ctx.globalAlpha=.55;
   ctx.filter=enemyArtFilter(e);
   const row=mobWalkRows.indexOf(base),frame=Math.floor(pose.phase*12+.5)%12,original=customEnemy(e,frame)||nativeFloorEnemy(e,frame);
-  if(e.hostileCrawler&&e.profile){ctx.filter='none';ctx.drawImage(crawlerPose('down',frame,e.profile,e.profile.gear),-12,-32,24,32)}else if(original){ctx.filter='none';ctx.drawImage(original,-w/2,-h+3,w,h)}else if(['flood-grub','mire-leprechaun','pack-llama'].includes(base)){
+  if(e.hostileCrawler&&e.profile){ctx.filter='none';const dx=m.x-m.fromX,dy=m.y-m.fromY,dir=Math.abs(dx)>Math.abs(dy)?'side':dy<0?'up':'down';ctx.save();if(dir==='side'&&dx<0)ctx.scale(-1,1);ctx.drawImage(crawlerPose(dir,progress<1?Math.floor(pose.phase*16)%16:0,e.profile,e.profile.gear),-12,-32,24,32);ctx.restore()}else if(original){ctx.filter='none';ctx.drawImage(original,-w/2,-h+3,w,h)}else if(['flood-grub','mire-leprechaun','pack-llama'].includes(base)){
     const wave=Math.sin(pose.phase*2*Math.PI);ctx.scale(m.facing*(1+.055*wave),1-.05*wave);
     spriteDraw(base,0,-2-Math.abs(wave)*1.5,base==='flood-grub'?27:30,base==='flood-grub'?23:32);
   }else if(row>=0&&mobWalkAtlas.complete&&mobWalkAtlas.naturalWidth){
