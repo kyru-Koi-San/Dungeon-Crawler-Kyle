@@ -2579,8 +2579,8 @@ function backpack(){
     $$('[data-choice]').forEach(b=>b.onclick=()=>inspectOwned(choices[Number(b.dataset.choice)]));
   });
   if(bagSection==='skills'){
-    $('[data-subclass]').forEach(b=>b.onclick=()=>chooseSubclass(Number(b.dataset.subclass)));
-    $('[data-racial]').forEach(b=>b.onclick=()=>trainRace(Number(b.dataset.racial)));
+    $$('[data-subclass]').forEach(b=>b.onclick=()=>chooseSubclass(Number(b.dataset.subclass)));
+    $$('[data-racial]').forEach(b=>b.onclick=()=>trainRace(Number(b.dataset.racial)));
     for(const limb of $$('[data-path]'))limb.ontoggle=()=>{if(!limb.isConnected)return;if(limb.open)openPaths.add(limb.dataset.path);else openPaths.delete(limb.dataset.path)};
     for(const b of $$('[data-prepare]'))b.onclick=()=>{
       const id=b.dataset.prepare,ready=prepared();if(!learned(id))return;
