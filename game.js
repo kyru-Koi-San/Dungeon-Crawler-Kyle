@@ -1563,7 +1563,10 @@ const rewardCatalog=[
 function rankedModifiers(base,rank){return Object.fromEntries(Object.entries(base.mods||{}).map(([key,n])=>[key,n>0?n+(rank-1)*(base.slot==='armor'||base.slot==='weapon'?2:1):n]))}
 function rollReward(tier){
   const pool=rewardCatalog.filter(i=>!['cage-cleaver','relay-maul','warden-plate','mirror-ward','cinder-seal'].includes(i.id)||['Gold','Legendary','Celestial'].includes(tier));
-  const item=pool[Math.floor(Math.random()*pool.length)];
+  // Premium boxes favor equipment for empty slots, without changing the reward rank.
+  const missing=pool.filter(i=>i.slot&&!state.equipment?.[i.slot]&&!state.inventory.some(owned=>owned.slot===i.slot&&owned.qty>0));
+  const choices=['Gold','Legendary','Celestial'].includes(tier)&&missing.length&&Math.random()<.65?missing:pool;
+  const item=choices[Math.floor(Math.random()*choices.length)];
   const rank=({Bronze:1,Silver:2,Gold:3,Legendary:4,Celestial:5})[tier]||1;
   const mods=rankedModifiers(item,rank);
   const label={power:'power',armor:'armor',spellBonus:'spell damage'};
