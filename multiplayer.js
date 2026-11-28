@@ -26,9 +26,9 @@
    return new Promise((resolve,reject)=>{
     let settled=false;try{socket=new WebSocket(url)}catch(e){reject(e);return}const activeSocket=socket;
     const timeout=setTimeout(()=>{if(!settled){settled=true;activeSocket.close();reject(new Error('Connection timed out.'))}},9000);
-    activeSocket.addEventListener('open',()=>{if(socket!==activeSocket)return;settled=true;clearTimeout(timeout);if(!recovery)emit('status',{text:'CONNECTED — SOLO / PARTY READY'});resolve()},{once:true});
-    activeSocket.addEventListener('error',()=>{if(socket!==activeSocket)return;if(!settled){settled=true;clearTimeout(timeout);reject(new Error('Could not reach the relay. Check the URL and hosting status.'))}else emit('error',{message:'Connection error.'})});
-    activeSocket.addEventListener('close',()=>{if(socket!==activeSocket)return;if(!settled){settled=true;clearTimeout(timeout);reject(Error('Connection closed.'))}roomCode=null;players={};if(resumeCode&&resumeToken){retry();emit('status',{text:'RECONNECTING TO PARTY'})}else emit('status',{text:'DISCONNECTED — SOLO MODE'});emit('players',{players:{}});if(pendingRoom){pendingRoom.reject(new Error('Connection closed.'));pendingRoom=null}});
+    activeSocket.addEventListener('open',()=>{if(socket!==activeSocket){if(!settled){settled=true;clearTimeout(timeout);reject(Error('Connection replaced.'))}return}settled=true;clearTimeout(timeout);if(!recovery)emit('status',{text:'CONNECTED — SOLO / PARTY READY'});resolve()},{once:true});
+    activeSocket.addEventListener('error',()=>{if(socket!==activeSocket){if(!settled){settled=true;clearTimeout(timeout);reject(Error('Connection replaced.'))}return}if(!settled){settled=true;clearTimeout(timeout);reject(new Error('Could not reach the relay. Check the URL and hosting status.'))}else emit('error',{message:'Connection error.'})});
+    activeSocket.addEventListener('close',()=>{if(socket!==activeSocket){if(!settled){settled=true;clearTimeout(timeout);reject(Error('Connection replaced.'))}return}if(!settled){settled=true;clearTimeout(timeout);reject(Error('Connection closed.'))}roomCode=null;players={};if(resumeCode&&resumeToken){retry();emit('status',{text:'RECONNECTING TO PARTY'})}else emit('status',{text:'DISCONNECTED — SOLO MODE'});emit('players',{players:{}});if(pendingRoom){pendingRoom.reject(new Error('Connection closed.'));pendingRoom=null}});
     activeSocket.addEventListener('message',ev=>{if(socket!==activeSocket)return;let m;try{m=JSON.parse(ev.data)}catch{return}
      if(m.type==='hello'){clientId=m.id;return}
      if(m.type==='resume_failed'){if(retrying){retry();return}emit('error',{message:'Party recovery unavailable.'});return}
@@ -36,7 +36,7 @@
      if(m.type==='host_resumed'){hostPaused=false;emit('status',{text:'HOST RECONNECTED',code:roomCode});return}
      if(m.type==='room_ended'){stopRetry();finishResume(Error('Party ended.'));roomCode=resumeCode=resumeToken=null;storeResume();hostPaused=false;players={};emit('players',{players:{}});emit('status',{text:'PARTY ENDED — SOLO MODE'});return}
      if(m.type==='room_joined'){stopRetry();hostPaused=false;resumeCode=m.code;resumeToken=m.resumeToken||null;storeResume();roomCode=m.code;hostId=m.host;revision=0;players=m.players||{};emit('room',{code:roomCode,resumed:!!m.resumed});emit('players',{players:remoteOnly()});emit('status',{text:'IN PRIVATE PARTY',code:roomCode});finishResume();if(pendingRoom){pendingRoom.resolve(roomCode);pendingRoom=null}return}
-     if(m.type==='host_changed'){hostId=m.host;emit('host',{isHost:api.isHost});return}
+     if(m.type==='host_changed'){hostPaused=false;hostId=m.host;emit('host',{isHost:api.isHost});return}
      if(m.type==='world_snapshot'){if(m.revision>revision){revision=m.revision;emit('world',{world:m.world})}return}
      if(m.type==='round_stored'){emit('round_stored',{key:m.key});return}
      if(m.type==='round_result'){emit('round_result',{roundId:m.roundId,turn:m.turn,damage:m.damage,mana:m.mana,heal:m.heal});return}
