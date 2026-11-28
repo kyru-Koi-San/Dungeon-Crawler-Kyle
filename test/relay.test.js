@@ -45,3 +45,27 @@ test('persistent relay restart restores world and completed trade receipts',{tim
  c.send({type:'trade_recover',id,token:tb});assert.deepEqual((await c.next('trade_end')).received,oa);
  const d=await peer(url,t);await d.next('hello');d.send({type:'resume_room',code:ra.code,token:ra.resumeToken});assert.equal((await d.next('room_joined')).resumed,true);await c.next('host_resumed');
 });
+
+test('four-player capacity and host-only world synchronization',{timeout:30000},async t=>{
+ const p=await port(),url='ws://127.0.0.1:'+p;
+ const child=spawn(process.execPath,['relay.js'],{env:{...process.env,PORT:String(p),ALLOWED_ORIGIN:'',DCK_STORAGE_FILE:''},stdio:['ignore','pipe','pipe']});
+ t.after(()=>child.kill());
+ await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('relay startup timeout')),5000);child.stdout.on('data',d=>{if(String(d).includes('listening')){clearTimeout(timer);resolve()}});child.once('exit',()=>{clearTimeout(timer);reject(Error('relay exited'))})});
+ const host=await peer(url,t);await host.next('hello');
+ host.send({type:'create_room',name:'Host'});const room=await host.next('room_joined');
+ const guests=[];
+ for(let i=0;i<3;i++){const g=await peer(url,t);await g.next('hello');g.send({type:'join_room',code:room.code,name:'Guest'+i});await g.next('room_joined');guests.push(g)}
+ const extra=await peer(url,t);await extra.next('hello');extra.send({type:'join_room',code:room.code,name:'Extra'});await extra.next('error',m=>m.message.includes('full'));
+ host.send({type:'world_snapshot',world:{floor:4,enemies:[]}});
+ for(const g of guests)assert.equal((await g.next('world_snapshot')).world.floor,4);
+ // Use an ordered player-state message as a barrier after the unauthorized snapshot.
+ guests[0].send({type:'world_snapshot',world:{floor:18,enemies:[]}});
+ guests[0].send({type:'player_state',player:{floor:4,x:15,y:9,hp:100,maxHp:100}});
+ await host.next('player_state',m=>m.player.floor===4);
+ host.send({type:'world_snapshot',world:{floor:5,enemies:[]}});
+ for(const g of guests)assert.equal((await g.next('world_snapshot')).world.floor,5);
+ guests[2].send({type:'leave_room'});
+ await host.next('player_left');
+ extra.send({type:'join_room',code:room.code,name:'Extra'});await extra.next('room_joined');
+ assert.equal((await extra.next('world_snapshot')).world.floor,5);
+});
