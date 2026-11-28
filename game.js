@@ -511,7 +511,8 @@ function advanceRowan(dt){
  if(!state.hall)return;const p=rowanPosition(),r=rowanWalk,h=state.hall;
  if(modalOpen()||state.dead)return;
  if(r.index!==r.next){r.progress=Math.min(1,r.progress+dt*2);if(r.progress===1){r.index=r.next;r.progress=0;r.rest=1.1}return}
- if(Math.hypot(p.x-h.x,p.y-h.y)<=1.6){r.rest=.8;return}
+ if(Math.hypot(p.x-h.x,p.y-h.y)<=1.6){r.rest=.8;if(!step&&!r.greeted&&(!state.rowanIntroduced||personalMenusLocked()||(state.floor>=4&&!state.identityLocked))){r.greeted=true;guildMaster()}return}
+ r.greeted=false;
  r.rest-=dt;if(r.rest>0)return;
  const next=(r.index+1)%rowanRoute.length,[x,y]=rowanRoute[next];
  if((x===h.x&&y===h.y)||(step&&step.nx===x&&step.ny===y)){r.rest=.4;return}
@@ -544,13 +545,12 @@ function enterHall(q){
   state.x=q.x;state.y=q.y;state.facing='up';step=null;clearMovement();cameraX=null;
   visualX=6;visualY=7;
   if(!q.visitedGuild){q.visitedGuild=true;ridiculous('Even Cowards Need a Break')}
-  caption('Guild Master Rowan',personalMenusLocked()?'Welcome to the Seattle guild. Walk up the rug and tap Interact for your induction.':'Back under our roof. Come by the hearth if you want to review a guardian fight.',true);
-  persistCampaign();render();if(!state.rowanIntroduced||personalMenusLocked()||(state.floor>=4&&!state.identityLocked))guildMaster();
+  caption('Guild sanctuary','Approach Guild Master Rowan to speak with him.',true);
+  persistCampaign();render();
 }
 function leaveHall(){
-  if(state.floor>=4&&!state.identityLocked){guildIdentity();return}
-  if(personalMenusLocked()){
-    state.hall.x=6;state.hall.y=7;clearMovement();visualX=6;visualY=7;notify('Finish induction with Rowan before leaving.');return;
+  if(!state.rowanIntroduced||personalMenusLocked()||(state.floor>=4&&!state.identityLocked)){
+    state.hall.x=6;state.hall.y=7;clearMovement();visualX=6;visualY=7;notify('Approach Rowan and complete your registration before leaving.');return;
   }
   if(state.chapter==='descent'){state.chapter='mine';state.hall=null;generate();caption('The Underfloor AI','Broadcast live. Achievements and reward boxes are now active. Find the keeper and survive.',true);activateCrawlAwards();persistCampaign();return}
   const h=state.hall;state.x=h.returnX;state.y=h.returnY;state.hall=null;$('#objective').textContent='FIND THE STAIRS • SURVIVE';
