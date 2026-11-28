@@ -383,8 +383,8 @@ function useRelay(){
  if(effect==='time')state.collapseLeft+={3:45,8:60,15:75}[state.floor];
  if(effect==='heal'){state.wounds={};restoreHealth(35)}
  if(effect==='mana')state.mp=state.maxMp;
- if(effect==='map')for(let y=Math.max(0,r.y-13);y<Math.min(H,r.y+14);y++)for(let x=Math.max(0,r.x-13);x<Math.min(W,r.x+14);x++)seen[y][x]=true;
- if(['stairs','final'].includes(effect)){let y=tiles.findIndex(row=>row.includes(3));if(y>=0){let x=tiles[y].indexOf(3);seen[y][x]=true;r.exit={x,y}}}
+ if(effect==='map')for(let y=Math.max(0,r.y-13);y<Math.min(H,r.y+14);y++)for(let x=Math.max(0,r.x-13);x<Math.min(W,r.x+14);x++)markMapSeen(x,y);
+ if(['stairs','final'].includes(effect)){let y=tiles.findIndex(row=>row.includes(3));if(y>=0){let x=tiles[y].indexOf(3);markMapSeen(x,y);r.exit={x,y}}}
  if(['lure','final'].includes(effect))for(const e of local){e.den={x:r.x,y:r.y};e.lured=18}
  if(effect==='scatter')for(const e of local){e.avoid=20;e.pursuit=0}
  if(effect==='weaken')for(const e of local)e.hp=Math.max(1,Math.ceil(e.hp*.6));
@@ -553,7 +553,7 @@ function hallInteract(){
     if(id===3){const y=tiles.findIndex(row=>row.includes(3));if(y>=0)detail='A brass pin marks the stairs at X '+tiles[y].indexOf(3)+', Y '+y+'.'}
     if(q&&!q.discoveryRead){
       q.discoveryRead=true;
-      if(id===0){for(let y=Math.max(0,q.y-7);y<Math.min(H,q.y+8);y++)for(let x=Math.max(0,q.x-7);x<Math.min(W,q.x+8);x++)if(Math.hypot(x-q.x,y-q.y)<=7)seen[y][x]=true;detail='You copy the surrounding passages onto your map.'}
+      if(id===0){for(let y=Math.max(0,q.y-7);y<Math.min(H,q.y+8);y++)for(let x=Math.max(0,q.x-7);x<Math.min(W,q.x+8);x++)if(Math.hypot(x-q.x,y-q.y)<=7)markMapSeen(x,y);detail='You copy the surrounding passages onto your map.'}
       if(id===1){giveItem('food',1);detail='You take a trail ration from the cabinet.'}
       if(id===4){giveItem('tonic',1);detail='A labeled tonic goes into your pack.'}
       if(id===5){state.relay.pinned=true;detail='You pin the local field station to your map.'}
@@ -866,7 +866,7 @@ function investigate(selected){if(state.hall){hallInteract();return}
   const [name,line]=dens[p.art]||sights[p.art-6];
   if(p.art>=3&&p.art<=5&&state.floor>=2&&!partyGuest()&&!window.DCKNet?.inRoom&&hiddenBossSite(p)){revealLocalBoss(p);return}
   state.investigated??=[];if(!state.investigated.includes(p.y*W+p.x))state.investigated.push(p.y*W+p.x);
-  if(p.art>=6)for(let y=Math.max(0,p.y-7);y<Math.min(H,p.y+8);y++)for(let x=Math.max(0,p.x-7);x<Math.min(W,p.x+8);x++)if(Math.hypot(x-p.x,y-p.y)<=7)seen[y][x]=true;
+  if(p.art>=6)for(let y=Math.max(0,p.y-7);y<Math.min(H,p.y+8);y++)for(let x=Math.max(0,p.x-7);x<Math.min(W,p.x+8);x++)if(Math.hypot(x-p.x,y-p.y)<=7)markMapSeen(x,y);
   caption(name,line,true);persistCampaign();render();inspectItem({id:"discovery",art:p.art,name,desc:line});
 }
 
@@ -933,7 +933,7 @@ function discoveryMenu(d){
  $('#discoverLeave').onclick=closeModal;$('#discoverUse').onclick=()=>{if(d.used)return;d.used=true;closeModal();let message='';
  if(kind==='cache'){state.gold+=12+state.floor*4;giveItem('tonic',1);message='Recovered gold and a health potion.'}
  if(kind==='salvage'){state.gold+=20+state.floor*5;giveItem('torch',1);const cost=Math.min(Math.max(0,state.hp-1),Math.max(1,Math.floor(state.floor*.8)));state.hp-=cost;message='Recovered salvage. The casing struck you for '+cost+' damage.'}
- if(kind==='map'){for(let y=Math.max(0,d.y-9);y<Math.min(H,d.y+10);y++)for(let x=Math.max(0,d.x-9);x<Math.min(W,d.x+10);x++)if(Math.hypot(x-d.x,y-d.y)<=9)seen[y][x]=true;message='Nearby passages revealed.'}
+ if(kind==='map'){for(let y=Math.max(0,d.y-9);y<Math.min(H,d.y+10);y++)for(let x=Math.max(0,d.x-9);x<Math.min(W,d.x+10);x++)if(Math.hypot(x-d.x,y-d.y)<=9)markMapSeen(x,y);message='Nearby passages revealed.'}
  if(kind==='disable'){let count=0;for(const [key,h] of Object.entries(state.hazards||{}))if(Math.hypot(h.x-d.x,h.y-d.y)<=12){delete state.hazards[key];count++}message=count+' nearby hazards disabled.'}
  if(kind==='lore'){state.xp+=20+state.floor*8;checkLevel();message='Recovered ancient knowledge and experience.'}
  if(kind==='mana'){state.mp=Math.min(state.maxMp,state.mp+20+state.floor*2);message='Stored mana absorbed.'}
@@ -1109,7 +1109,8 @@ function spawnBoss(x,y){let brood=state.floor%9===6,phantom=state.floor%9===0,hp
 if(state.floor===12)Object.assign(b,{name:'The Cinder Inquisitor',sprite:'shaman'});if(state.floor===15)Object.assign(b,{name:'The Iron Magistrate',sprite:'bone-champion'});if(state.floor===FINAL_FLOOR)b.name='The Last Bellkeeper';
 const balance=guardianBalance(state.floor);Object.assign(b,{hp:balance.hp,max:balance.hp,atk:balance.atk,armor:balance.armor,xp:balance.xp,balanceVersion:1});entities.push(b);state.boss=entities.length-1;$('#bossbar').classList.add('hidden');$('#bossName').textContent=b.name;}
 function tile(x,y){return tiles[y]?.[x]??0}function solid(x,y){return !!state.scenery?.some(p=>p.art<3&&p.x===x&&p.y===y)||(tile(x,y)!==1&&tile(x,y)!==3)||!!(bossFight&&state.arena?.gates?.some(g=>g.x===x&&g.y===y))}
-function reveal(){if(state.hall)return;let rad=state.torchTurns>0?7:5;for(let y=Math.max(0,state.y-rad);y<=Math.min(H-1,state.y+rad);y++)for(let x=Math.max(0,state.x-rad);x<=Math.min(W-1,state.x+rad);x++)if(Math.hypot(x-state.x,y-state.y)<=rad)seen[y][x]=true}
+let mapRevealRevision=0;function markMapSeen(x,y){if(!seen[y][x]){seen[y][x]=true;mapRevealRevision++}}
+function reveal(){if(state.hall)return;let rad=state.torchTurns>0?7:5;for(let y=Math.max(0,state.y-rad);y<=Math.min(H-1,state.y+rad);y++)for(let x=Math.max(0,state.x-rad);x<=Math.min(W-1,state.x+rad);x++)if(Math.hypot(x-state.x,y-state.y)<=rad)markMapSeen(x,y)}
 function feed(s){let d=new Date(),tm=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});state.feed.unshift({tm,s});state.feed=state.feed.slice(0,30);renderFeed()}
 function ai(s){caption("Underfloor",s);$('#aiLine').textContent='“'+s+'”'}function notify(s){let t=$('#toast');t.textContent=s;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),1600)}
 function beep(f=180,d=.07,type='square'){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();let o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+d);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d)}catch(e){}}
@@ -2260,7 +2261,7 @@ if(state.chapter==='mine'){
  if(torch){const warm=ctx.createRadialGradient(sx,sy,0,sx,sy,radius*.72);warm.addColorStop(0,'rgba(255,175,72,.12)');warm.addColorStop(1,'rgba(255,175,72,0)');ctx.fillStyle=warm;ctx.fillRect(0,0,canvas.width,canvas.height)}
 }
 if(performance.now()-hurtAt<220){ctx.fillStyle='rgba(180,20,25,.15)';ctx.fillRect(0,0,canvas.width,canvas.height)}}
-let miniTerrain=null,miniTerrainKey='',miniSeen=null,miniPaintAt=0;
+let miniTerrain=null,miniTerrainKey='',miniSeen=null,miniPaintAt=0,miniTerrainRevision=-1;
 let miniDrawTime=-Infinity,miniDrawFloor=null,miniDrawSeen=null;
 function drawMini(){const stamp=performance.now(),floorKey=state.floor+'/'+(state.hall?.index??'field');if(miniDrawFloor===floorKey&&miniDrawSeen===seen&&stamp-miniDrawTime<120)return;miniDrawTime=stamp;miniDrawFloor=floorKey;miniDrawSeen=seen;if(state.hall){
 mini.fillStyle='#182222';mini.fillRect(0,0,240,180);mini.fillStyle='#725e48';mini.fillRect(24,25,188,128);
@@ -2270,7 +2271,7 @@ let m=$('#minimap'),w=m.width,h=m.height;let s=Math.min(w/W,h/H),ox=(w-W*s)/2,oy
 const arena=!!(bossFight?.e?.boss||(Array.isArray(state.guardianRecord)&&state.guardianRecord.some(r=>r.floor===state.floor))),key=[state.floor,W,H,w,h,arena].join('/');
 if(!miniTerrain||miniTerrainKey!==key||miniSeen!==seen){miniTerrain=document.createElement('canvas');miniTerrain.width=w;miniTerrain.height=h;miniTerrainKey=key;miniSeen=seen;miniPaintAt=0;}
 const now=performance.now();
-if(!miniPaintAt||now-miniPaintAt>=400){const c=miniTerrain.getContext('2d');c.fillStyle='#070b0f';c.fillRect(0,0,w,h);for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(!seen[y]?.[x])continue;c.fillStyle=arena&&inArena(x,y)&&tiles[y][x]===1?'#9d6549':tiles[y][x]===2?'#26323a':tiles[y][x]===3?'#d6a65a':'#655e50';c.fillRect(ox+x*s,oy+y*s,Math.ceil(s),Math.ceil(s))}miniPaintAt=now}
+if(!miniPaintAt||(miniTerrainRevision!==mapRevealRevision&&now-miniPaintAt>=120)||now-miniPaintAt>=5000){const c=miniTerrain.getContext('2d');c.fillStyle='#070b0f';c.fillRect(0,0,w,h);for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(!seen[y]?.[x])continue;c.fillStyle=arena&&inArena(x,y)&&tiles[y][x]===1?'#9d6549':tiles[y][x]===2?'#26323a':tiles[y][x]===3?'#d6a65a':'#655e50';c.fillRect(ox+x*s,oy+y*s,Math.ceil(s),Math.ceil(s))}miniPaintAt=now;miniTerrainRevision=mapRevealRevision}
 mini.drawImage(miniTerrain,0,0);for(let e of entities){if(!e.alive||!seen[e.y]?.[e.x])continue;mini.fillStyle=e.type==='loot'?'#d6a65a':'#e34e4b';mini.beginPath();mini.arc(ox+(e.x+.5)*s,oy+(e.y+.5)*s,2.6,0,Math.PI*2);mini.fill()}for(let e of entities){if(e.alive||e.type!=='enemy'||e.looted||!seen[e.y]?.[e.x])continue;mini.fillStyle='#eee';mini.fillRect(ox+(e.x+.3)*s,oy+(e.y+.3)*s,3,3)}for(let q of state.sanctuaries||[state.safe].filter(Boolean)){if(personalMenusLocked()||seen[q.y]?.[q.x]){mini.fillStyle='#71cfa2';mini.fillRect(ox+(q.x+.5)*s-2,oy+(q.y+.5)*s-2,4,4)}}for(const p of state.scenery||[]){if(!seen[p.y]?.[p.x])continue;mini.fillStyle=p.art<3?'#36363a':p.art<6?'#c58555':'#90d4ca';mini.fillRect(ox+p.x*s,oy+p.y*s,Math.ceil(s),Math.ceil(s))}
 for(const d of state.discoveries||[]){if(d.used||!seen[d.y]?.[d.x])continue;mini.fillStyle='#e4bf73';mini.fillRect(ox+(d.x+.5)*s-2,oy+(d.y+.5)*s-2,4,4)}
 if(state.relay?.pinned){mini.fillStyle='#83dcef';mini.fillRect(ox+state.relay.x*s-2,oy+state.relay.y*s-2,5,5)}
