@@ -530,7 +530,7 @@ function enterHall(q){
   visualX=6;visualY=7;
   if(!q.visitedGuild){q.visitedGuild=true;ridiculous('Even Cowards Need a Break')}
   caption('Guild Master Rowan',personalMenusLocked()?'Welcome to the Seattle guild. Walk up the rug and tap Interact for your induction.':'Back under our roof. Come by the hearth if you want to review a guardian fight.',true);
-  persistCampaign();render();if(personalMenusLocked()||(state.floor>=4&&!state.identityLocked))guildMaster();
+  persistCampaign();render();if(!state.rowanIntroduced||personalMenusLocked()||(state.floor>=4&&!state.identityLocked))guildMaster();
 }
 function leaveHall(){
   if(state.floor>=4&&!state.identityLocked){guildIdentity();return}
@@ -599,11 +599,25 @@ function ratMasterArt(){
  rowanArt=canvas;return canvas;
 }
 function rowanProfile(){return {skin:3,race:'Ratfolk',job:'Guild master',ratMaster:true,hair:'Crop',shirt:'Tunic',shirtColor:'#725b43',pants:'Trousers',pantsColor:'#383b47',shoes:'Boots',gear:{}}}
+function rowanIntroduction(page=0,review=false){
+ if(!state.hall)return;
+ const lines=[
+ 'My name is Rowan. Before I wore these robes, I was a crawler, just like you. I fought my way through twelve floors and thought I understood the dungeon. The thirteenth taught me otherwise.',
+ 'I reached floor thirteen, but I never made it past it. When I had nothing left, the dungeon offered me a deal: surrender my place in the crawl and serve as a guild master. I accepted. I am still here because of that bargain.',
+ 'I cannot win your battles for you, but I can teach you how to survive them. Learn from my mistakes, trust carefully, and never let the audience decide what your life is worth.'
+ ];
+ page=Math.max(0,Math.min(lines.length-1,page));
+ dialogueFrame('Guild Master Rowan',lines[page],rowanProfile(),[{label:page<2?'Continue listening':'Thank you, Rowan',run:()=>{
+ if(page<2){if(!review){state.rowanIntroPage=page+1;persistCampaign()}rowanIntroduction(page+1,review);return}
+ state.rowanIntroduced=true;delete state.rowanIntroPage;persistCampaign();guildMaster();
+ }}],'THE SURVIVOR · '+(page+1)+' / 3');
+}
 function guildMaster(){
   if(!state.hall)return;
+  if(!state.rowanIntroduced){rowanIntroduction(state.rowanIntroPage??0);return}
   if(state.floor>=4&&!state.identityLocked){dialogueFrame('Guild Master Rowan','Welcome to the Guild of Ascension. It is time to choose your permanent race and class.',rowanProfile(),[{label:'Begin identity registration',run:guildIdentity}],'GUILD OF ASCENSION');return}
   if(personalMenusLocked()){hallTutorial();return}
-  const choices=[{label:'Review defeated guardians',run:guildReview},{label:'Revisit the tutorial',run:()=>hallTutorial(0,true)},{label:'Guild services',run:()=>sanctuaryMenu(state.sanctuaries[state.hall.index])},{label:'Audience terminal',run:onAir},{label:'Field manual',run:fieldManual}];
+  const choices=[{label:'Tell me about floor thirteen',run:()=>rowanIntroduction(0,true)},{label:'Review defeated guardians',run:guildReview},{label:'Revisit the tutorial',run:()=>hallTutorial(0,true)},{label:'Guild services',run:()=>sanctuaryMenu(state.sanctuaries[state.hall.index])},{label:'Audience terminal',run:onAir},{label:'Field manual',run:fieldManual}];
   if(state.floor%6===0)choices.push({label:'City exchange',run:cityMarket});
   choices.push({label:'End conversation',run:closeModal});
   dialogueFrame('Guild Master Rowan','Take a seat by the hearth, crawler. What shall we go over?',rowanProfile(),choices,'SEATTLE CRAWLERS’ GUILD');
@@ -639,9 +653,9 @@ function drawHall(){
   g.save();g.translate((canvas.width-416*sx)/2,(canvas.height-320*sy)/2);g.scale(sx,sy);g.imageSmoothingEnabled=false;
   const backdrop=hallBackdrop(h);if(backdrop)g.drawImage(backdrop,0,0);else{g.fillStyle='#584638';g.fillRect(0,0,416,320)}
   const rp=rowanPosition(),rx=rp.x*32+16,ry=rp.y*32+29,bob=rp.moving&&!ambientMotion.matches?Math.sin(rowanWalk.progress*Math.PI*4)*1.5:0;
-  g.fillStyle='#0007';g.beginPath();g.ellipse(rx,ry,15,4,0,0,Math.PI*2);g.fill();
-  g.save();g.translate(rx,ry-bob);if(rp.dx<0)g.scale(-1,1);g.drawImage(ratMasterArt(),-24,-64,48,64);g.restore();
-  g.font='bold 11px monospace';g.textAlign='center';g.fillStyle='#161b1e';g.fillRect(rx-59,ry-79,118,14);g.fillStyle='#eed19a';g.fillText('Guild Master Rowan',rx,ry-69);
+  g.fillStyle='#0007';g.beginPath();g.ellipse(rx,ry,10,3,0,0,Math.PI*2);g.fill();
+  g.save();g.translate(rx,ry-bob);if(rp.dx<0)g.scale(-1,1);g.drawImage(ratMasterArt(),-15,-40,30,40);g.restore();
+  g.font='bold 11px monospace';g.textAlign='center';g.fillStyle='#161b1e';g.fillRect(rx-59,ry-55,118,14);g.fillStyle='#eed19a';g.fillText('Guild Master Rowan',rx,ry-45);
   g.font='bold 12px monospace';g.textAlign='center';g.fillStyle='#19212a';g.fillRect(91,265,234,16);g.fillStyle=hallStyles[hallTheme()].color;g.fillText(hallStyles[hallTheme()].name+' · '+state.floor+'-'+(h.index+1),208,277);
   drawHero(x,y);
   for(const ally of Object.values(netPlayers))if(ally.floor===state.floor&&ally.hall?.index===h.index)g.drawImage(crawlerPose('down',0,ally.character||{},ally.gear||{}),ally.hall.x*32+4,ally.hall.y*32-4,24,32);
